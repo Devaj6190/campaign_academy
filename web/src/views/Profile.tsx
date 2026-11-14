@@ -5,6 +5,7 @@ import { OPPONENTS, PROBLEMS, RECORD } from "@/lib/data";
 import { netPerDay, useGame } from "@/lib/store";
 import { cn, money, moneyK } from "@/lib/util";
 import { Dock, DockButton, Inspector, Label, Meter, Section } from "@/components/ui";
+import { ShaderBackground } from "@/components/ui21/dithering";
 
 export function Profile() {
   const s = useGame();
@@ -25,8 +26,8 @@ export function Profile() {
           <div className="mx-auto max-w-[800px]">
             <div className="grid grid-cols-[176px_1fr] items-end gap-9">
               <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-[#1b1b20] to-[#0c0c0e]">
-                <div className="absolute inset-x-0 bottom-0 h-2/3 bg-[radial-gradient(ellipse_at_50%_120%,rgba(255,255,255,0.12),transparent_62%)]" />
-                <span className="absolute inset-0 grid place-items-center font-serif text-[72px] text-white/15">AC</span>
+                <div className="absolute inset-0 opacity-45 [mask-image:linear-gradient(to_top,black,transparent_85%)]"><ShaderBackground /></div>
+                <span className="absolute inset-0 grid place-items-center font-serif text-[72px] text-white/70 mix-blend-overlay">AC</span>
                 <span className="absolute inset-x-0 bottom-3 text-center text-[10px] tracking-[0.12em] text-faint uppercase">Portrait</span>
               </div>
               <div className="pb-1">

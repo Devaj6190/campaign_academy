@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { FACTIONS, GAINS, LOSSES, QUIPS, STAFF, STRONG, WEAK, type Faction, type Flow, type Staff, type View } from "./data";
+import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
 import { DISTRICTS } from "./geo";
 import { hash } from "./util";
 
@@ -35,6 +36,7 @@ type State = {
   faction: string | null;
   person: string | null;
   logs: Record<string, Line[]>;
+  plans: Record<string, PlanTask[]>; // per direct report: tasks split into jobs for their people
   busy: Record<string, "down" | "up" | "work">;
   unread: Record<string, boolean>;
   overlay: Overlay;
@@ -65,6 +67,31 @@ export const netPerDay = net;
 
 const sent: Record<number, number> = {};
 for (const d of DISTRICTS) sent[d.cd] = STRONG.includes(d.cd) ? 62 + hash(d.cd) * 12 : WEAK.includes(d.cd) ? 22 + hash(d.cd) * 12 : 38 + hash(d.cd) * 18;
+
+// What each person does when their boss hands them a piece of work. Placeholder until the agents write their own plans.
+const JOBS: Record<string, [string, string]> = {
+  sch: ["Clear the calendar and book it", "Moves existing holds and confirms the slot with everyone involved."],
+  oq: ["Run canvass shifts in Queens", "Three shifts through the tenant networks, starting with the strongest blocks."],
+  ob: ["Recruit block captains in Brooklyn", "One captain per building before the weekend."],
+  vc: ["Staff the volunteer shifts", "Fills sign-ups and runs the door-knocking training."],
+  ct: ["Build the donor call sheet", "Top fifty names, ordered by how recently they gave."],
+  ev: ["Book the venue", "Finds a room that fills and keeps staging costs down."],
+  pr: ["Brief reporters", "Pitches the story to the three desks most likely to run it."],
+  dg: ["Send the email and social push", "Drafts, tests two subject lines and sends tonight."],
+};
+
+function planFor(staff: Staff[], id: string, title: string, statuses: PlanStatus[]): PlanTask {
+  const me = staff.find((p) => p.id === id)!;
+  const subs = staff.filter((p) => p.boss === id && p.name);
+  const jobs = subs.length
+    ? subs.map((p) => ({ id: p.id, title: JOBS[p.id]?.[0] ?? "Carry out their part", description: JOBS[p.id]?.[1] ?? "", assigned: [p.name!] }))
+    : [
+        { id: "a", title: "Draft the plan", description: "No staff under this post yet, so the director does it personally.", assigned: [me.name!] },
+        { id: "b", title: "Carry it out", description: "", assigned: [me.name!] },
+      ];
+  const subtasks = jobs.map((j, i) => ({ ...j, status: statuses[i % statuses.length] }));
+  return { id: `${id}-${uid++}`, title, status: subtasks.every((x) => x.status === "completed") ? "completed" : "in-progress", subtasks };
+}
 
 /** Sentiment for one district under the current filter. Simulated. */
 export const sentimentOf = (s: Pick<State, "sent" | "filter" | "factions">, cd: number) => {
@@ -101,6 +128,8 @@ export const useGame = create<State>((set, get) => ({
   faction: null,
   person: null,
   logs: {},
+  // Everyone starts mid-task, so the war room has work in flight on day one.
+  plans: Object.fromEntries(STAFF.filter((p) => !p.boss && p.name).map((p) => [p.id, [planFor(STAFF, p.id, p.doing!, ["completed", "in-progress", "pending"])]])),
   busy: {},
   unread: {},
   overlay: "paper",
@@ -152,23 +181,36 @@ export const useGame = create<State>((set, get) => ({
     const subs = get().staff.filter((x) => x.boss === id && x.name).map((x) => x.id);
     const first = (x: string) => get().staff.find((p) => p.id === x)!.name!.split(" ")[0];
 
+    // The director writes a plan, hands each job to one of their people, and the plan updates as they work.
+    const plan = planFor(get().staff, id, text, ["pending"]);
+    const step = (status: PlanStatus, done = false) =>
+      set((s) => ({
+        plans: { ...s.plans, [id]: (s.plans[id] ?? []).map((t) => (t.id === plan.id ? { ...t, status: done ? "completed" : t.status, subtasks: t.subtasks.map((x) => ({ ...x, status })) } : t)) },
+      }));
+
     say({ who: "me", text });
     mark([id], "down");
     setTimeout(() => {
       say({ who: "them", text: subs.length ? `On it. Splitting this across ${subs.map(first).join(", ")}.` : "On it." });
+      set((s) => ({ plans: { ...s.plans, [id]: [plan, ...(s.plans[id] ?? [])] } }));
       mark([id], "work");
       mark(subs, "down");
     }, 1200);
-    setTimeout(() => mark(subs, "work"), 2400);
+    setTimeout(() => {
+      mark(subs, "work");
+      step("in-progress");
+    }, 2400);
     setTimeout(() => mark(subs, "up"), 4200);
     setTimeout(() => {
       mark(subs);
       mark([id], "up");
+      step("completed");
     }, 5400);
     setTimeout(() => {
       const cd = STRONG[Math.floor(Math.random() * STRONG.length)];
       const where = DISTRICTS.find((d) => d.cd === cd)!.name;
       set((s) => ({ cash: s.cash - 2400, sent: { ...s.sent, [cd]: Math.min(95, s.sent[cd] + 4) } }));
+      step("completed", true);
       say({ who: "them", text: `Done. Spent $2,400. Support is up in ${where}. I could do more with another $3k.` });
       say({ who: "note", text: `Placeholder reply. ${me.name!.split(" ")[0]} becomes a real agent here.` });
       mark([id]);

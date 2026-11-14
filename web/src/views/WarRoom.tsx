@@ -4,6 +4,8 @@ import { ArrowUp, FlaskConical, MessageSquare, Plus, Shuffle, UserMinus, UserPlu
 import { useEffect, useRef, useState } from "react";
 import { Fit } from "@/components/Fit";
 import { Avatar, Button, Dock, DockButton, Label, Section, ViewHeader } from "@/components/ui";
+import { AgentPlan } from "@/components/ui21/agent-plan";
+import { ShaderBackground } from "@/components/ui21/dithering";
 import type { Staff } from "@/lib/data";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
@@ -37,7 +39,9 @@ export function WarRoom() {
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader title="War room" sub="You direct. Your reports plan the work and hand it to their people." />
         <div className="relative min-h-0 flex-1 px-6 pb-24" onClick={() => pick(null)}>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_55%_at_50%_0%,rgba(255,255,255,0.06),transparent)]" />
+          <div className="pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-screen [mask-image:radial-gradient(ellipse_65%_60%_at_50%_0%,black,transparent)]">
+            <ShaderBackground />
+          </div>
           <Fit w={W} h={H}>
             <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 overflow-visible" aria-hidden>
               {staff.map((p) => {
@@ -147,6 +151,7 @@ const Status = ({ on }: { on: boolean }) => (
 
 function Person({ p }: { p: Staff }) {
   const log = useGame((s) => s.logs[p.id]);
+  const plan = useGame((s) => s.plans[p.id]);
   const busy = useGame((s) => !!s.busy[p.id]);
   const boss = useGame((s) => s.staff.find((x) => x.id === p.boss));
   const instruct = useGame((s) => s.instruct);
@@ -175,6 +180,11 @@ function Person({ p }: { p: Staff }) {
             ))}
           </dl>
         </Section>
+        {!!plan?.length && (
+          <Section title="Plan" right={<span className="text-[10.5px] text-faint">Click a job for detail</span>}>
+            <AgentPlan tasks={plan} />
+          </Section>
+        )}
         <Section title="Conversation">
           {!log?.length && <p className="text-[12.5px] text-faint">Nothing yet. Tell {first} what you need.</p>}
           <div className="space-y-2">

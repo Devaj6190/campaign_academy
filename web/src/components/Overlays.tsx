@@ -7,6 +7,7 @@ import { DISTRICTS } from "@/lib/geo";
 import { useGame, type Draft } from "@/lib/store";
 import { cn, hash } from "@/lib/util";
 import { Avatar, Button, Dialog, Label, Meter, Tag } from "./ui";
+import { ShaderBackground } from "./ui21/dithering";
 
 export function Overlays() {
   const overlay = useGame((s) => s.overlay);
@@ -221,9 +222,10 @@ function Election() {
   const won = cole > hale;
   const rows: [string, number, string][] = [["Adrian Cole", cole, "var(--color-warm)"], ["Victoria Hale", hale, "rgb(255 255 255 / .45)"], ["Naomi Brandt", brandt, "rgb(255 255 255 / .22)"]];
   return (
-    <div className="p-8">
-      <Label>Election night · polls closed</Label>
-      <h2 className="mt-3 font-serif text-[56px] leading-none tracking-tight">{won ? "Cole wins." : "Cole concedes."}</h2>
+    <div className="relative p-8">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-44 opacity-30 [mask-image:linear-gradient(black,transparent)]"><ShaderBackground /></div>
+      <Label className="relative">Election night · polls closed</Label>
+      <h2 className="relative mt-3 font-serif text-[56px] leading-none tracking-tight">{won ? "Cole wins." : "Cole concedes."}</h2>
       <div className="mt-8 space-y-4">
         {rows.map(([n, v, c], i) => (
           <div key={n}>

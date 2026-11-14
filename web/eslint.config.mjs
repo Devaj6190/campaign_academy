@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored third-party shader, kept as published.
+    "src/components/ui21/dithering.tsx",
   ]),
 ]);
 
