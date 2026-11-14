@@ -189,12 +189,11 @@ export const useGame = create<State>((set, get) => ({
     })),
 
   runTactic: () => {
-    const back = Math.random() < 0.78;
+    const back = Math.random() < 0.55;
     set((s) => ({
       cash: s.cash - 8000,
       tacticResult: back ? "backfired" : "worked",
       factions: s.factions.map((f) => (f.id === "seniors" ? { ...f, feel: f.feel + (back ? -6 : 3) } : f)),
-      staff: back ? s.staff.map((p) => (p.id === "pr" ? { id: p.id, boss: p.boss, role: p.role } : p)) : s.staff,
     }));
   },
 

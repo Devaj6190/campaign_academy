@@ -18,7 +18,7 @@ This document is the idea hub. It holds the idea and nothing else: no research, 
 | **Length** | 30 in-game days, each on a running clock |
 | **What you do** | Direct staff, act on the map, spend and raise money, build a manifesto |
 | **How it ends** | Election night: you win or lose the race |
-| **What you learn** | How a campaign and policymaking actually work, and that running is possible |
+| **What you learn** | How to delegate, budget, read what different groups of voters want and weigh policy trade-offs, and that running is possible |
 
 **Design references**
 
@@ -92,7 +92,7 @@ One of the four main views, alongside the war room, the map and factions. It is 
 │  ┌──────────────┐   ADRIAN COLE                                      │
 │  │              │   Council Member, Queens · running for Mayor       │
 │  │   portrait   │                                                    │
-│  │              │   Ideology    Pragmatic centre-left                │
+│  │              │   Runs on     Housing and transit                  │
 │  │              │   Polling     31%  (2nd of 3)   ▲ 1 this week      │
 │  │              │   Days left   30                                   │
 │  └──────────────┘   Cash        $412,000                             │
@@ -345,7 +345,7 @@ Click a circle to read about that faction:
 - **Read-only.** Unlike Frostpunk, you cannot change a faction from this screen. You read it, then use what you learned to write better policy and choose better actions.
 - Circle colour can show how the faction currently feels about you.
 
-Factions are groups of people defined by interest, identity or ideology, for example renters, homeowners, union members, immigrant communities, small-business owners, wealthy donors.
+Factions are groups of people defined by interest or identity, for example renters, homeowners, union members, immigrant communities, small-business owners, wealthy donors.
 
 ---
 
@@ -381,24 +381,25 @@ flowchart LR
 **Politics**
 
 - **No real people.** Every candidate, staffer and journalist is fictional.
-- **Real ideologies.** Left, right, and named ideologies such as socialism or conservatism appear as labels on candidates and factions.
-- **No side is favoured.** The same rules apply whatever your candidate believes.
+- **No party or ideology labels.** Candidates and factions are described by where they stand on local issues such as housing, transit, safety and small business, never as left or right.
+- **No side is favoured.** The same rules apply whatever your candidate stands for.
 
 **Tactics and risk**
 
-- Honest tactics and deceptive tactics are both available.
-- Deceptive tactics can pay off.
-- Each one shows a **risk factor before you commit**, and that number decides whether it backfires.
-- A backfire is public: it reaches the newspaper, moves factions against you, and can cost staff.
+- Some moves are safe and slow. Others are bold: going negative with an accurate contrast ad, a large ad buy, staking the week on one endorsement.
+- Nothing dishonest is on offer. The game never rewards deceiving voters.
+- Each bold move shows a **risk factor before you commit**, and that number decides whether it backfires.
+- A backfire is public: it reaches the newspaper, moves factions against you, and can cost you volunteers or money.
 
 ```
 ┌────────────────────────────────────────────────────┐
-│  MISLEADING MAILER ON HALE'S TAX RECORD            │
+│  CONTRAST AD ON HALE'S COUNCIL ATTENDANCE          │
+│  Accurate, but negative                            │
 │  Cost $8,000          Could gain  +3 with seniors  │
-│  Risk of backfire  ████████░░  78%                 │
-│  If exposed: front-page story, −6 with seniors,    │
-│  Press Secretary may resign                        │
-│                       [ Do it ]   [ Don't ]        │
+│  Risk of backlash  █████░░░░░  55%                 │
+│  If it reads as an attack: −6 with seniors,        │
+│  volunteers cancel shifts                          │
+│                       [ Run it ]   [ Hold off ]    │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -416,7 +417,7 @@ The one hand-made candidate in the first build. Fictional.
 
 - Two-term City Council member from western Queens, running for Mayor.
 - Son of a bus mechanic and a school aide; former tenant organiser, then a small-business loan officer.
-- **Ideology:** pragmatic centre-left. Progressive on housing and transit, moderate on public safety, friendly to small business.
+- **Stands for:** more housing near transit, better buses, level police funding, and help for small business.
 - **Why him:** he is cross-pressured. Nobody is fully happy with him, so every choice has a visible cost.
 
 **His record**
@@ -425,17 +426,17 @@ The one hand-made candidate in the first build. Fictional.
 |---|---|---|
 | Voted for new housing near subway stations | Renters, students | Low-density homeowners |
 | Wrote small-business rent relief | Small-business owners, immigrant communities | Real-estate donors |
-| Voted against cutting the police budget | Seniors, public-safety voters | Young progressives |
+| Voted against cutting the police budget | Seniors, public-safety voters | Young activists |
 | Backed bus lane expansion | Transit riders | Drivers, some merchants |
 | Took union endorsements, skipped a strike picket | Nobody fully | Union members are lukewarm |
 
 **The race on day 1**
 
-| Candidate | Ideology | Poll | Strength |
+| Candidate | Runs on | Poll | Strength |
 |---|---|---|---|
-| Victoria Hale | Centre-right, law-and-order, pro-business | 38% | Money, homeowners, Staten Island |
-| **Adrian Cole** | Pragmatic centre-left | 31% | Renters, western Queens |
-| Naomi Brandt | Democratic socialist insurgent | 14% | Young progressives, students |
+| Victoria Hale | Public safety and business | 38% | Money, homeowners, Staten Island |
+| **Adrian Cole** | Housing, transit and small business | 31% | Renters, western Queens |
+| Naomi Brandt | Rent and police reform | 14% | Young activists, students |
 | Undecided | | 17% | |
 
 **The map on day 1**
@@ -455,7 +456,7 @@ The one hand-made candidate in the first build. Fictional.
 | Seniors | Large | Mixed | Like the police vote, distrust change |
 | Union members | Medium | Lukewarm | Missed the picket |
 | Small-business owners | Medium | Warm | Rent relief |
-| Young progressives | Medium | Cool | Police vote; prefer Brandt |
+| Young activists | Medium | Cool | Police vote; prefer Brandt |
 | Wealthy donors and real estate | Small, rich | Cold | Prefer Hale |
 | Students | Small | Mixed | Split with Brandt |
 
@@ -487,7 +488,7 @@ The player's first job is to take this to five.
 
 **Opening problems for the player**
 
-- Brandt is taking the left; Hale is taking the centre. Which do you chase?
+- Brandt is pulling young activists and students; Hale holds homeowners and seniors. Which do you chase?
 - Money runs out before day 30 at the current burn.
 - No organizer in the Bronx, the biggest open area.
 - Unions have not endorsed.
@@ -500,6 +501,5 @@ The player's first job is to take this to five.
 - How fine the map is: the 59 community districts, or the smaller neighbourhood areas inside them.
 - How many speed steps the clock has.
 - Whether opponents act on their own each day or only through newspaper events.
-- Whether parties are named or candidates carry ideology labels only.
 - How long one in-game day lasts in real time.
 - The final name.

@@ -1,4 +1,5 @@
-// Seed content for the one hand-made candidate. All of it is fiction; only the map data (nyc.json) is real.
+// Seed content for the one hand-made candidate. People and groups are described by local issues, never by party or ideology.
+// All of it is fiction; only the map data (nyc.json) is real.
 
 export type View = "profile" | "war" | "map" | "factions";
 
@@ -20,7 +21,7 @@ export const FACTIONS: Faction[] = [
   { id: "seniors", name: "Seniors", size: 70, feel: 48, about: "The most dependable voters in the city. Cautious about change, attentive to safety and services.", values: ["Safety", "Healthcare access", "Stability"], dislikes: ["Disorder", "Sudden change"] },
   { id: "unions", name: "Union members", size: 56, feel: 46, about: "Municipal workers, building trades, transit and service workers. Organised, and they remember who showed up.", values: ["Contracts honoured", "Good public jobs", "Showing up"], dislikes: ["Outsourcing", "Fair-weather allies"] },
   { id: "smallbiz", name: "Small business", size: 50, feel: 62, about: "Shop, restaurant and service owners working on thin margins and high rents.", values: ["Affordable commercial rent", "Less red tape"], dislikes: ["Fines", "Street changes without consultation"] },
-  { id: "progressives", name: "Young progressives", size: 46, feel: 38, about: "Activist, online and energetic. They supply volunteers when they believe, and criticism when they do not.", values: ["Bold housing and climate action", "Police accountability"], dislikes: ["Compromise sold as victory", "The police budget vote"] },
+  { id: "progressives", name: "Young activists", size: 46, feel: 38, about: "Activist, online and energetic. They supply volunteers when they believe, and criticism when they do not.", values: ["Bold housing and climate action", "Police accountability"], dislikes: ["Compromise sold as victory", "The police budget vote"] },
   { id: "donors", name: "Donors & real estate", size: 26, feel: 24, about: "Few in number, large in money. They fund campaigns and expect a hearing.", values: ["Predictability", "Development rights"], dislikes: ["Rent regulation", "Surprises"] },
   { id: "students", name: "Students", size: 24, feel: 50, about: "Low turnout, high energy. Many are deciding between you and Brandt.", values: ["Affordable housing and transit", "Being taken seriously"], dislikes: ["Being treated as free labour"] },
 ];
@@ -49,7 +50,7 @@ export const STAFF: Staff[] = [
   { id: "ox", boss: "fd", role: "Organizer, Bronx" },
   { id: "ct", boss: "fin", name: "Tom Avery", role: "Call-time Manager", good: "Persistence", weak: "Blunt", doing: "Building today's call sheet" },
   { id: "ev", boss: "fin", name: "Nina Shah", role: "Events Lead", good: "Rooms that fill", weak: "Costs run over", doing: "Astoria house party" },
-  { id: "pr", boss: "com", name: "Jo Park", role: "Press Secretary", good: "Reporters trust her", weak: "Will quit over dishonesty", doing: "Pitching the housing story" },
+  { id: "pr", boss: "com", name: "Jo Park", role: "Press Secretary", good: "Reporters trust her", weak: "Uneasy with negative campaigning", doing: "Pitching the housing story" },
   { id: "dg", boss: "com", name: "Eli Stone", role: "Digital Lead", good: "Small-dollar email", weak: "Edgy tone", doing: "Drafting tonight's email" },
 ];
 
@@ -71,18 +72,18 @@ export const GAINS: Flow[] = [
 export const RECORD: { ok: boolean; text: string; liked: string; not: string }[] = [
   { ok: true, text: "Voted for housing near subway stations", liked: "Renters, students", not: "Homeowners" },
   { ok: true, text: "Wrote small-business rent relief", liked: "Small business, immigrant communities", not: "Real-estate donors" },
-  { ok: false, text: "Voted against cutting the police budget", liked: "Seniors", not: "Young progressives" },
+  { ok: false, text: "Voted against cutting the police budget", liked: "Seniors", not: "Young activists" },
   { ok: true, text: "Backed bus lane expansion", liked: "Transit riders", not: "Drivers, some merchants" },
   { ok: false, text: "Took union endorsements, skipped a picket", liked: "Nobody fully", not: "Union members" },
 ];
 
 export const OPPONENTS = [
-  { id: "hale", name: "Victoria Hale", tag: "Centre-right · law and order", note: "Money, homeowners, Staten Island." },
-  { id: "brandt", name: "Naomi Brandt", tag: "Democratic socialist insurgent", note: "Young progressives and students." },
+  { id: "hale", name: "Victoria Hale", tag: "Runs on public safety and business", note: "Money, homeowners, Staten Island." },
+  { id: "brandt", name: "Naomi Brandt", tag: "Runs on rent and police reform", note: "Young activists and students." },
 ] as const;
 
 export const PROBLEMS = [
-  "Brandt is taking the left; Hale is taking the centre.",
+  "Brandt is pulling young activists and students; Hale holds homeowners and seniors.",
   "At the current burn, the money runs out before day 30.",
   "No organizer in the Bronx, the biggest open area.",
   "The unions have not endorsed.",

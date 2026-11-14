@@ -180,7 +180,7 @@ function Calendar() {
   );
 }
 
-// A deceptive tactic can pay off. The risk is shown before you commit, and it decides whether it backfires.
+// Bold moves are honest but risky. The risk is shown before you commit, and it decides whether the move backfires.
 function Tactic({ close }: { close: () => void }) {
   const run = useGame((s) => s.runTactic);
   const result = useGame((s) => s.tacticResult);
@@ -188,27 +188,28 @@ function Tactic({ close }: { close: () => void }) {
     return (
       <div className="p-7">
         <Label className={result === "backfired" ? "text-neg" : "text-pos"}>{result === "backfired" ? "It backfired" : "It worked, this time"}</Label>
-        <h2 className="mt-2 font-serif text-[30px] leading-tight tracking-tight">{result === "backfired" ? "The Ledger traced the mailer to you" : "Nobody has traced it yet"}</h2>
-        <p className="mt-3 text-[13px] leading-relaxed text-soft">{result === "backfired" ? "Front-page story tomorrow. Seniors down 6. Jo Park has resigned as Press Secretary." : "Seniors up 3. The risk does not go away: it can still surface before election day."}</p>
+        <h2 className="mt-2 font-serif text-[30px] leading-tight tracking-tight">{result === "backfired" ? "Voters read it as an attack" : "The contrast landed"}</h2>
+        <p className="mt-3 text-[13px] leading-relaxed text-soft">{result === "backfired" ? "The Ledger calls it the first negative ad of the race. Seniors down 6, and two volunteer shifts have cancelled." : "Seniors up 3. Going negative a second time will carry more risk."}</p>
         <div className="mt-6 flex justify-end"><Button variant="primary" onClick={close}>Continue</Button></div>
       </div>
     );
   return (
     <div className="p-7">
       <div className="flex items-center gap-2.5"><Avatar name="Leo Santos" size={26} /><span className="text-[12.5px] text-muted">Leo Santos proposes</span></div>
-      <h2 className="mt-4 font-serif text-[30px] leading-[1.1] tracking-tight">A misleading mailer on Hale&apos;s tax record</h2>
+      <h2 className="mt-4 font-serif text-[30px] leading-[1.1] tracking-tight">A contrast ad on Hale&apos;s council attendance</h2>
+      <p className="mt-2 text-[13px] text-muted">Every claim in it is accurate. It is still a negative ad.</p>
       <dl className="mt-5 space-y-2 text-[13px]">
         <div className="flex justify-between"><dt className="text-muted">Cost</dt><dd className="tnum font-mono">$8,000</dd></div>
-        <div className="flex justify-between"><dt className="text-muted">If it works</dt><dd className="text-pos">+3 with seniors</dd></div>
-        <div className="flex justify-between"><dt className="text-muted">If exposed</dt><dd className="text-neg">−6 with seniors, a resignation</dd></div>
+        <div className="flex justify-between"><dt className="text-muted">If it lands</dt><dd className="text-pos">+3 with seniors</dd></div>
+        <div className="flex justify-between"><dt className="text-muted">If it reads as an attack</dt><dd className="text-neg">−6 with seniors, lost volunteers</dd></div>
       </dl>
       <div className="mt-5 rounded-xl border border-neg/25 bg-neg/[0.06] p-4">
-        <div className="flex items-baseline justify-between"><Label className="text-neg">Risk of backfire</Label><span className="tnum font-mono text-[20px] font-medium text-neg">78%</span></div>
-        <Meter value={78} color="var(--color-neg)" className="mt-2.5 h-1.5" />
+        <div className="flex items-baseline justify-between"><Label className="text-neg">Risk of backlash</Label><span className="tnum font-mono text-[20px] font-medium text-neg">55%</span></div>
+        <Meter value={55} color="var(--color-neg)" className="mt-2.5 h-1.5" />
       </div>
       <div className="mt-6 flex items-center gap-2">
-        <Button variant="primary" onClick={close}>Decline</Button>
-        <Button onClick={close}>Ask for an honest version</Button>
+        <Button variant="primary" onClick={close}>Hold off</Button>
+        <Button onClick={close}>Ask for a positive version</Button>
         <Button variant="ghost" className="ml-auto text-neg hover:text-neg" onClick={run}>Run it</Button>
       </div>
     </div>
