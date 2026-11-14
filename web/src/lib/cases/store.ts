@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { DISTRICTS, districtBy } from "../geo";
 import { CASES } from "./index";
 import { effectOf, simulate, type Case, type Decision, type Shift, type World } from "./types";
 
@@ -42,4 +43,41 @@ export function changeAt(c: Case, picks: Record<string, Pick>, d: Decision): Shi
     for (const [k, v] of Object.entries(s.groups ?? {})) out.groups[k] = (out.groups[k] ?? 0) + v;
   }
   return out;
+}
+
+/** The student's world right now: on arrival at the current step, plus the current decision if it has been made. */
+export function worldNow(): { c: Case; w: World } {
+  const { caseId, picks, step } = useCase.getState();
+  const c = currentCase(caseId);
+  const i = Math.min(Math.max(step - 1, 0), c.decisions.length);
+  const w = worldAt(c, picks, i);
+  const d = c.decisions[i];
+  if (!d || !picks[d.id]) return { c, w };
+  const ch = changeAt(c, picks, d);
+  const plus = (base: Record<string, number>, x?: Record<string, number>) => Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v + (x?.[k] ?? 0)]));
+  return { c, w: { budget: w.budget + (ch.budget ?? 0), poll: plus(w.poll, ch.poll), groups: plus(w.groups, ch.groups) } };
+}
+
+/**
+ * The student's support in one community district, in percent: each group's support weighted by the share of
+ * residents the census puts in that group there. Residents outside the tracked groups count at the citywide figure.
+ */
+export function supportIn(cd: number): number | null {
+  if (!districtBy(cd)?.demo) return null;
+  const { c, w } = worldNow();
+  const raw = (id: number) => {
+    const race = districtBy(id)!.demo!.race;
+    let sum = 0, covered = 0;
+    for (const g of c.groups) {
+      if (!g.census) continue;
+      sum += race[g.census] * (w.groups[g.id] ?? 0);
+      covered += race[g.census];
+    }
+    return (sum + Math.max(0, 100 - covered) * (w.poll[c.follow] ?? 0)) / Math.max(100, covered);
+  };
+  // Scale so the city as a whole, weighted by population, matches the student's citywide standing.
+  let total = 0, people = 0;
+  for (const d of DISTRICTS) if (d.demo && !d.park) { total += raw(d.cd) * d.demo.pop; people += d.demo.pop; }
+  const mean = people ? total / people : 0;
+  return Math.max(0, Math.min(100, raw(cd) * (mean ? (w.poll[c.follow] ?? mean) / mean : 1)));
 }

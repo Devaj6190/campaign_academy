@@ -77,7 +77,7 @@ export function MapCanvas({ onHover, onSelect }: { onHover: (t: { x: number; y: 
       if (d.park) continue;
       const g = world.filter === "all" ? null : groupsHere(d.cd).find((x) => x.id === world.filter);
       const op = g ? 0.25 + 0.5 * Math.min(1, g.rel / 1.6) : 0.6;
-      m.setFeatureState({ source: "districts", id: d.cd }, { v: sentimentOf(world, d.cd), op });
+      m.setFeatureState({ source: "districts", id: d.cd }, { v: sentimentOf(world, d.cd) * (world.filter === "all" ? 2 : 1), op });
     }
   };
 

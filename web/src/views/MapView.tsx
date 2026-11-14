@@ -48,7 +48,7 @@ export function MapView() {
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader
           title="New York City"
-          sub="59 community districts on the real street map. Colour shows how each one feels about Cole."
+          sub="59 community districts on the real street map. Colour shows how strong your campaign is in each one."
           right={
             <div className="flex shrink-0 items-center gap-5">
               <div className="hidden items-center gap-2 text-[11px] text-muted @[700px]:flex">
@@ -138,11 +138,11 @@ function CityPanel() {
         <p className="text-[12.5px] leading-relaxed text-muted">Click a district to fly in: see who lives there, what they complain about, how they voted in 2025, and what you can do there. Drag with right-click to tilt.</p>
         <div className="mt-3 space-y-2 text-[12px] text-soft">
           <div className="flex items-start gap-2"><Tag kind="real" /><span>Streets, boundaries, 311 complaints ({FETCHED}), census demographics and 2025 turnout.</span></div>
-          <div className="flex items-start gap-2"><Tag kind="sim" /><span>How each district feels about your candidate.</span></div>
+          <div className="flex items-start gap-2"><Tag kind="sim" /><span>Your support in each district: your standing with each voter group, placed by who lives there.</span></div>
         </div>
       </Section>
-      <Section title="Strongest districts" right={<Tag kind="sim" />}>{list(ranked.slice(0, 5))}</Section>
-      <Section title="Weakest districts" right={<Tag kind="sim" />}>{list(ranked.slice(-5).reverse())}</Section>
+      <Section title="Strongest districts">{list(ranked.slice(0, 5))}</Section>
+      <Section title="Weakest districts">{list(ranked.slice(-5).reverse())}</Section>
     </>
   );
 }
@@ -170,12 +170,12 @@ function DistrictPanel({ cd }: { cd: number }) {
       {d.park ? (
         <Section title="No voters"><p className="text-[12.5px] text-muted">Park or airport land. Nobody votes from here.</p></Section>
       ) : (
-        <Section title="Support for Cole" right={<Tag kind="sim" />}>
+        <Section title="Your support here">
           <div className="flex items-baseline gap-2">
-            <span className="tnum font-mono text-[30px] leading-none font-medium tracking-tight" style={{ color: tone(v) }}>{v}%</span>
+            <span className="tnum font-mono text-[30px] leading-none font-medium tracking-tight" style={{ color: tone(world.filter === "all" ? v * 2 : v) }}>{v}%</span>
             <span className="text-[12px] text-muted">{world.filter === "all" ? "of all voters" : `of ${name(world.filter).toLowerCase()}`}</span>
           </div>
-          <Meter value={v} color={tone(v)} className="mt-3" />
+          <Meter value={world.filter === "all" ? v * 2 : v} color={tone(world.filter === "all" ? v * 2 : v)} className="mt-3" />
         </Section>
       )}
       {!d.park && (

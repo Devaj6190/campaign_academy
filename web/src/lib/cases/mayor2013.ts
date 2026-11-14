@@ -86,9 +86,9 @@ export const mayor2013: Case = {
   ],
 
   groups: [
-    { id: "black", name: "Black voters" },
-    { id: "white", name: "White voters" },
-    { id: "hispanic", name: "Hispanic voters" },
+    { id: "black", name: "Black voters", census: "black" },
+    { id: "white", name: "White voters", census: "white" },
+    { id: "hispanic", name: "Hispanic voters", census: "hispanic" },
     { id: "union", name: "Union households" },
   ],
 
@@ -175,10 +175,10 @@ export const mayor2013: Case = {
       did: [
         c("On the day Weiner entered, de Blasio's spokesman said only that the race was now wide open.", "cbs-weiner"),
         c("A later profile of campaign manager Bill Hyers says de Blasio, trailing, considered speeding up and spending more, and Hyers recommended staying with the plan.", "spb-hyers"),
-        c("On July 23, after Weiner admitted to further explicit messages, de Blasio called on him to withdraw. He and Sal Albanese were the only Democratic candidates to do so.", "dna-0723", "dna-0724"),
       ],
       followed: [
         c("Weiner rose to 25 or 26 percent by mid-July, then fell: 16 on July 29 and 10 on August 13.", "q-0715", "q-0724", "q-0813"),
+        c("On July 23, after Weiner admitted to further explicit messages, de Blasio called on him to withdraw. He and Sal Albanese were the only Democratic candidates to do so.", "dna-0723", "dna-0724"),
         c("Weiner finished fifth with 4.94 percent.", "boe-cert"),
       ],
       saidAfter: [
@@ -256,7 +256,7 @@ export const mayor2013: Case = {
           c("Liu was denied public matching funds on August 5.", "wnyc-liu"),
           c("Polls of likely voters at the end of July: Quinn 26 or 27, with you, Thompson and Weiner between 15 and 21.", "q-0813", "m-0725"),
         ],
-        shift: { poll: { deblasio: 6, quinn: 5, thompson: 9, weiner: -9, liu: -1 } },
+        shift: { poll: { deblasio: 6, quinn: 5, thompson: 9, weiner: -9, liu: -1 }, groups: { black: 3, white: 5, hispanic: 4, union: 3 } },
       },
       situation: [
         c("You need to finish in the top two to reach a runoff, or pass 40 percent to avoid one.", "cfb-ao"),
@@ -266,7 +266,7 @@ export const mayor2013: Case = {
       constraints: { daysLeft: 33, notes: ["A first flight of television costs about $1.1 million"] },
       options: [
         { id: "bio", label: "You, to camera, on your record", detail: "A biographical ad in which the candidate introduces himself.", preview: { up: ["Poll standing", "White voters"], down: [TV] }, effect: { poll: { deblasio: 4 }, groups: { white: 3 }, budget: -1_100_000 } },
-        { id: "family", label: "A family member introduces you", detail: "Your teenage son speaks, naming the break from the incumbent, the tax plan and stop-and-frisk.", preview: { up: ["Poll standing", "Black voters", "White voters", "Hispanic voters"], down: [TV] }, effect: { poll: { deblasio: 6 }, groups: { black: 8, white: 4, hispanic: 4 }, budget: -1_100_000 }, synergy: { with: "positioning:break", effect: { poll: { deblasio: 3 }, groups: { black: 2, hispanic: 1 } } } },
+        { id: "family", label: "A family member introduces you", detail: "Your teenage son speaks, naming the break from the incumbent, the tax plan and stop-and-frisk.", preview: { up: ["Poll standing", "Black voters", "White voters", "Hispanic voters"], down: [TV] }, effect: { poll: { deblasio: 6 }, groups: { black: 8, white: 12, hispanic: 8 }, budget: -1_100_000 }, synergy: { with: "positioning:break", effect: { poll: { deblasio: 3 }, groups: { black: 2, hispanic: 1 } } } },
         { id: "contrast", label: "A contrast with the front-runner", detail: "Open on term limits and her record alongside the incumbent.", preview: { up: ["Poll standing", "White voters"], down: [TV] }, effect: { poll: { deblasio: 5, quinn: -2 }, groups: { white: 4 }, budget: -1_100_000 } },
         { id: "wait", label: "Hold all television for the last two weeks", detail: "Stay dark now and concentrate the buy at the end.", preview: { up: [], down: [] }, effect: {} },
       ],
@@ -305,7 +305,7 @@ export const mayor2013: Case = {
       ],
       constraints: { daysLeft: 22, notes: ["A second flight costs about $1.7 million", "The closing week will need about $1 million more"] },
       options: [
-        { id: "frisk", label: "Make stop-and-frisk the second ad", detail: "Claim the sharpest position in the field on the issue.", preview: { up: ["Poll standing", "Black voters", "Hispanic voters"], down: [TV] }, effect: { poll: { deblasio: 5 }, groups: { black: 16, hispanic: 6 }, budget: -1_700_000 }, synergy: { with: "positioning:break", effect: { poll: { deblasio: 2 }, groups: { black: 4, hispanic: 2 } } } },
+        { id: "frisk", label: "Make stop-and-frisk the second ad", detail: "Claim the sharpest position in the field on the issue.", preview: { up: ["Poll standing", "Black voters", "Hispanic voters"], down: [TV] }, effect: { poll: { deblasio: 5 }, groups: { black: 16, hispanic: 6, white: 5 }, budget: -1_700_000 }, synergy: { with: "positioning:break", effect: { poll: { deblasio: 2 }, groups: { black: 4, hispanic: 2 } } } },
         { id: "jobs", label: "Move to jobs and the cost of living", detail: "The issues voters rank first.", preview: { up: ["Poll standing", "White voters", "Hispanic voters", "Union households"], down: [TV] }, effect: { poll: { deblasio: 4 }, groups: { white: 3, hispanic: 4, union: 3 }, budget: -1_700_000 } },
         { id: "manhattan", label: "Take liberal Manhattan from the Speaker", detail: "Leave the former Comptroller's supporters alone, with a runoff in mind.", preview: { up: ["Poll standing", "White voters"], down: [TV] }, effect: { poll: { deblasio: 4, quinn: -2 }, groups: { white: 8 }, budget: -1_700_000 } },
         { id: "repeat", label: "Keep the first ad on air", detail: "A smaller buy, and no direct contrast with any rival.", preview: { up: ["Poll standing", "Black voters", "White voters"], down: [TV] }, effect: { poll: { deblasio: 3 }, groups: { black: 3, white: 2 }, budget: -1_200_000 } },
@@ -335,7 +335,7 @@ export const mayor2013: Case = {
 
   close: {
     notes: [c("The campaign's last large television payment before the primary, about $1 million, is dated August 28.", "cfb-exp")],
-    shift: { poll: { deblasio: 2, quinn: -8, thompson: 4, weiner: -5, liu: 1 }, budget: -1_000_000 },
+    shift: { poll: { deblasio: 2, quinn: -8, thompson: 4, weiner: -5, liu: 1 }, groups: { black: 3, white: 4, hispanic: 4, union: 4 }, budget: -1_000_000 },
   },
 
   press: [

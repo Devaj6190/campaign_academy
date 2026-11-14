@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowDown, ArrowRight, ArrowUp, Check, ExternalLink, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, Check, ExternalLink, Map as MapIcon, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { Button, Label, Meter, Section, Tag } from "@/components/ui";
+import { Button, Label, Meter, Section } from "@/components/ui";
 import { changeAt, currentCase, useCase, worldAt } from "@/lib/cases/store";
 import type { Advice, Case, Claim, Decision, Judgment, Shift, Skill, World } from "@/lib/cases/types";
+import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 
 // A case, played: briefing, then each decision point, then the debrief.
@@ -55,7 +56,7 @@ function WorldStrip({ c, w, final }: { c: Case; w: World; final?: boolean }) {
   const field = Object.entries(w.poll).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   return (
     <div className="mt-5 rounded-xl border border-line bg-surface px-5 py-4">
-      <div className="mb-3 flex items-center gap-2"><Label>{final ? "Where your campaign finished" : "Your campaign now"}</Label><Tag kind="sim" /></div>
+      <div className="mb-3"><Label>{final ? "Where your campaign finished" : "Your campaign now"}</Label></div>
       <div className="grid gap-x-8 gap-y-3 sm:grid-cols-[1fr_1fr]">
         <div className="space-y-1.5">
           {field.map(([id, v]) => (
@@ -132,7 +133,7 @@ function Briefing({ c }: { c: Case }) {
       </Section>
       <Section title="How this works">
         <p className="text-[14px] text-soft">{c.lesson}</p>
-        <p className="mt-2 text-[13px] text-muted">The people, dates, polls and money in this case are real and sourced. Your decisions are yours: each one changes your campaign, and the race plays on from where you leave it. Those changes are simulated. What the real campaign chose is shown at the end.</p>
+        <p className="mt-2 text-[13px] text-muted">The people, dates, polls and money in this case are real and sourced. Your decisions are yours: each one changes your campaign, and the race plays on from where you leave it. After each decision you see what the real campaign did; how it turned out for them comes at the end.</p>
         <div className="mt-3"><Claims c={c} items={c.start.basis} /></div>
         <Button variant="primary" className="mt-4" onClick={() => go(1)}>First decision <ArrowRight className="size-3.5" /></Button>
       </Section>
@@ -155,7 +156,7 @@ function AdviceCard({ c, a, option }: { c: Case; a: Advice; option?: string }) {
       </div>
       <p className="mt-1 text-[13px] leading-relaxed text-soft">{a.says}{a.sources.map((id) => <Cite key={id} c={c} id={id} />)}</p>
       <p className="mt-1.5 text-[11.5px] text-muted">Argues for: <span className="text-soft">{option}</span></p>
-      <p className="mt-0.5 text-[10.5px] tracking-wide text-faint uppercase">{a.basis === "on-record" ? "On the record" : "Predicted from the role · not a quotation"}</p>
+      <p className="mt-0.5 text-[10.5px] tracking-wide text-faint uppercase">{a.basis === "on-record" ? "On the record" : "Predicted"}</p>
     </div>
   );
 }
@@ -245,10 +246,17 @@ function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: number }) 
       </Section>
 
       {decided && (
-        <Section title="What changed" right={<Tag kind="sim" />}>
-          <Changes c={c} s={changeAt(c, picks, d)} />
-          <Button variant="primary" className="mt-4" onClick={() => go(step + 1)}>{last ? "Election day" : "Next decision"} <ArrowRight className="size-3.5" /></Button>
-        </Section>
+        <>
+          <Section title="What changed">
+            <Changes c={c} s={changeAt(c, picks, d)} />
+            <Button className="mt-4" onClick={() => useGame.getState().go("map")}><MapIcon className="size-3.5" /> See it on the map</Button>
+          </Section>
+          <Section title="What the real campaign did">
+            <p className="mb-3 text-[13px] text-muted">{d.taken === null ? "Something that was not on your list." : d.taken === pick.option ? "The same call you made." : `A different call: ${label(d.taken)}.`}</p>
+            <Claims c={c} items={d.did} />
+            <Button variant="primary" className="mt-4" onClick={() => go(step + 1)}>{last ? "Election day" : "Next decision"} <ArrowRight className="size-3.5" /></Button>
+          </Section>
+        </>
       )}
     </>
   );
@@ -266,11 +274,11 @@ function Debrief({ c }: { c: Case }) {
 
   return (
     <>
-      <Section title="Your election night" right={<Tag kind="sim" />}>
+      <Section title="Your election night">
         <p className="text-[15px] text-fg">{verdict}</p>
-        <p className="mt-2 text-[12.5px] text-muted">This is the simulation&rsquo;s estimate of your path. It is fitted so that the real campaign&rsquo;s choices land near the real result, and it cannot prove what another path would have produced.</p>
+        <p className="mt-2 text-[12.5px] text-muted">A simulated result, fitted so that the real campaign&rsquo;s choices land on the real one.</p>
       </Section>
-      <Section title={`What really happened · ${day(c.electionDate)}`} right={<Tag kind="real" />}>
+      <Section title={`What really happened · ${day(c.electionDate)}`}>
         <div className="space-y-2.5">
           {c.result.map((r) => (
             <div key={r.candidate}>
@@ -298,7 +306,6 @@ function Debrief({ c }: { c: Case }) {
                   <div>The real campaign: <span className="text-soft">{they?.label ?? "Something not on the list"}</span>{you && they && you.id === they.id && <span className="text-pos"> · the same call</span>}</div>
                 </div>
                 <div className="mt-3 space-y-3 border-t border-line pt-3">
-                  <div><Label>What they did</Label><div className="mt-1.5"><Claims c={c} items={d.did} /></div></div>
                   <div><Label>What followed</Label><div className="mt-1.5"><Claims c={c} items={d.followed} /></div></div>
                   {!!d.saidAfter.length && <div><Label>What was said afterwards</Label><div className="mt-1.5"><Claims c={c} items={d.saidAfter} /></div></div>}
                 </div>

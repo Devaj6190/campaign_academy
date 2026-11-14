@@ -102,7 +102,8 @@ export type Case = {
   /** One sentence: what this case teaches. */
   lesson: string;
   /** Voter groups the simulation tracks: support for the followed candidate in each, 0 to 100. */
-  groups: { id: string; name: string }[];
+  /** `census` names the census share that says where the group lives, so the map can place its support. */
+  groups: { id: string; name: string; census?: "white" | "black" | "asian" | "hispanic" }[];
   /** Where the simulation starts. `basis` says what the starting numbers rest on. */
   start: { budget: number; poll: Record<string, number>; groups: Record<string, number>; basis: Claim[] };
   /** The closing stretch after the last decision. Its budget is spent only as far as the money lasts. */
