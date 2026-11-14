@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #060607;
+  --color-surface: #0b0b0d;
+  --color-raised: #111114;
+  --color-hover: #17171b;
+  --color-line: rgb(255 255 255 / 0.07);
+  --color-line-strong: rgb(255 255 255 / 0.14);
+  --color-fg: #ededf0;
+  --color-soft: #b4b4bd;
+  --color-muted: #84848e;
+  --color-faint: #54545d;
+  --color-warm: #f0a23b;
+  --color-cool: #5b8def;
+  --color-pos: #5fd08a;
+  --color-neg: #f0705f;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-serif);
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Film grain over everything: the one texture in an otherwise flat UI. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: rgb(255 255 255 / 0.18);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.12) transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 1px solid rgb(255 255 255 / 0.5);
+  outline-offset: 2px;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.dots {
+  background-image: radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@keyframes flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+.edge-flow {
+  stroke-dasharray: 3 6;
+  animation: flow 0.7s linear infinite;
+}
+.edge-flow.up {
+  animation-direction: reverse;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+.breathe {
+  animation: breathe 1.4s ease-in-out infinite;
+}
