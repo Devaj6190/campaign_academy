@@ -370,7 +370,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
             placeholder={thinking ? `${first} is on it…` : `Tell ${first} what you need…`}
             className="flex-1 resize-none bg-transparent px-1.5 py-1 text-[13px] outline-none placeholder:text-faint"
           />
-          <button onClick={() => send()} disabled={!text.trim() || thinking} aria-label="Send" className="grid size-7 shrink-0 place-items-center rounded-lg bg-fg text-bg transition-opacity disabled:opacity-25">
+          <button onClick={() => send()} disabled={!text.trim() || thinking} aria-label="Send" className="grid size-7 shrink-0 place-items-center rounded-lg bg-gold text-bg transition-opacity disabled:opacity-25">
             <ArrowUp className="size-4" />
           </button>
         </div>
@@ -384,7 +384,7 @@ function ChatRow({ c, index, id, onSuggest }: { c: ChatItem; index: number; id: 
   if (c.k === "me" || c.k === "them")
     return (
       <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={cn("flex flex-col", c.k === "me" ? "items-end" : "items-start")}>
-        <div className={cn("max-w-[88%] rounded-xl px-3 py-2 text-[13px] leading-snug", c.k === "me" ? "bg-fg text-bg" : "border border-line bg-raised text-soft")}>{c.text}</div>
+        <div className={cn("max-w-[88%] rounded-xl px-3 py-2 text-[13px] leading-snug", c.k === "me" ? "bg-gold text-bg" : "border border-line bg-raised text-soft")}>{c.text}</div>
         {c.k === "them" && c.suggest && (
           <button onClick={() => onSuggest(c.suggest!)} className="mt-1 flex items-center gap-1 text-[11px] text-warm hover:underline">
             <Sparkles className="size-3" /> {c.suggest}

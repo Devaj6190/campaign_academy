@@ -7,7 +7,6 @@ import { DISTRICTS } from "@/lib/geo";
 import { useGame, type Draft } from "@/lib/store";
 import { cn, hash } from "@/lib/util";
 import { Avatar, Button, Dialog, Label, Meter, Tag } from "./ui";
-import { ShaderBackground } from "./ui21/dithering";
 
 export function Overlays() {
   const overlay = useGame((s) => s.overlay);
@@ -15,11 +14,11 @@ export function Overlays() {
   const close = () => open(null);
   return (
     <>
-      <Dialog open={overlay === "paper"} onClose={close} className="max-w-[720px]"><Paper close={close} /></Dialog>
+      <Dialog open={overlay === "paper"} onClose={close} plate="plate-press" className="max-w-[720px]"><Paper close={close} /></Dialog>
       <Dialog open={overlay === "manifesto"} onClose={close} side="right"><Manifesto /></Dialog>
       <Dialog open={overlay === "calendar"} onClose={close} className="max-w-[880px]"><Calendar /></Dialog>
       <Dialog open={overlay === "tactic"} onClose={close} className="max-w-[440px]"><Tactic close={close} /></Dialog>
-      <Dialog open={overlay === "election"} onClose={close} className="max-w-[520px]"><Election /></Dialog>
+      <Dialog open={overlay === "election"} onClose={close} plate="plate-election" className="max-w-[520px]"><Election /></Dialog>
       <Toasts />
     </>
   );
@@ -170,7 +169,7 @@ function Calendar() {
             </div>
             <div className="mt-1 space-y-0.5">
               {(calendar[d] ?? []).slice(0, 3).map((e, i) => (
-                <div key={i} className={cn("truncate rounded px-1.5 py-px text-[11px]", d === 30 ? "bg-fg text-bg" : "bg-white/[0.06] text-soft")}>{e}</div>
+                <div key={i} className={cn("truncate rounded px-1.5 py-px text-[11px]", d === 30 ? "bg-gold text-bg" : "bg-white/[0.06] text-soft")}>{e}</div>
               ))}
             </div>
           </div>
@@ -224,7 +223,6 @@ function Election() {
   const rows: [string, number, string][] = [["Adrian Cole", cole, "var(--color-warm)"], ["Victoria Hale", hale, "rgb(255 255 255 / .45)"], ["Naomi Brandt", brandt, "rgb(255 255 255 / .22)"]];
   return (
     <div className="relative p-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-44 opacity-30 [mask-image:linear-gradient(black,transparent)]"><ShaderBackground /></div>
       <Label className="relative">Election night · polls closed</Label>
       <h2 className="relative mt-3 font-serif text-[56px] leading-none tracking-tight">{won ? "Cole wins." : "Cole concedes."}</h2>
       <div className="mt-8 space-y-4">
