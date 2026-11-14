@@ -273,7 +273,9 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
   const boss = staff.find((x) => x.id === p.boss);
   const team = staff.filter((x) => x.boss === p.id);
   const instruct = useGame((s) => s.instruct);
-  const [text, setText] = useState("");
+  // A draft handed over from elsewhere (the map's "Send staff") starts in the box, ready to edit and send.
+  const [text, setText] = useState(() => useStaff.getState().draft[p.id] ?? "");
+  useEffect(() => { useStaff.setState((s) => ({ draft: Object.fromEntries(Object.entries(s.draft).filter(([k]) => k !== p.id)) })); }, [p.id]);
   const end = useRef<HTMLDivElement>(null);
   const first = p.name!.split(" ")[0];
   const prof = hired ?? profileFor(p.id, p.role);

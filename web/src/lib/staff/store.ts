@@ -31,8 +31,9 @@ type StaffState = {
   hires: Record<string, Profile>;
   candidates: Record<string, { status: "loading" | "ready"; list: Candidate[]; mode?: "live" | "offline" }>;
   mode: "live" | "offline" | null;
-  momentum: number;
   spoken: Record<string, number>; // trigger → day it last fired
+  /** A ready-made order waiting in someone's input box (e.g. "Send staff" from the map). */
+  draft: Record<string, string>;
 };
 
 export const useStaff = create<StaffState>(() => ({
@@ -46,8 +47,8 @@ export const useStaff = create<StaffState>(() => ({
   hires: {},
   candidates: {},
   mode: null,
-  momentum: 0,
   spoken: {},
+  draft: {},
 }));
 
 let uid = 1;

@@ -13,6 +13,8 @@ export type Profile = {
   special?: Partial<Record<ActionId, number>>;
   /** Extra effect in these boroughs (first digit of the district number). */
   turf?: number[];
+  /** Extra effect in these specific districts (the candidate's home turf). */
+  home?: number[];
   /** How they talk. Fed to their agent. */
   voice: string;
   salary: number;
@@ -52,6 +54,16 @@ export const PROFILES: Record<string, Profile> = {
   ev: { skills: ["events"], cost: 1.2, effect: 1.15, voice: "Showman. Loves a packed room, forgets the budget.", salary: 450 },
   pr: { skills: ["press", "comms"], cost: 1, effect: 1, special: { press_pitch: 1.3 }, voice: "Measured and principled. Reporters trust her. Will not lie.", salary: 500 },
   dg: { skills: ["digital"], cost: 1, effect: 1, special: { email_blast: 1.3 }, voice: "Online native. Edgy, punchy, uses short sentences.", salary: 400 },
+};
+
+// The candidate in person: better than staff, no skill gaps, strongest in his council district in western Queens.
+export const CANDIDATE: Profile = {
+  skills: ["planning", "scheduling", "field", "volunteers", "finance", "events", "comms", "press", "digital", "policy", "data"],
+  cost: 1,
+  effect: 1.15,
+  home: [401, 402, 403],
+  voice: "Adrian Cole, the candidate.",
+  salary: 0,
 };
 
 export const profileFor = (id: string, role: string): Profile =>
