@@ -6,12 +6,13 @@ import { Overlays } from "@/components/Overlays";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { useGame } from "@/lib/store";
+import { CaseView } from "@/views/CaseView";
 import { Factions } from "@/views/Factions";
 import { MapView } from "@/views/MapView";
 import { Profile } from "@/views/Profile";
 import { WarRoom } from "@/views/WarRoom";
 
-const VIEWS = { profile: Profile, war: WarRoom, map: MapView, factions: Factions };
+const VIEWS = { case: CaseView, profile: Profile, war: WarRoom, map: MapView, factions: Factions };
 
 export default function Home() {
   const view = useGame((s) => s.view);

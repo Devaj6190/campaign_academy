@@ -131,7 +131,7 @@ export const sentimentOf = (s: Pick<State, "sent" | "filter" | "factions">, cd: 
 if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") queueMicrotask(() => ((window as unknown as { game: unknown }).game = useGame));
 
 export const useGame = create<State>((set, get) => ({
-  view: "profile",
+  view: "case",
   day: 1,
   min: DAY_START,
   speed: 1,
@@ -159,7 +159,7 @@ export const useGame = create<State>((set, get) => ({
   plans: Object.fromEntries(STAFF.filter((p) => !p.boss && p.name).map((p) => [p.id, [planFor(STAFF, p.id, p.doing!, ["completed", "in-progress", "pending"])]])),
   busy: {},
   unread: {},
-  overlay: "paper",
+  overlay: null,
   toasts: [],
   tacticResult: null,
   momentum: 0,
@@ -201,7 +201,7 @@ export const useGame = create<State>((set, get) => ({
       cash: s.cash + net(s),
       poll: { ...s.poll, cole: s.poll.cole + Math.round(hash(s.day, 3) * 3 - 1) },
       tasks: s.tasks.filter((t) => !t.done),
-      overlay: "paper",
+      overlay: s.view === "case" ? s.overlay : "paper",
     });
   },
 
