@@ -134,6 +134,11 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
   const on = (e: RunEvent) => handle(id, runId, e);
   try {
     const res = await fetch("/api/staff/instruct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
+    // A refused order (vacant post, empty text) is not a network failure: say so instead of simulating.
+    if (res.status >= 400 && res.status < 500) {
+      pushChat(id, { k: "note", text: "That order couldn't be given." });
+      return;
+    }
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
     const reader = res.body.getReader();
     const dec = new TextDecoder();

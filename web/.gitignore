@@ -43,3 +43,6 @@ next-env.d.ts
 # env files (keys stay local; .env.example is committed)
 .env*
 !.env.example
+
+# MapLibre worker, copied from node_modules on install
+/public/maplibre/
