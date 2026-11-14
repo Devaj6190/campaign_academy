@@ -84,6 +84,11 @@ function handle(director: string, runId: number, e: RunEvent) {
     }
     case "action": {
       apply(e.effect);
+      if (!e.effect.fit) {
+        const by = e.effect.by;
+        useStaff.setState((s) => ({ misfit: { ...s.misfit, [by]: true } }));
+        setTimeout(() => useStaff.setState((s) => ({ misfit: { ...s.misfit, [by]: false } })), 8000);
+      }
       const where = e.effect.district ? ` in ${shortPlace(e.effect.district)}` : "";
       useStaff.setState((s) => ({ job: { ...s.job, [e.effect.by]: `${e.effect.action in ACTIONS ? ACTIONS[e.effect.action as keyof typeof ACTIONS].doing : e.effect.label}${where}` } }));
       pushChat(director, { k: "receipt", effect: e.effect, by: e.effect.by });

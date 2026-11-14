@@ -25,6 +25,7 @@ type StaffState = {
   runs: Record<string, Run[]>; // newest first, per person who was instructed
   active: Record<string, number>; // run id in flight, per person
   job: Record<string, string>; // what each person is doing right now
+  misfit: Record<string, boolean>; // just did a job outside their skills; flashes on the chart
   packets: Packet[];
   feed: FeedItem[];
   morale: Record<string, number>;
@@ -41,6 +42,7 @@ export const useStaff = create<StaffState>(() => ({
   runs: {},
   active: {},
   job: {},
+  misfit: {},
   packets: [],
   feed: [],
   morale: { cm: 72, fd: 78, fin: 66, com: 70, sch: 64, oq: 58, ob: 74, vc: 70, ct: 62, ev: 68, pr: 71, dg: 69 },

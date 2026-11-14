@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { FACTIONS, GAINS, LOSSES, STAFF, STRONG, WEAK, type Faction, type Flow, type Staff, type View } from "./data";
 import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
+import { supportIn } from "./cases/store";
 import { DISTRICTS } from "./geo";
 import { shares } from "./demographics";
 import { hash } from "./util";
@@ -135,7 +136,8 @@ function planFor(staff: Staff[], id: string, title: string, statuses: PlanStatus
 
 /** Sentiment for one district under the current filter. Simulated. */
 export const sentimentOf = (s: Pick<State, "sent" | "filter" | "factions">, cd: number) => {
-  if (s.filter === "all") return s.sent[cd];
+  // With no group filter the map shows the case: the student's support here, in percent.
+  if (s.filter === "all") return supportIn(cd) ?? s.sent[cd];
   // Support among one group here = how that group feels citywide, shifted by this district's lean.
   const f = s.factions.find((x) => x.id === s.filter)!;
   return Math.max(5, Math.min(95, f.feel + (s.sent[cd] - 50) * 0.6));
@@ -156,7 +158,7 @@ const START_RIVALS: Record<Rival, RivalState> = {
 };
 
 export const useGame = create<State>((set, get) => ({
-  view: "profile",
+  view: "case",
   day: 1,
   min: DAY_START,
   speed: 1,
@@ -184,7 +186,7 @@ export const useGame = create<State>((set, get) => ({
   plans: Object.fromEntries(STAFF.filter((p) => !p.boss && p.name).map((p) => [p.id, [planFor(STAFF, p.id, p.doing!, ["completed", "in-progress", "pending"])]])),
   busy: {},
   unread: {},
-  overlay: "paper",
+  overlay: null,
   toasts: [],
   tacticResult: null,
   ledger: [],
@@ -255,7 +257,7 @@ export const useGame = create<State>((set, get) => ({
       tasks: s.tasks.filter((t) => !t.done),
       pollHistory: [...s.pollHistory, s.poll.cole],
       news: { day: s.day + 1, opposition: [] },
-      overlay: "paper",
+      overlay: s.view === "case" ? s.overlay : "paper",
     });
     void import("./engine/schedule").then((m) => m.overnight(s.day));
   },

@@ -1,4 +1,5 @@
 import raw from "../nyc.json";
+import { ACTIONS } from "../engine/catalog";
 import type { Faction, Staff } from "../data";
 import type { Profile } from "./roster";
 
@@ -59,4 +60,15 @@ export const findBoros = (text: string) => {
 export const findFactions = (text: string) => {
   const t = text.toLowerCase();
   return Object.entries(FACTION_WORDS).filter(([, ws]) => ws.some((w) => t.includes(w))).map(([id]) => id);
+};
+
+/** Turn the ids an agent writes into words a player reads: "voter_targeting in district 403, faction id: renters"
+ *  becomes "voter targeting in Jackson Heights, Renters". */
+export const humanize = (text: string, factions: { id: string; name: string }[]) => {
+  const fname = (id: string) => factions.find((f) => f.id === id.toLowerCase())?.name;
+  return text
+    .replace(/(?<![$\d,.])\b(?:(?:community )?district |cd ?)?#?(\d{3})\b(?![,.]?\d)/gi, (m, n) => (PLACES.some((p) => p.cd === +n) ? shortPlace(+n) : m))
+    .replace(/\(?\bfaction(?:[ _]id)?\s*[:=]?\s*"?([a-z]+)"?\)?/gi, (m, id) => fname(id) ?? m)
+    .replace(/\b(smallbiz|progressives)\b/g, (m) => fname(m)?.toLowerCase() ?? m)
+    .replace(/\b[a-z]+(?:_[a-z]+)+\b/g, (m) => (ACTIONS as Record<string, { label: string }>)[m]?.label.toLowerCase() ?? m.replace(/_/g, " "));
 };
