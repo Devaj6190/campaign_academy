@@ -6,7 +6,7 @@ import { shares } from "./demographics";
 import { hash } from "./util";
 import { effectOf, type Effect } from "./engine/resolve";
 import { knockOns } from "./relations";
-import { pollOf, type Rival } from "./engine/poll";
+import { calibrate, pollOf, type Rival } from "./engine/poll";
 import { RIVALS } from "./engine/rivals";
 import { tacticOutcome, type Deliverer } from "./engine/tactic";
 import type { ElectionResult } from "./engine/election";
@@ -147,6 +147,9 @@ if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") queu
 // A game day is one real minute at 1x: 06:00 to 22:00 in 240 ticks of 250 ms.
 const MIN_PER_TICK = 4;
 const NOON = 720;
+// Tune the poll so day 1 reads as the README describes (Hale 38, Cole 31, Brandt 14, undecided 17).
+calibrate(sent);
+
 const START_RIVALS: Record<Rival, RivalState> = {
   hale: { cash: RIVALS.hale.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
   brandt: { cash: RIVALS.brandt.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
