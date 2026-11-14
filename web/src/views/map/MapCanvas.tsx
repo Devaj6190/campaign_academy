@@ -3,6 +3,7 @@
 import { Map as MLMap, NavigationControl, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
+import adResult from "@/lib/cases/mayor2013-ad.json";
 import { groupsHere } from "@/lib/demographics";
 import { DISTRICTS } from "@/lib/geo";
 import { sentimentOf, useGame } from "@/lib/store";
@@ -55,12 +56,22 @@ async function loadStyle(): Promise<StyleSpecification | string> {
   }
 }
 
-export function MapCanvas({ onHover, onSelect }: { onHover: (t: { x: number; y: number; cd: number } | null) => void; onSelect: (cd: number | null) => void }) {
+/** One Assembly District's certified 2013 votes (Board of Elections recaps, checked against the borough totals). */
+export type RealRow = { ad: number; total: number; share: number; deblasio: number; thompson: number; quinn: number; liu: number; weiner: number };
+export type Tip = { x: number; y: number; cd: number; real?: RealRow };
+
+const LAYERS = { districts: ["district-fill", "district-line", "district-pulse", "district-selected"], real: ["real-fill", "real-line"] };
+const show = (m: MLMap, real: boolean) => {
+  for (const id of LAYERS.districts) m.setLayoutProperty(id, "visibility", real ? "none" : "visible");
+  for (const id of LAYERS.real) m.setLayoutProperty(id, "visibility", real ? "visible" : "none");
+};
+
+export function MapCanvas({ onHover, onSelect, real = false }: { onHover: (t: Tip | null) => void; onSelect: (cd: number | null) => void; real?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const ready = useRef(false);
-  const cbs = useRef({ onHover, onSelect });
-  useEffect(() => { cbs.current = { onHover, onSelect }; });
+  const cbs = useRef({ onHover, onSelect, real });
+  useEffect(() => { cbs.current = { onHover, onSelect, real }; });
 
   const sent = useGame((s) => s.sent);
   const filter = useGame((s) => s.filter);
@@ -99,6 +110,11 @@ export function MapCanvas({ onHover, onSelect }: { onHover: (t: { x: number; y: 
         m.addLayer({ id: "district-line", type: "line", source: "districts", filter: ["!", ["get", "park"]], paint: { "line-color": "rgba(255,255,255,0.22)", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 14, 1.6] } }, firstLabel);
         m.addLayer({ id: "district-pulse", type: "line", source: "districts", paint: { "line-color": "#f0a23b", "line-blur": 3, "line-width": ["case", ["boolean", ["feature-state", "pulse"], false], 6, 0], "line-opacity": ["case", ["boolean", ["feature-state", "pulse"], false], 0.9, 0], "line-width-transition": { duration: 500 }, "line-opacity-transition": { duration: 900 } } });
         m.addLayer({ id: "district-selected", type: "line", source: "districts", filter: ["==", ["get", "cd"], -1], paint: { "line-color": "#ffffff", "line-width": 2.4 } });
+        // The real 2013 result by Assembly District, coloured by de Blasio's share. Hidden until the case is finished.
+        m.addSource("real", { type: "geojson", data: adResult as never });
+        m.addLayer({ id: "real-fill", type: "fill", source: "real", paint: { "fill-color": ["interpolate", ["linear"], ["get", "share"], 25, "rgb(70,116,214)", 40, "rgb(50,50,58)", 55, "rgb(240,162,59)"] as never, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.85, 0.68] as never } }, firstLabel);
+        m.addLayer({ id: "real-line", type: "line", source: "real", paint: { "line-color": "rgba(255,255,255,0.22)", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 14, 1.6] } }, firstLabel);
+        show(m, cbs.current.real);
         // 3D buildings from the street map's own building data, rising as you zoom in.
         if (m.getSource("openmaptiles")) {
           m.addLayer({ id: "buildings-3d", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: 12, paint: { "fill-extrusion-color": "#3b3b45", "fill-extrusion-height": ["coalesce", ["get", "render_height"], 10] as never, "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0] as never, "fill-extrusion-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13.2, 0.9] as never } }, firstLabel);
@@ -108,25 +124,29 @@ export function MapCanvas({ onHover, onSelect }: { onHover: (t: { x: number; y: 
         // Coming back to the map with a district already picked: go straight to it.
         focus(m, true, useGame.getState().district, 0);
       });
-      m.on("mousemove", "district-fill", (e) => {
-        const f = e.features?.[0];
-        if (!f) return;
-        const cd = Number(f.id);
-        if (hovered !== cd) {
-          if (hovered != null) m.setFeatureState({ source: "districts", id: hovered }, { hover: false });
-          hovered = cd;
-          m.setFeatureState({ source: "districts", id: cd }, { hover: true });
-        }
-        m.getCanvas().style.cursor = "pointer";
-        const r = m.getContainer().getBoundingClientRect();
-        cbs.current.onHover({ x: r.left + e.point.x, y: r.top + e.point.y, cd });
-      });
-      m.on("mouseleave", "district-fill", () => {
-        if (hovered != null) m.setFeatureState({ source: "districts", id: hovered }, { hover: false });
-        hovered = null;
-        m.getCanvas().style.cursor = "";
-        cbs.current.onHover(null);
-      });
+      // Only one of the two fills is visible at a time, so they share the hover bookkeeping.
+      for (const [layer, source] of [["district-fill", "districts"], ["real-fill", "real"]] as const) {
+        m.on("mousemove", layer, (e) => {
+          const f = e.features?.[0];
+          if (!f) return;
+          const id = Number(f.id);
+          if (hovered !== id) {
+            if (hovered != null) m.setFeatureState({ source, id: hovered }, { hover: false });
+            hovered = id;
+            m.setFeatureState({ source, id }, { hover: true });
+          }
+          m.getCanvas().style.cursor = source === "real" ? "" : "pointer";
+          const r = m.getContainer().getBoundingClientRect();
+          const at = { x: r.left + e.point.x, y: r.top + e.point.y };
+          cbs.current.onHover(source === "real" ? { ...at, cd: 0, real: f.properties as RealRow } : { ...at, cd: id });
+        });
+        m.on("mouseleave", layer, () => {
+          if (hovered != null) m.setFeatureState({ source, id: hovered }, { hover: false });
+          hovered = null;
+          m.getCanvas().style.cursor = "";
+          cbs.current.onHover(null);
+        });
+      }
       m.on("click", (e) => {
         const f = m.queryRenderedFeatures(e.point, { layers: ["district-fill"] })[0];
         cbs.current.onSelect(f ? Number(f.id) : null);
@@ -137,6 +157,9 @@ export function MapCanvas({ onHover, onSelect }: { onHover: (t: { x: number; y: 
 
   // Recolour whenever support, the group filter or group feelings change.
   useEffect(paint, [sent, filter, factions]);
+
+  // Swap between the student's campaign and the real result.
+  useEffect(() => { if (map.current && ready.current) show(map.current, real); }, [real]);
 
   // Fly to the selected district and tilt so its buildings stand up; zoom back out when cleared.
   useEffect(() => focus(map.current, ready.current, district), [district]);

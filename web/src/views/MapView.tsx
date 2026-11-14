@@ -8,8 +8,14 @@ import { Dock, DockButton, Inspector, Label, Meter, Popover, Section, Tag, ViewH
 import { appear, APPEARANCES, appearancesToday, DAILY, preview, sendStaff, type Appearance } from "@/lib/candidate";
 import { groupsHere } from "@/lib/demographics";
 import { DISTRICTS, FETCHED, districtBy } from "@/lib/geo";
+import { currentCase, useCase } from "@/lib/cases/store";
 import { sentimentOf, useGame } from "@/lib/store";
 import { clock, cn, heat, tone } from "@/lib/util";
+import type { RealRow, Tip } from "./map/MapCanvas";
+
+// ponytail: the one case with a baked result layer (mayor2013-ad.json); make this a field on the case when a second has one.
+const REAL_RESULT: Record<string, string> = { "nyc-2013-dem-mayor": "Real result 2013" };
+const RIVALS = ["deblasio", "thompson", "quinn", "liu", "weiner"] as const satisfies readonly (keyof RealRow)[];
 
 // The map itself touches the browser (WebGL), so it only renders on the client.
 const MapCanvas = dynamic(() => import("./map/MapCanvas").then((m) => m.MapCanvas), {
@@ -26,7 +32,14 @@ export function MapView() {
   const select = useGame((s) => s.select);
   const done = useGame((s) => appearancesToday(s));
   const sent = useGame((s) => s.sent);
-  const [tip, setTip] = useState<{ x: number; y: number; cd: number } | null>(null);
+  const [tip, setTip] = useState<Tip | null>(null);
+  // The real result is only offered once the student has finished the case, so it can't spoil a decision.
+  const caseId = useCase((s) => s.caseId);
+  const step = useCase((s) => s.step);
+  const theCase = currentCase(caseId);
+  const realLabel = step > theCase.decisions.length ? REAL_RESULT[caseId] : undefined;
+  const [wantReal, setReal] = useState(false);
+  const real = wantReal && !!realLabel;
   const [notice, setNotice] = useState<{ id: number; ok: boolean; text: string } | null>(null);
   const noticeId = useRef(0);
   const world = { sent, filter, factions };
@@ -48,15 +61,24 @@ export function MapView() {
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader
           title="New York City"
-          sub="59 community districts on the real street map. Colour shows how strong your campaign is in each one."
+          sub={real ? "The certified result in the 65 Assembly Districts. Colour shows de Blasio's share of the vote in each one." : "59 community districts on the real street map. Colour shows how strong your campaign is in each one."}
           right={
             <div className="flex shrink-0 items-center gap-5">
               <div className="hidden items-center gap-2 text-[11px] text-muted @[700px]:flex">
-                Cold
+                {real ? "25%" : "Cold"}
                 <i className="h-1 w-24 rounded-full" style={{ background: `linear-gradient(90deg, ${heat(20)}, ${heat(47)}, ${heat(75)})` }} />
-                Warm
+                {real ? "55%" : "Warm"}
               </div>
-              <div className="h-8">
+              {realLabel && (
+                <div className="flex h-8 overflow-hidden rounded-md border border-line-strong text-[12.5px]">
+                  {([[false, "Your campaign"], [true, realLabel]] as const).map(([v, label]) => (
+                    <button key={label} aria-pressed={real === v} onClick={() => { setReal(v); if (v) select({ district: null }); }} className={cn("px-3 whitespace-nowrap transition-colors", real === v ? "bg-hover text-gold-bright" : "bg-raised text-muted hover:text-fg")}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className={cn("h-8", real && "hidden")}>
                 <Popover
                   align="end"
                   className="w-56 p-1.5"
@@ -80,8 +102,14 @@ export function MapView() {
           }
         />
         <div className="relative min-h-0 flex-1 overflow-hidden border-t border-line">
-          <MapCanvas onHover={setTip} onSelect={(cd) => select({ district: cd && districtBy(cd)?.park ? null : cd })} />
-          {current && (
+          <MapCanvas real={real} onHover={setTip} onSelect={(cd) => select({ district: cd && districtBy(cd)?.park ? null : cd })} />
+          {real && (
+            <div className="pointer-events-none absolute top-3 left-3 flex max-w-[440px] items-start gap-2 rounded-md border border-line bg-raised/85 px-2.5 py-1.5 text-[11.5px] text-soft backdrop-blur">
+              <Tag kind="real" />
+              <span>Board of Elections certified returns, primary of 10 September 2013. Votes are counted by Assembly District, so the boundaries differ from your campaign map.</span>
+            </div>
+          )}
+          {current && !real && (
             <div className="pointer-events-none absolute top-3 left-3 rounded-md border border-line bg-raised/85 px-2.5 py-1.5 text-[11.5px] text-soft backdrop-blur">
               Showing <span className="text-fg">{current.name.toLowerCase()}</span>: colour is their support, brightness is how many live there
             </div>
@@ -101,7 +129,18 @@ export function MapView() {
             <span className="tnum ml-2 font-mono text-muted">{Math.round(sentimentOf(world, hovered.cd))}%</span>
           </div>
         )}
-        <Dock label={sel ? `${sel.name} · Cole ${left}/${DAILY} left today` : "Select a district to act there"}>
+        {tip?.real && (
+          <div className="pointer-events-none fixed z-50 min-w-44 rounded-md border border-line-strong bg-raised px-2.5 py-1.5 text-[12px] shadow-xl" style={{ left: tip.x + 14, top: tip.y + 14 }}>
+            <div className="mb-1 flex justify-between gap-4">Assembly District {tip.real.ad}<span className="tnum font-mono text-muted">{tip.real.total.toLocaleString("en-US")} votes</span></div>
+            {[...RIVALS].sort((a, b) => tip.real![b] - tip.real![a]).map((id) => (
+              <div key={id} className="flex justify-between gap-4 text-soft">
+                {theCase.candidates.find((x) => x.id === id)?.name ?? id}
+                <span className="tnum font-mono text-muted">{((tip.real![id] / tip.real!.total) * 100).toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <Dock label={real ? "The real result. Switch to Your campaign to act in a district." : sel ?`${sel.name} · Cole ${left}/${DAILY} left today` : "Select a district to act there"}>
           {sel && !sel.park && (
             <>
               {APPEARANCES.map((a, i) => {
