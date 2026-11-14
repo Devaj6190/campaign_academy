@@ -52,6 +52,7 @@ Every action lands in one shared world state. The map, the war room, the faction
 ```mermaid
 flowchart TB
     subgraph Views
+        PRO[Profile]
         MAP[Map screen]
         WAR[War room]
         FAC[Factions]
@@ -59,6 +60,7 @@ flowchart TB
         NEWS[Newspaper]
     end
     WS[(Shared world state<br/>sentiment by area and faction,<br/>money, staff, manifesto, polls, calendar)]
+    WS --> PRO
     MAP <--> WS
     WAR <--> WS
     FAC --> WS
@@ -81,9 +83,9 @@ You do not start from zero. You are handed a campaign that is already in motion.
 
 To the student it looks as though every player is dealt their own candidate, with their own stats, record and staff. The first build ships one hand-made candidate (section 11).
 
-### Profile screen
+### View: profile
 
-The first thing you see, and reachable any time from the top bar.
+One of the four main views, alongside the war room, the map and factions. It is the first thing you see, and you can return to it any time from the top bar. It is live, not a one-off intro: polling, cash, days left and where you stand update as the race goes on, and the record grows as you add to the manifesto.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -146,7 +148,7 @@ It carries three things:
 
 ## 5. The shell: what is always on screen
 
-Three main screens (war room, map, factions) share one frame.
+Four main views (profile, war room, map, factions) share one frame.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -155,7 +157,7 @@ Three main screens (war room, map, factions) share one frame.
 │ ┌─────────────┐                                                        │
 │ │ TASKS       │                                                        │
 │ │ ☐ Rally, BX │              MAIN VIEW                                 │
-│ │ ☐ Call time │      War room  ·  Map  ·  Factions                     │
+│ │ ☐ Call time │  Profile  ·  War room  ·  Map  ·  Factions             │
 │ │ + add task  │                                                        │
 │ └─────────────┘                                                        │
 │                                                                        │
@@ -166,7 +168,7 @@ Three main screens (war room, map, factions) share one frame.
 
 - **Top bar:** profile, money, day and time, and the speed control (slower / faster, no pause).
 - **Tasks panel:** today's tasks, top left, on every screen.
-- **Main view:** one of the three screens.
+- **Main view:** one of the four views. The profile is described in section 3; the other three follow below.
 - **Action panel:** bottom strip whose contents depend on the screen.
 
 ### Money: the only resource
