@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FACTIONS, GAINS, LOSSES, QUIPS, STAFF, STRONG, WEAK, type Faction, type Flow, type Staff, type View } from "./data";
+import { FACTIONS, GAINS, LOSSES, STAFF, STRONG, WEAK, type Faction, type Flow, type Staff, type View } from "./data";
 import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
 import { DISTRICTS } from "./geo";
 import { hash } from "./util";
@@ -165,57 +165,8 @@ export const useGame = create<State>((set, get) => ({
   toggleTask: (id) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) })),
   addTask: (text) => set((s) => ({ tasks: [...s.tasks, { id: uid++, text, done: false }], calendar: { ...s.calendar, [s.day]: [...(s.calendar[s.day] ?? []), text] } })),
 
-  // agent: stand-in for a real deep agent. The instruction travels down, work happens, a report comes back, state changes.
-  instruct: (id, text) => {
-    const say = (line: Line) => set((s) => ({ logs: { ...s.logs, [id]: [...(s.logs[id] ?? []), line] } }));
-    const mark = (ids: string[], v?: "down" | "up" | "work") =>
-      set((s) => {
-        const busy = { ...s.busy };
-        for (const x of ids) {
-          if (v) busy[x] = v;
-          else delete busy[x];
-        }
-        return { busy };
-      });
-    const me = get().staff.find((x) => x.id === id)!;
-    const subs = get().staff.filter((x) => x.boss === id && x.name).map((x) => x.id);
-    const first = (x: string) => get().staff.find((p) => p.id === x)!.name!.split(" ")[0];
-
-    // The director writes a plan, hands each job to one of their people, and the plan updates as they work.
-    const plan = planFor(get().staff, id, text, ["pending"]);
-    const step = (status: PlanStatus, done = false) =>
-      set((s) => ({
-        plans: { ...s.plans, [id]: (s.plans[id] ?? []).map((t) => (t.id === plan.id ? { ...t, status: done ? "completed" : t.status, subtasks: t.subtasks.map((x) => ({ ...x, status })) } : t)) },
-      }));
-
-    say({ who: "me", text });
-    mark([id], "down");
-    setTimeout(() => {
-      say({ who: "them", text: subs.length ? `On it. Splitting this across ${subs.map(first).join(", ")}.` : "On it." });
-      set((s) => ({ plans: { ...s.plans, [id]: [plan, ...(s.plans[id] ?? [])] } }));
-      mark([id], "work");
-      mark(subs, "down");
-    }, 1200);
-    setTimeout(() => {
-      mark(subs, "work");
-      step("in-progress");
-    }, 2400);
-    setTimeout(() => mark(subs, "up"), 4200);
-    setTimeout(() => {
-      mark(subs);
-      mark([id], "up");
-      step("completed");
-    }, 5400);
-    setTimeout(() => {
-      const cd = STRONG[Math.floor(Math.random() * STRONG.length)];
-      const where = DISTRICTS.find((d) => d.cd === cd)!.name;
-      set((s) => ({ cash: s.cash - 2400, sent: { ...s.sent, [cd]: Math.min(95, s.sent[cd] + 4) } }));
-      step("completed", true);
-      say({ who: "them", text: `Done. Spent $2,400. Support is up in ${where}. I could do more with another $3k.` });
-      say({ who: "note", text: `Placeholder reply. ${me.name!.split(" ")[0]} becomes a real agent here.` });
-      mark([id]);
-    }, 6400);
-  },
+  // Staff are real agents (src/lib/staff). Loaded on demand to keep this store free of agent code.
+  instruct: (id, text) => void import("./staff/run").then((m) => m.instruct(id, text)),
 
   hire: (id, pick) =>
     set((s) => ({
@@ -247,12 +198,6 @@ export const useGame = create<State>((set, get) => ({
     }));
   },
 
-  speak: () => {
-    const [staff, text] = QUIPS[Math.floor(Math.random() * QUIPS.length)];
-    set((s) => ({
-      toasts: [...s.toasts.slice(-2), { id: uid++, staff, text }],
-      unread: { ...s.unread, [staff]: true },
-      logs: { ...s.logs, [staff]: [...(s.logs[staff] ?? []), { who: "them", text }] },
-    }));
-  },
+  // Staff speak up when something in the world deserves it (src/lib/staff/speak.ts).
+  speak: () => void import("./staff/speak").then((m) => m.speakUp()),
 }));
