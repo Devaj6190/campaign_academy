@@ -62,8 +62,9 @@ function pickFaction(w: Snapshot, text: string, action: ActionId) {
 export async function runOffline(ctx: RunCtx, pace = 1) {
   const { req, emit } = ctx;
   const w = req.snapshot;
-  const me = w.staff.find((s) => s.id === req.director)!;
-  const first = me.name!.split(" ")[0];
+  const me = w.staff.find((s) => s.id === req.director);
+  if (!me?.name) return emit({ t: "done" }); // the post is vacant now
+  const first = me.name.split(" ")[0];
   const team = describeTeam(w, req.director);
   const basis = req.followOf ?? req.text;
   const actions = pickActions(basis, req.director);

@@ -53,24 +53,7 @@ function packet(from: string, to: string) {
   setTimeout(() => useStaff.setState((s) => ({ packets: s.packets.filter((p) => p.id !== id) })), 1300);
 }
 
-/** Apply one action's effects to the shared world. Functional updates, so a day rolling over mid-run is fine. */
-function apply(e: Effect) {
-  useGame.setState((g) => {
-    const sent = { ...g.sent };
-    for (const [cd, d] of Object.entries(e.sent)) sent[+cd] = Math.max(5, Math.min(95, (sent[+cd] ?? 50) + d));
-    const factions = g.factions.map((f) => (e.factions[f.id] ? { ...f, feel: Math.max(5, Math.min(95, f.feel + e.factions[f.id])) } : f));
-    const day = Math.min(30, g.day + 1); // booked for tomorrow
-    const calendar = e.calendar ? { ...g.calendar, [day]: [...(g.calendar[day] ?? []), e.calendar] } : g.calendar;
-    return { cash: g.cash - e.cost + e.raised, sent, factions, calendar };
-  });
-  // Poll momentum accumulates; whole points reach the poll.
-  let m = useStaff.getState().momentum + e.momentum;
-  let gain = 0;
-  while (m >= 1) { m -= 1; gain += 1; }
-  useStaff.setState({ momentum: m });
-  // Gains come out of the undecided share, so the poll never sums past 100.
-  if (gain) useGame.setState((g) => ({ poll: { ...g.poll, cole: g.poll.cole + Math.min(gain, Math.max(0, 100 - g.poll.cole - g.poll.hale - g.poll.brandt)) } }));
-}
+const apply = (e: Effect) => useGame.getState().applyEffect(e, "staff");
 
 function handle(director: string, runId: number, e: RunEvent) {
   const patchRun = (fn: (r: NonNullable<ReturnType<typeof current>>) => void) =>
@@ -151,6 +134,11 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
   const on = (e: RunEvent) => handle(id, runId, e);
   try {
     const res = await fetch("/api/staff/instruct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
+    // A refused order (vacant post, empty text) is not a network failure: say so instead of simulating.
+    if (res.status >= 400 && res.status < 500) {
+      pushChat(id, { k: "note", text: "That order couldn't be given." });
+      return;
+    }
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
     const reader = res.body.getReader();
     const dec = new TextDecoder();
@@ -207,7 +195,7 @@ export async function loadCandidates(post: string) {
   if (!role || useStaff.getState().candidates[post]) return;
   useStaff.setState((s) => ({ candidates: { ...s.candidates, [post]: { status: "loading", list: [] } } }));
   const g = useGame.getState();
-  const context = `Day ${g.day} of 30, $${g.cash.toLocaleString("en-US")} in the bank, candidate Adrian Cole is pragmatic centre-left and polling ${g.poll.cole}% to Hale's ${g.poll.hale}%.`;
+  const context = `Day ${g.day} of 30, $${g.cash.toLocaleString("en-US")} in the bank, candidate Adrian Cole stands for more housing near transit, better buses, level police funding and help for small business, and is polling ${g.poll.cole}% to Hale's ${g.poll.hale}%.`;
   try {
     const res = await fetch("/api/staff/candidates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role, context }) });
     const data = (await res.json()) as { list: Candidate[]; mode: "live" | "offline" };

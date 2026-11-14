@@ -2,7 +2,9 @@ import { create } from "zustand";
 import { FACTIONS, GAINS, LOSSES, STAFF, STRONG, WEAK, type Faction, type Flow, type Staff, type View } from "./data";
 import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
 import { DISTRICTS } from "./geo";
+import { shares } from "./demographics";
 import { hash } from "./util";
+import type { Effect } from "./staff/engine";
 
 // One shared world state. Every screen is a view of this, so an action on one shows up on the others.
 // Behaviour is canned for now: the places marked "agent" and "model" are where real calls go.
@@ -15,6 +17,9 @@ type Line = { who: "me" | "them" | "note"; text: string };
 type Overlay = "paper" | "manifesto" | "calendar" | "tactic" | "election" | null;
 export type Toast = { id: number; staff: string; text: string };
 export type Draft = { text: string; up: string[]; down: string[] };
+
+/** One change to the world, stamped with when it happened. Every view that explains "why" reads this. */
+export type LedgerEntry = { id: number; day: number; min: number; source: "staff" | "candidate"; effect: Effect };
 
 type State = {
   view: View;
@@ -42,6 +47,11 @@ type State = {
   overlay: Overlay;
   toasts: Toast[];
   tacticResult: "backfired" | "worked" | null;
+  /** Fractional poll movement; whole points reach the poll. */
+  momentum: number;
+  ledger: LedgerEntry[];
+  /** The one write path for cash, district support, faction feeling and the poll (contract on #1). */
+  applyEffect: (e: Effect, source: LedgerEntry["source"]) => void;
 
   go: (v: View) => void;
   tick: () => void;
@@ -67,6 +77,22 @@ export const netPerDay = net;
 
 const sent: Record<number, number> = {};
 for (const d of DISTRICTS) sent[d.cd] = STRONG.includes(d.cd) ? 62 + hash(d.cd) * 12 : WEAK.includes(d.cd) ? 22 + hash(d.cd) * 12 : 38 + hash(d.cd) * 18;
+// Day 1 is half the README's story (above) and half real data: how each district's mix of voter groups
+// (census shares) feels about Cole. Both halves are spread over the same range so neither drowns the other.
+{
+  const lean: Record<number, number> = {};
+  for (const d of DISTRICTS) {
+    const s = shares(d.cd);
+    if (!s) continue;
+    let w = 0, v = 0;
+    for (const f of FACTIONS) { w += s[f.id] ?? 0; v += (s[f.id] ?? 0) * f.feel; }
+    lean[d.cd] = v / w;
+  }
+  const vals = Object.values(lean);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length) || 1;
+  for (const [cd, v] of Object.entries(lean)) sent[+cd] = 0.5 * sent[+cd] + 0.5 * Math.max(15, Math.min(85, 48 + ((v - mean) / sd) * 13));
+}
 
 // What each person does when their boss hands them a piece of work. Placeholder until the agents write their own plans.
 const JOBS: Record<string, [string, string]> = {
@@ -96,8 +122,9 @@ function planFor(staff: Staff[], id: string, title: string, statuses: PlanStatus
 /** Sentiment for one district under the current filter. Simulated. */
 export const sentimentOf = (s: Pick<State, "sent" | "filter" | "factions">, cd: number) => {
   if (s.filter === "all") return s.sent[cd];
+  // Support among one group here = how that group feels citywide, shifted by this district's lean.
   const f = s.factions.find((x) => x.id === s.filter)!;
-  return Math.max(5, Math.min(95, s.sent[cd] + (hash(cd, f.size) - 0.5) * 44 + (f.feel - 50) * 0.5));
+  return Math.max(5, Math.min(95, f.feel + (s.sent[cd] - 50) * 0.6));
 };
 
 // Dev handle for driving the UI from the console: window.game.setState({ view: "map" })
@@ -135,6 +162,25 @@ export const useGame = create<State>((set, get) => ({
   overlay: "paper",
   toasts: [],
   tacticResult: null,
+  momentum: 0,
+  ledger: [],
+
+  applyEffect: (e, source) =>
+    set((g) => {
+      const sent = { ...g.sent };
+      for (const [cd, d] of Object.entries(e.sent)) sent[+cd] = Math.max(5, Math.min(95, (sent[+cd] ?? 50) + d));
+      const factions = g.factions.map((f) => (e.factions[f.id] ? { ...f, feel: Math.max(5, Math.min(95, f.feel + e.factions[f.id])) } : f));
+      const booked = Math.min(30, g.day + 1); // events go on tomorrow's calendar
+      const calendar = e.calendar ? { ...g.calendar, [booked]: [...(g.calendar[booked] ?? []), e.calendar] } : g.calendar;
+      // Whole points of momentum reach the poll, taken from the undecided share so it never sums past 100.
+      let momentum = g.momentum + e.momentum;
+      let gain = 0;
+      while (momentum >= 1) { momentum -= 1; gain += 1; }
+      const room = Math.max(0, 100 - g.poll.cole - g.poll.hale - g.poll.brandt);
+      const poll = gain ? { ...g.poll, cole: g.poll.cole + Math.min(gain, room) } : g.poll;
+      const entry: LedgerEntry = { id: uid++, day: g.day, min: g.min, source, effect: e };
+      return { cash: g.cash - e.cost + e.raised, sent, factions, calendar, momentum, poll, ledger: [...g.ledger, entry].slice(-400) };
+    }),
 
   go: (view) => set({ view }),
   setSpeed: (speed) => set({ speed }),

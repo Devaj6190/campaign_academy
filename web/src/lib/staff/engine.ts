@@ -1,6 +1,7 @@
+import { presence } from "../demographics";
 import { hash } from "../util";
 import { ACTIONS, type ActionId } from "./catalog";
-import { profileFor, type Profile } from "./roster";
+import { CANDIDATE, profileFor, type Profile } from "./roster";
 import { findBoros, findFactions, findPlaces, PLACES, placeName, shortPlace, type Snapshot } from "./world";
 
 // Deterministic rules. Same inputs, same outcome, so the server can tell an agent what happened and the
@@ -24,6 +25,7 @@ export type Effect = {
 };
 
 export const profileOf = (w: Pick<Snapshot, "staff" | "hires">, id: string): Profile => {
+  if (id === "candidate") return CANDIDATE;
   const p = w.staff.find((s) => s.id === id);
   return w.hires[id] ?? profileFor(id, p?.role ?? "");
 };
@@ -45,7 +47,7 @@ export function resolve(
   const district = a.needs.district ? p.district ?? PLACES[Math.floor(hash(ctx.seed, 7) * PLACES.length)].cd : p.district;
   const faction = a.needs.faction ? p.faction ?? w.factions[0].id : p.faction;
   const boro = district ? Math.floor(district / 100) : 0;
-  const turf = prof.turf?.includes(boro) ? 1.2 : 1;
+  const turf = prof.turf?.includes(boro) || (district && prof.home?.includes(district)) ? 1.2 : 1;
   const stretched = ctx.load > 2 ? 0.85 : 1;
   const luck = 0.85 + hash(ctx.seed, 13) * 0.3;
   const mod = prof.effect * (prof.special?.[id] ?? 1) * turf * (0.85 + morale / 400) * ctx.quality * stretched * luck * (fit ? 1 : 0.65);
@@ -53,13 +55,15 @@ export function resolve(
   const cost = r50(a.cost * prof.cost * (fit ? 1 : 1.15));
   const sent: Record<number, number> = {};
   const factions: Record<string, number> = {};
+  // Aiming at a group lands harder where that group really lives (census shares).
+  const here = presence(district, p.faction ? faction : undefined);
   if (a.local && district) {
     const now = w.sent[district] ?? 50;
-    sent[district] = r1(a.local * mod * Math.max(0.3, Math.min(1.2, (100 - now) / 55)));
+    sent[district] = r1(a.local * mod * here * Math.max(0.3, Math.min(1.2, (100 - now) / 55)));
   }
   if (a.group && faction) {
     const feel = w.factions.find((f) => f.id === faction)?.feel ?? 50;
-    factions[faction] = r1(a.group * mod * Math.max(0.35, Math.min(1.2, (100 - feel) / 55)));
+    factions[faction] = r1(a.group * mod * here * Math.max(0.35, Math.min(1.2, (100 - feel) / 55)));
   }
   // Fundraising from the rich is noticed by the people who dislike the rich.
   if (id === "donor_dinner") {
