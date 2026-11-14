@@ -1,14 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowDown, ArrowUp, Lock, Sparkles, X } from "lucide-react";
+import { Lock, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { DISTRICTS } from "@/lib/geo";
 import { useGame, type Draft } from "@/lib/store";
 import { cn, hash } from "@/lib/util";
 import { tacticRisk, type Deliverer } from "@/lib/engine/tactic";
-import { Avatar, Button, Dialog, Label, Meter, Tag } from "./ui";
+import { Avatar, Button, Dialog, Label, Meter } from "./ui";
 import { ShaderBackground } from "./ui21/dithering";
+import { PaperView } from "@/views/paper/Paper";
 
 export function Overlays() {
   const overlay = useGame((s) => s.overlay);
@@ -16,93 +16,13 @@ export function Overlays() {
   const close = () => open(null);
   return (
     <>
-      <Dialog open={overlay === "paper"} onClose={close} className="max-w-[720px]"><Paper close={close} /></Dialog>
+      <Dialog open={overlay === "paper"} onClose={close} className="max-w-[1040px]"><PaperView close={close} /></Dialog>
       <Dialog open={overlay === "manifesto"} onClose={close} side="right"><Manifesto /></Dialog>
       <Dialog open={overlay === "calendar"} onClose={close} className="max-w-[880px]"><Calendar /></Dialog>
       <Dialog open={overlay === "tactic"} onClose={close} className="max-w-[440px]"><Tactic close={close} /></Dialog>
       <Dialog open={overlay === "election"} onClose={close} className="max-w-[520px]"><Election /></Dialog>
       <Toasts />
     </>
-  );
-}
-
-// The morning paper: how events and yesterday's results reach the player.
-function Paper({ close }: { close: () => void }) {
-  const day = useGame((s) => s.day);
-  const poll = useGame((s) => s.poll);
-  const factions = useGame((s) => s.factions);
-  const news = useGame((s) => s.news);
-  // Lead story is built from a real district's top 311 complaint.
-  const lead = DISTRICTS.filter((d) => !d.park && d.issues.length).sort((a, b) => hash(b.cd, day) - hash(a.cd, day))[0];
-  const [issue, count] = lead.issues[0];
-  const up = factions.filter((f) => f.feel >= 58), down = factions.filter((f) => f.feel <= 40);
-  const rows: [string, number, string][] = [["Hale", poll.hale, "rgb(255 255 255 / .45)"], ["Cole", poll.cole, "var(--color-warm)"], ["Brandt", poll.brandt, "rgb(255 255 255 / .25)"]];
-  return (
-    <div className="overflow-y-auto px-10 pt-9 pb-8">
-      <div className="tnum flex justify-between pr-8 font-mono text-[10.5px] tracking-[0.14em] text-faint uppercase">
-        <span>Day {day}</span><span>{30 - day} days to the election</span><span>Morning edition</span>
-      </div>
-      <h1 className="mt-4 border-y border-line-strong py-3 text-center font-serif text-[44px] leading-none tracking-tight">The Five Borough Ledger</h1>
-
-      <div className="mt-7 flex items-center gap-2"><Label>Lead story</Label><Tag kind="real" /></div>
-      <h2 className="mt-2 font-serif text-[32px] leading-[1.08] tracking-tight">
-        <span className="capitalize">{issue.toLowerCase()}</span> complaints pile up in {lead.name}
-      </h2>
-      <p className="mt-3 max-w-[60ch] text-[14px] leading-relaxed text-soft">
-        Residents filed {count.toLocaleString("en-US")} reports in a month and say nobody at City Hall is listening. Both leading campaigns were asked what they would do about it.
-      </p>
-      <div className="mt-4 flex items-center gap-2">
-        <Button size="sm" onClick={close}>Respond today</Button>
-        <Button size="sm" variant="ghost" onClick={close}>Let it pass</Button>
-      </div>
-
-      <div className="mt-8 grid grid-cols-2 gap-8 border-t border-line pt-6">
-        <article>
-          <Label>The opposition</Label>
-          {/* What the rival campaigns actually did overnight (engine/schedule.ts). */}
-          {news.debate && <h3 className="mt-1.5 font-serif text-[21px] leading-tight">{news.debate}</h3>}
-          {news.opposition.length ? (
-            <>
-              {!news.debate && <h3 className="mt-1.5 font-serif text-[21px] leading-tight">{news.opposition[0].replace(/\.$/, "")}</h3>}
-              <p className="mt-2 text-[13px] leading-relaxed text-muted">{news.opposition.slice(news.debate ? 0 : 1).join(" ") || "Their campaigns are watching where you go next."}</p>
-            </>
-          ) : (
-            !news.debate && (
-              <>
-                <h3 className="mt-1.5 font-serif text-[21px] leading-tight">{day === 1 ? "Hale and Brandt open their final month" : "A quiet night for the rivals"}</h3>
-                <p className="mt-2 text-[13px] leading-relaxed text-muted">{day === 1 ? "The front-runner has money and the outer boroughs; the insurgent has volunteers. Both will answer what you do." : "Their moves will show up here the morning after they make them."}</p>
-              </>
-            )
-          )}
-        </article>
-        <article>
-          <Label>Your campaign</Label>
-          <h3 className="mt-1.5 font-serif text-[21px] leading-tight">Cole canvass reaches 1,400 doors</h3>
-          <p className="mt-2 text-[13px] leading-relaxed text-muted">Volunteers in western Queens credited the field team. The results of what you did yesterday are reported here.</p>
-        </article>
-      </div>
-
-      <div className="mt-8 grid grid-cols-2 gap-8 border-t border-line pt-6">
-        <div>
-          <Label>The poll</Label>
-          <div className="mt-3 space-y-2.5">
-            {rows.map(([n, v, c]) => (
-              <div key={n} className="flex items-center gap-3 text-[13px]">
-                <span className="w-12 text-soft">{n}</span><Meter value={v * 2} color={c} className="flex-1" /><span className="tnum w-8 text-right font-mono text-[12px]">{v}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <Label>Who likes Cole</Label>
-          <div className="mt-3 space-y-2 text-[13px]">
-            <div className="flex gap-2.5"><ArrowUp className="mt-0.5 size-3.5 shrink-0 text-warm" /><span className="text-soft">{up.map((f) => f.name).join(", ")}</span></div>
-            <div className="flex gap-2.5"><ArrowDown className="mt-0.5 size-3.5 shrink-0 text-cool" /><span className="text-soft">{down.map((f) => f.name).join(", ")}</span></div>
-          </div>
-        </div>
-      </div>
-      <div className="mt-8 flex justify-end"><Button variant="primary" onClick={close}>Start the day</Button></div>
-    </div>
   );
 }
 

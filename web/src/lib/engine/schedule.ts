@@ -21,7 +21,8 @@ function coleToday() {
   const g = useGame.getState();
   const today = g.ledger.filter((l) => l.day === g.day && l.source !== "rival");
   const gained = [...new Set(today.flatMap((l) => Object.entries(l.effect.sent).filter(([, d]) => d > 0).map(([cd]) => +cd)))];
-  return { lines: today.slice(-6).map((l) => l.effect.summary.replace(/ \(Not their strength.*$/, "")), gained };
+  const ignored = g.editions.filter((e) => e.day === g.day && e.decision === "pass").map((e) => `Cole chose not to respond to this story in today's paper: "${e.lead.headline}"`);
+  return { lines: [...today.slice(-6).map((l) => l.effect.summary.replace(/ \(Not their strength.*$/, "")), ...ignored], gained };
 }
 
 async function plan(who: Rival, forDay?: number) {
@@ -81,4 +82,6 @@ export function overnight(ended: number) {
     const p = publish(g, today);
     useGame.setState({ polls: [...g.polls, p], poll: { cole: p.cole, hale: p.hale, brandt: p.brandt }, fieldRead: { ...g.sent } });
   }
+  // Then the paper goes to press: a debate extra, election eve on day 30, a daily edition otherwise.
+  void import("../paper/run").then((m) => m.publishEdition(today === 30 ? "eve" : DEBATE_DAYS.includes(ended) ? "debate" : "daily"));
 }

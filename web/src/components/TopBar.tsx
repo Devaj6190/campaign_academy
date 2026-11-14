@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowDownRight, ArrowUpRight, ListChecks, Minus, Plus } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ListChecks, Minus, Newspaper, Plus } from "lucide-react";
 import type { Flow, View } from "@/lib/data";
 import { DAY_END, DAY_START, SPEEDS, netPerDay, useGame } from "@/lib/store";
 import { clock, cn, money, moneyK } from "@/lib/util";
@@ -128,6 +128,20 @@ const Step = ({ children, onClick, label }: { children: React.ReactNode; onClick
   </button>
 );
 
+// The Ledger arrives here, never as a popup: the latest headline, with a dot until it has been read.
+function PaperChip() {
+  const e = useGame((s) => s.editions[s.editions.length - 1]);
+  const open = useGame((s) => s.open);
+  if (!e) return null;
+  return (
+    <button onClick={() => { useGame.setState({ paperIndex: null }); open("paper"); }} title={e.lead.headline} className="relative hidden h-8 max-w-[260px] items-center gap-2 rounded-md border border-line px-2.5 text-[12px] text-soft transition-colors hover:bg-hover hover:text-fg min-[1400px]:flex">
+      <Newspaper className="size-3.5 shrink-0 text-muted" />
+      <span className="truncate font-serif text-[13px]">{e.lead.headline}</span>
+      {!e.read && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warm" aria-label="Unread" />}
+    </button>
+  );
+}
+
 function Clock() {
   const day = useGame((s) => s.day);
   const min = useGame((s) => s.min);
@@ -139,6 +153,7 @@ function Clock() {
   const late = min > DAY_END - 120; // last two hours of the day
   return (
     <div className="flex items-center justify-end gap-4">
+      <PaperChip />
       <div className="hidden w-40 xl:block" title={`${latest.pollster}, day ${latest.day}: ${latest.n.toLocaleString("en-US")} likely voters, margin of error ±${latest.moe}`}>
         <div className="tnum mb-1 flex justify-between font-mono text-[11px]">
           <span className="text-warm">Cole {poll.cole}</span>

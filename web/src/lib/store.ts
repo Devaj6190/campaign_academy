@@ -10,7 +10,8 @@ import { calibrate, pollOf, type Rival } from "./engine/poll";
 import { publish, type PollRecord } from "./engine/polls";
 import { RIVALS } from "./engine/rivals";
 import { tacticOutcome, type Deliverer } from "./engine/tactic";
-import type { ElectionResult } from "./engine/election";
+import { electionResult, type ElectionResult } from "./engine/election";
+import type { Edition } from "./paper/edition";
 
 // One shared world state. Every screen is a view of this, so an action on one shows up on the others.
 // Behaviour is canned for now: the places marked "agent" and "model" are where real calls go.
@@ -71,6 +72,10 @@ type State = {
   /** Cole's poll at the end of each day, for trends and debates. */
   /** Election night: the result and how many districts have reported so far. */
   election: { result: ElectionResult; shown: number; done?: boolean } | null;
+  /** Every edition of The Five Borough Ledger so far, oldest first (lib/paper). */
+  editions: Edition[];
+  /** Which edition the paper shows: an index into editions, or null for the latest. */
+  paperIndex: number | null;
   /** The one write path for cash, district support, faction feeling and the poll (contract on #1). */
   applyEffect: (e: Effect, source: LedgerEntry["source"]) => void;
 
@@ -204,13 +209,15 @@ export const useGame = create<State>((set, get) => ({
   plans: Object.fromEntries(STAFF.filter((p) => !p.boss && p.name).map((p) => [p.id, [planFor(STAFF, p.id, p.doing!, ["completed", "in-progress", "pending"])]])),
   busy: {},
   unread: {},
-  overlay: "paper",
+  overlay: null,
   toasts: [],
   tacticResult: null,
   ledger: [],
   rivals: START_RIVALS,
   news: { day: 1, opposition: [] },
   election: null,
+  editions: [],
+  paperIndex: null,
 
   applyEffect: (e, source) =>
     set((g) => {
@@ -265,7 +272,8 @@ export const useGame = create<State>((set, get) => ({
     if (s.day >= 30) {
       if (s.min >= DAY_END) return;
       set({ min: DAY_END });
-      void import("./engine/election").then(({ electionResult }) => set({ view: "map", district: null, overlay: null, election: { result: electionResult(get()), shown: 0 } }));
+      set({ view: "map", district: null, overlay: null, election: { result: electionResult(get()), shown: 0 } });
+      void import("./paper/run").then((m) => m.publishEdition("result"));
       return;
     }
     // Day rolls over: money settles, the rivals' overnight moves land, debates are judged, and the paper arrives.
@@ -275,7 +283,6 @@ export const useGame = create<State>((set, get) => ({
       cash: s.cash + net(s),
       tasks: s.tasks.filter((t) => !t.done),
       news: { day: s.day + 1, opposition: [] },
-      overlay: "paper",
     });
     void import("./engine/schedule").then((m) => m.overnight(s.day));
   },
@@ -320,3 +327,6 @@ export const useGame = create<State>((set, get) => ({
   // Staff speak up when something in the world deserves it (src/lib/staff/speak.ts).
   speak: () => void import("./staff/speak").then((m) => m.speakUp()),
 }));
+
+// The first morning's paper (later editions come from engine/schedule.ts overnight).
+if (typeof window !== "undefined") queueMicrotask(() => void import("./paper/run").then((m) => m.publishEdition()));

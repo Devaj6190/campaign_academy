@@ -21,6 +21,7 @@ export function SidebarBody() {
   const addTask = useGame((s) => s.addTask);
   const open = useGame((s) => s.open);
   const planks = useGame((s) => s.manifesto.length);
+  const unread = useGame((s) => s.editions.length > 0 && !s.editions[s.editions.length - 1].read);
   const [text, setText] = useState("");
   const left = tasks.filter((t) => !t.done).length;
 
@@ -52,7 +53,7 @@ export function SidebarBody() {
         </form>
 
         <div className="mt-6 mb-2 px-1"><Label>Desk</Label></div>
-        <Row icon={<Newspaper />} onClick={() => open("paper")}>Morning paper</Row>
+        <Row icon={<Newspaper />} onClick={() => { useGame.setState({ paperIndex: null }); open("paper"); }} dot={unread}>Morning paper</Row>
         <Row icon={<ScrollText />} onClick={() => open("manifesto")} badge={String(planks)}>Manifesto</Row>
         <Row icon={<CalendarDays />} onClick={() => open("calendar")}>Calendar</Row>
       </div>
@@ -61,10 +62,11 @@ export function SidebarBody() {
   );
 }
 
-const Row = ({ icon, children, onClick, badge }: { icon: ReactNode; children: ReactNode; onClick: () => void; badge?: string }) => (
+const Row = ({ icon, children, onClick, badge, dot }: { icon: ReactNode; children: ReactNode; onClick: () => void; badge?: string; dot?: boolean }) => (
   <button onClick={onClick} className="flex h-8 w-full items-center gap-2.5 rounded-md px-1.5 text-[13px] text-soft transition-colors hover:bg-hover hover:text-fg [&_svg]:size-4 [&_svg]:text-muted">
     {icon}
     <span className="flex-1 text-left">{children}</span>
+    {dot && <span className="size-1.5 rounded-full bg-warm" aria-label="Unread" />}
     {badge && <span className="tnum rounded bg-white/[0.07] px-1.5 font-mono text-[10.5px] text-muted">{badge}</span>}
   </button>
 );
