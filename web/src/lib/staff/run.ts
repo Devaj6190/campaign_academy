@@ -1,8 +1,8 @@
 "use client";
 
 import { useGame } from "../store";
-import { ACTIONS } from "./catalog";
-import type { Effect } from "./engine";
+import { ACTIONS } from "../engine/catalog";
+import type { Effect } from "../engine/resolve";
 import { runOffline } from "./offline";
 import { RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
@@ -90,7 +90,7 @@ function handle(director: string, runId: number, e: RunEvent) {
         setTimeout(() => useStaff.setState((s) => ({ misfit: { ...s.misfit, [by]: false } })), 8000);
       }
       const where = e.effect.district ? ` in ${shortPlace(e.effect.district)}` : "";
-      useStaff.setState((s) => ({ job: { ...s.job, [e.effect.by]: `${ACTIONS[e.effect.action].doing}${where}` } }));
+      useStaff.setState((s) => ({ job: { ...s.job, [e.effect.by]: `${e.effect.action in ACTIONS ? ACTIONS[e.effect.action as keyof typeof ACTIONS].doing : e.effect.label}${where}` } }));
       pushChat(director, { k: "receipt", effect: e.effect, by: e.effect.by });
       if (e.effect.by !== director) pushChat(e.effect.by, { k: "receipt", effect: e.effect, by: e.effect.by });
       feed(e.effect.by, e.effect.summary, e.effect.raised > e.effect.cost ? "pos" : undefined);

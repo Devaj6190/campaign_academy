@@ -2,8 +2,8 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { tool } from "@langchain/core/tools";
 import { createDeepAgent, registerHarnessProfile, type SubAgent } from "deepagents";
 import { z } from "zod";
-import { ACTION_IDS, ACTIONS } from "./catalog";
-import { describeTeam, profileOf } from "./engine";
+import { ACTION_IDS, ACTIONS } from "../engine/catalog";
+import { describeTeam, profileOf } from "../engine/resolve";
 import type { RunCtx } from "./protocol";
 import { humanize, PLACES, type Snapshot } from "./world";
 
@@ -26,7 +26,7 @@ const textOf = (c: unknown) => (typeof c === "string" ? c : Array.isArray(c) ? c
 
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z]+/g, "_").replace(/^_|_$/g, "");
 
-function world(w: Snapshot) {
+export function world(w: Snapshot) {
   const days = 30 - w.day;
   const factions = w.factions.map((f) => `${f.id} (${f.name}): feels ${Math.round(f.feel)}/100 toward Cole, size ${f.size}`).join("\n");
   const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 50) - (w.sent[b.cd] ?? 50));
@@ -40,7 +40,7 @@ ${PLACES.map(line).join("\n")}
 Weakest five: ${weakest.slice(0, 5).map((p) => p.name).join(", ")}.`;
 }
 
-const CATALOG = ACTION_IDS.map((id) => `- ${id}: ${ACTIONS[id].about} ~$${ACTIONS[id].cost.toLocaleString("en-US")}${ACTIONS[id].needs.district ? " [needs district]" : ""}${ACTIONS[id].needs.faction ? " [needs faction]" : ""}`).join("\n");
+export const CATALOG = ACTION_IDS.map((id) => `- ${id}: ${ACTIONS[id].about} ~$${ACTIONS[id].cost.toLocaleString("en-US")}${ACTIONS[id].needs.district ? " [needs district]" : ""}${ACTIONS[id].needs.faction ? " [needs faction]" : ""}`).join("\n");
 
 function actionTool(ctx: RunCtx, by: string) {
   return tool(

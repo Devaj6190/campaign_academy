@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Effect } from "./engine";
+import type { Effect } from "../engine/resolve";
 import type { Ask, PlanItem } from "./protocol";
 import type { Candidate, Profile } from "./roster";
 

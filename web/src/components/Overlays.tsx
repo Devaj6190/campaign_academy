@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { DISTRICTS } from "@/lib/geo";
 import { useGame, type Draft } from "@/lib/store";
 import { cn, hash } from "@/lib/util";
+import { tacticRisk, type Deliverer } from "@/lib/engine/tactic";
 import { Avatar, Button, Dialog, Label, Meter, Tag } from "./ui";
 import { ShaderBackground } from "./ui21/dithering";
 
@@ -30,6 +31,7 @@ function Paper({ close }: { close: () => void }) {
   const day = useGame((s) => s.day);
   const poll = useGame((s) => s.poll);
   const factions = useGame((s) => s.factions);
+  const news = useGame((s) => s.news);
   // Lead story is built from a real district's top 311 complaint.
   const lead = DISTRICTS.filter((d) => !d.park && d.issues.length).sort((a, b) => hash(b.cd, day) - hash(a.cd, day))[0];
   const [issue, count] = lead.issues[0];
@@ -57,8 +59,21 @@ function Paper({ close }: { close: () => void }) {
       <div className="mt-8 grid grid-cols-2 gap-8 border-t border-line pt-6">
         <article>
           <Label>The opposition</Label>
-          <h3 className="mt-1.5 font-serif text-[21px] leading-tight">Hale promises 2,000 new officers</h3>
-          <p className="mt-2 text-[13px] leading-relaxed text-muted">The front-runner drew applause from homeowners in southern Brooklyn. Seniors are paying attention.</p>
+          {/* What the rival campaigns actually did overnight (engine/schedule.ts). */}
+          {news.debate && <h3 className="mt-1.5 font-serif text-[21px] leading-tight">{news.debate}</h3>}
+          {news.opposition.length ? (
+            <>
+              {!news.debate && <h3 className="mt-1.5 font-serif text-[21px] leading-tight">{news.opposition[0].replace(/\.$/, "")}</h3>}
+              <p className="mt-2 text-[13px] leading-relaxed text-muted">{news.opposition.slice(news.debate ? 0 : 1).join(" ") || "Their campaigns are watching where you go next."}</p>
+            </>
+          ) : (
+            !news.debate && (
+              <>
+                <h3 className="mt-1.5 font-serif text-[21px] leading-tight">{day === 1 ? "Hale and Brandt open their final month" : "A quiet night for the rivals"}</h3>
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">{day === 1 ? "The front-runner has money and the outer boroughs; the insurgent has volunteers. Both will answer what you do." : "Their moves will show up here the morning after they make them."}</p>
+              </>
+            )
+          )}
         </article>
         <article>
           <Label>Your campaign</Label>
@@ -184,6 +199,11 @@ function Calendar() {
 function Tactic({ close }: { close: () => void }) {
   const run = useGame((s) => s.runTactic);
   const result = useGame((s) => s.tacticResult);
+  const world = useGame();
+  const [by, setBy] = useState<Deliverer>("com");
+  // The risk is worked out from the situation (engine/tactic.ts) and shown with its reasons before you commit.
+  const { risk, reasons } = tacticRisk(world, by);
+  const pct = Math.round(risk * 100);
   if (result)
     return (
       <div className="p-7">
@@ -203,24 +223,36 @@ function Tactic({ close }: { close: () => void }) {
         <div className="flex justify-between"><dt className="text-muted">If it lands</dt><dd className="text-pos">+3 with seniors</dd></div>
         <div className="flex justify-between"><dt className="text-muted">If it reads as an attack</dt><dd className="text-neg">−6 with seniors, lost volunteers</dd></div>
       </dl>
-      <div className="mt-5 rounded-xl border border-neg/25 bg-neg/[0.06] p-4">
-        <div className="flex items-baseline justify-between"><Label className="text-neg">Risk of backlash</Label><span className="tnum font-mono text-[20px] font-medium text-neg">55%</span></div>
-        <Meter value={55} color="var(--color-neg)" className="mt-2.5 h-1.5" />
+      <div className="mt-5 flex items-center gap-1.5 text-[12px]">
+        <span className="mr-1 text-muted">Who delivers it</span>
+        {([["com", "Leo (comms)"], ["pr", "Jo (press)"]] as const).map(([id, label]) => (
+          <button key={id} onClick={() => setBy(id)} className={cn("rounded-full border px-2.5 py-0.5 transition-colors", by === id ? "border-white/40 bg-white/[0.08] text-fg" : "border-line-strong text-muted hover:text-fg")}>{label}</button>
+        ))}
+      </div>
+      <div className="mt-3 rounded-xl border border-neg/25 bg-neg/[0.06] p-4">
+        <div className="flex items-baseline justify-between"><Label className="text-neg">Risk of backlash</Label><span className="tnum font-mono text-[20px] font-medium text-neg">{pct}%</span></div>
+        <Meter value={pct} color="var(--color-neg)" className="mt-2.5 h-1.5" />
+        <ul className="mt-3 space-y-1 text-[11.5px]">
+          {reasons.map((r) => (
+            <li key={r.text} className="flex justify-between gap-3"><span className="text-soft">{r.text}</span><span className={cn("tnum shrink-0 font-mono", r.v > 0 ? "text-neg" : "text-pos")}>{r.v > 0 ? "+" : "−"}{Math.round(Math.abs(r.v) * 100)}</span></li>
+          ))}
+        </ul>
       </div>
       <div className="mt-6 flex items-center gap-2">
         <Button variant="primary" onClick={close}>Hold off</Button>
         <Button onClick={close}>Ask for a positive version</Button>
-        <Button variant="ghost" className="ml-auto text-neg hover:text-neg" onClick={run}>Run it</Button>
+        <Button variant="ghost" className="ml-auto text-neg hover:text-neg" onClick={() => run(by)}>Run it</Button>
       </div>
     </div>
   );
 }
 
 function Election() {
-  const poll = useGame((s) => s.poll);
-  const undecided = 100 - poll.cole - poll.hale - poll.brandt;
-  const cole = poll.cole + Math.round(undecided * 0.5), hale = poll.hale + Math.round(undecided * 0.4), brandt = 100 - cole - hale;
-  const won = cole > hale;
+  // District-by-district result from the engine (engine/election.ts), revealed on the map first.
+  const result = useGame((s) => s.election?.result);
+  if (!result) return null;
+  const { cole, hale, brandt } = result.pct;
+  const won = result.won;
   const rows: [string, number, string][] = [["Adrian Cole", cole, "var(--color-warm)"], ["Victoria Hale", hale, "rgb(255 255 255 / .45)"], ["Naomi Brandt", brandt, "rgb(255 255 255 / .22)"]];
   return (
     <div className="relative p-8">
@@ -237,7 +269,9 @@ function Election() {
           </div>
         ))}
       </div>
-      <p className="mt-8 border-t border-line pt-4 text-[12.5px] leading-relaxed text-muted">Next: the map fills in district by district, then the debrief shows what you did, what it cost, and what the research says about it.</p>
+      <p className="mt-8 border-t border-line pt-4 text-[12.5px] leading-relaxed text-muted">
+        Cole carried {result.districtsWon.cole} of 59 districts (Hale {result.districtsWon.hale}, Brandt {result.districtsWon.brandt}) with {result.totals.cole.toLocaleString("en-US")} votes. Turnout starts from the real 2025 count in each district and rose where your field work was strongest.
+      </p>
     </div>
   );
 }

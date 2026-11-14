@@ -1,5 +1,5 @@
-import { ACTIONS, type ActionId } from "./catalog";
-import { describeTeam, profileOf } from "./engine";
+import { ACTIONS, type ActionId } from "../engine/catalog";
+import { describeTeam, profileOf } from "../engine/resolve";
 import { jitter, RunCtx, sleep } from "./protocol";
 import { findBoros, findFactions, findPlaces, PLACES, shortPlace, type Snapshot } from "./world";
 
