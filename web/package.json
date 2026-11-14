@@ -9,11 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@langchain/anthropic": "^1.6.5",
+    "deepagents": "^1.16.5",
     "lucide-react": "^1.73.0",
     "motion": "^14.14.0",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "zod": "^4.6.7",
     "zustand": "^5.1.0"
   },
   "devDependencies": {
