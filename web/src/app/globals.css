@@ -1,20 +1,27 @@
 @import "tailwindcss";
 
+/* Warm black ground, cream text, and gold kept to one job: marking the thing you can act on or the place you are. */
 @theme {
-  --color-bg: #060607;
-  --color-surface: #0b0b0d;
-  --color-raised: #111114;
-  --color-hover: #17171b;
-  --color-line: rgb(255 255 255 / 0.07);
-  --color-line-strong: rgb(255 255 255 / 0.14);
-  --color-fg: #ededf0;
-  --color-soft: #b4b4bd;
-  --color-muted: #84848e;
-  --color-faint: #54545d;
-  --color-warm: #f0a23b;
-  --color-cool: #5b8def;
-  --color-pos: #5fd08a;
-  --color-neg: #f0705f;
+  --color-bg: #0c0b09;
+  --color-surface: #131210;
+  --color-raised: #1a1815;
+  --color-hover: #23201b;
+  --color-line: rgb(255 244 220 / 0.09);
+  --color-line-strong: rgb(255 244 220 / 0.17);
+  --color-fg: #ece6da;
+  --color-soft: #c6bfb1;
+  --color-muted: #9d9586;
+  --color-faint: #8a8273;
+  --color-gold: #cfa85a;
+  --color-gold-bright: #e6c684;
+  --color-gold-deep: #8c6b2e;
+  /* Data colours. warm is the candidate, cool is the opposition. */
+  --color-warm: #e39a45;
+  --color-cool: #6f9fc4;
+  --color-pos: #86c58f;
+  --color-neg: #e06a52;
+  /* Every white/N overlay in the app picks up the cream tint. */
+  --color-white: #fbf3df;
 }
 
 @theme inline {
@@ -33,10 +40,11 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   letter-spacing: -0.005em;
   font-feature-settings: "cv11", "ss01";
+  caret-color: var(--color-gold);
 }
 
 /* Film grain over everything: the one texture in an otherwise flat UI. */
@@ -46,25 +54,29 @@ body::after {
   inset: 0;
   z-index: 100;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: 0.04;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 ::selection {
-  background: rgb(255 255 255 / 0.18);
+  background: rgb(207 168 90 / 0.3);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 0.12) transparent;
+  scrollbar-color: rgb(255 244 220 / 0.16) transparent;
 }
 
 button {
   cursor: pointer;
 }
 
+a {
+  text-underline-offset: 3px;
+}
+
 :focus-visible {
-  outline: 1px solid rgb(255 255 255 / 0.5);
+  outline: 2px solid var(--color-gold);
   outline-offset: 2px;
 }
 
@@ -73,8 +85,17 @@ button {
 }
 
 .dots {
-  background-image: radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1px);
+  background-image: radial-gradient(rgb(255 244 220 / 0.08) 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+/* Painted header band on a dialog. It fades into the panel below it. */
+.plate-art {
+  background-position: center 40%;
+  background-size: cover;
+  filter: sepia(0.3) saturate(1.1);
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent);
+  mask-image: linear-gradient(to bottom, black 55%, transparent);
 }
 
 @keyframes flow {
@@ -97,4 +118,11 @@ button {
 }
 .breathe {
   animation: breathe 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edge-flow,
+  .breathe {
+    animation: none;
+  }
 }
