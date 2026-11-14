@@ -5,17 +5,22 @@ import { resolve, type Effect } from "./resolve";
 import { lean, type Rival } from "./poll";
 import { PLACES, shortPlace, type Snapshot } from "../staff/world";
 import type { Profile } from "../staff/roster";
+import { GAME } from "../money/rules";
 
 // Hale and Brandt. Their moves come from the same catalog and are scored by the same rules as Cole's,
 // then turned against him: support for Cole falls where they work, the group they court cools on Cole,
 // and their own strength in those districts grows (which the poll reads).
 
-export const RIVALS: Record<Rival, { name: string; short: string; cash: number; perDay: number; runsOn: string; base: string; profile: Profile }> = {
+/** income: what they raise on an ordinary day; participant: in public financing (matching and a spending limit). */
+export const RIVALS: Record<Rival, { name: string; short: string; cash: number; perDay: number; income: number; participant: boolean; smallShare: number; runsOn: string; base: string; profile: Profile }> = {
   hale: {
     name: "Victoria Hale",
     short: "Hale",
     cash: 900_000,
     perDay: 30_000,
+    income: 24_000, // big checks from business and real estate; stays out of public financing
+    participant: false,
+    smallShare: 0.1,
     runsOn: "public safety and business: more police officers, lower property taxes, fewer fines and rules for small business",
     base: "homeowners, seniors, donors and real estate, Staten Island and southern Brooklyn",
     profile: { skills: ["planning", "field", "volunteers", "finance", "events", "comms", "press", "digital", "policy", "data"], cost: 1, effect: 1, voice: "Disciplined front-runner with money.", salary: 0 },
@@ -25,6 +30,9 @@ export const RIVALS: Record<Rival, { name: string; short: string; cash: number; 
     short: "Brandt",
     cash: 250_000,
     perDay: 9_000,
+    income: 5_500, // small online gifts, matched 8 to 1 with public funds
+    participant: true,
+    smallShare: 0.9,
     runsOn: "rent and police reform: rent freezes, tenant protection, moving police money to services",
     base: "young activists, students and young renters in north Brooklyn and upper Manhattan",
     profile: { skills: ["planning", "field", "volunteers", "events", "comms", "press", "digital", "policy"], cost: 0.9, effect: 1.05, voice: "Energetic insurgent with volunteers, not money.", salary: 0 },
@@ -33,12 +41,23 @@ export const RIVALS: Record<Rival, { name: string; short: string; cash: number; 
 
 export type Move = { action: ActionId; district?: number; faction?: string };
 
+/** Tonight's budget comes from the bank: a fair share of the cash for the days left, within the
+ *  campaign's usual range, and (for a participant) within what the spending limit still allows. */
+export function rivalBudget(who: Rival, b: { cash: number; spent: number; day: number; extra: boolean }) {
+  const r = RIVALS[who];
+  const daysLeft = Math.max(1, 30 - b.day);
+  let budget = Math.max(r.perDay * 0.5, Math.min(b.cash / daysLeft, r.perDay * 2.2));
+  if (r.participant) budget = Math.min(budget, Math.max(0, GAME.spendingLimit - b.spent) / daysLeft);
+  return Math.max(0, Math.min(b.cash, budget * (b.extra ? 1.6 : 1)));
+}
+
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /** Score a rival's move with the shared rules, then point it at Cole. */
 export function rivalEffect(w: Snapshot, who: Rival, m: Move, seed: number): Effect {
   const r = RIVALS[who];
-  const world = { ...w, hires: { ...w.hires, [who]: r.profile }, morale: { ...w.morale, [who]: 75 } };
+  // Rivals keep their own books (store.ts), so Cole's donor fatigue and budgets don't apply to them.
+  const world = { ...w, money: undefined, hires: { ...w.hires, [who]: r.profile }, morale: { ...w.morale, [who]: 75 } };
   const base = resolve(world, who, m.action, { district: m.district, faction: m.faction }, { quality: 1, seed, load: 0 });
   const sent = Object.fromEntries(Object.entries(base.sent).map(([cd, d]) => [cd, r1(-0.6 * d)]));
   const factions = Object.fromEntries(Object.entries(base.factions).filter(([, d]) => d > 0).map(([f, d]) => [f, r1(-0.4 * d)]));

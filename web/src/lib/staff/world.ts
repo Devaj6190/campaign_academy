@@ -16,6 +16,8 @@ export type Snapshot = {
   /** Profiles for people hired during the game (seed staff use roster.ts). */
   hires: Record<string, Profile>;
   morale: Record<string, number>;
+  /** Campaign money the rules need: how tired donor groups are, public financing, and today's budgets left. */
+  money?: { fatigue: Record<string, number>; participant: boolean | null; left: Record<"ads" | "field" | "events", number> };
 };
 
 export const BOROS = ["", "Manhattan", "Bronx", "Brooklyn", "Queens", "Staten Island"];

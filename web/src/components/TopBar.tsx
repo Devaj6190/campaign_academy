@@ -1,12 +1,15 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowDownRight, ArrowUpRight, ListChecks, Minus, Newspaper, Plus } from "lucide-react";
-import type { Flow, View } from "@/lib/data";
-import { DAY_END, DAY_START, SPEEDS, netPerDay, useGame } from "@/lib/store";
+import { ArrowDownRight, ArrowUpRight, ListChecks, Newspaper } from "lucide-react";
+import type { View } from "@/lib/data";
+import { DAY_END, DAY_START, SPEEDS, useGame } from "@/lib/store";
+import { avgIncome } from "@/lib/money/finance";
+import { sum } from "@/lib/money/rules";
+import { FinancePanel, IncomePanel, SpendingPanel } from "./money/MoneyPanels";
 import { clock, cn, money, moneyK } from "@/lib/util";
 import { SidebarBody } from "./Sidebar";
-import { Label, Meter, Popover } from "./ui";
+import { Meter, Popover } from "./ui";
 
 const VIEWS: [View, string][] = [["profile", "Profile"], ["war", "War room"], ["map", "Map"], ["factions", "Factions"]];
 
@@ -54,24 +57,32 @@ function Nav() {
   );
 }
 
-// Money is the only resource: spending on the left, the total in the middle, income on the right.
+// Money is the only resource: spending on the left, the books in the middle, income on the right (components/money).
 function Money() {
   const cash = useGame((s) => s.cash);
-  const losses = useGame((s) => s.losses);
-  const gains = useGame((s) => s.gains);
-  const net = netPerDay({ gains, losses });
-  const out = losses.reduce((a, c) => a + c.v, 0), inc = gains.reduce((a, c) => a + c.v, 0);
+  const day = useGame((s) => s.day);
+  const payroll = useGame((s) => s.losses[0]?.v ?? 0);
+  const m = useGame((s) => s.money);
+  const out = payroll + sum(m.envelopes);
+  const inc = avgIncome(m, day);
+  const net = inc - payroll - sum(m.next);
+  const attention = m.participant === null || m.proposal?.state === "open";
   return (
     <div className="flex h-9 items-stretch rounded-lg border border-line bg-surface">
-      <Popover trigger={(o) => <FlowTrigger open={o} side="left" label="Spending" value={out} />} className="w-[340px]">
-        <FlowPanel kind="losses" title="Spending" flows={losses} total={out} />
+      <Popover trigger={(o) => <FlowTrigger open={o} side="left" label="Spending" value={out} />} className="w-[360px]">
+        <SpendingPanel />
       </Popover>
-      <div className="flex items-center gap-2.5 border-x border-line px-4">
-        <span className="tnum font-mono text-[15px] font-medium tracking-tight">{money(cash)}</span>
-        <span className={cn("tnum font-mono text-[11px] whitespace-nowrap", net < 0 ? "text-neg" : "text-pos")}>{net < 0 ? "−" : "+"}{moneyK(net)}/d</span>
-      </div>
+      <Popover trigger={(o) => (
+        <button className={cn("relative flex items-center gap-2.5 border-x border-line px-4 transition-colors hover:bg-hover", o && "bg-hover")} title="The books: runway, matching funds, spending limit, filings">
+          <span className="tnum font-mono text-[15px] font-medium tracking-tight">{money(cash)}</span>
+          <span className={cn("tnum font-mono text-[11px] whitespace-nowrap", net < 0 ? "text-neg" : "text-pos")}>{net < 0 ? "−" : "+"}{moneyK(Math.abs(net))}/d</span>
+          {attention && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warm" aria-label="Needs a decision" />}
+        </button>
+      )} className="w-[380px]">
+        <FinancePanel />
+      </Popover>
       <Popover trigger={(o) => <FlowTrigger open={o} side="right" label="Income" value={inc} />} className="w-[340px]">
-        <FlowPanel kind="gains" title="Income" flows={gains} total={inc} />
+        <IncomePanel />
       </Popover>
     </div>
   );
@@ -87,46 +98,6 @@ function FlowTrigger({ open, side, label, value }: { open: boolean; side: "left"
     </button>
   );
 }
-
-function FlowPanel({ kind, title, flows, total }: { kind: "losses" | "gains"; title: string; flows: Flow[]; total: number }) {
-  const allocate = useGame((s) => s.allocate);
-  const color = kind === "losses" ? "var(--color-neg)" : "var(--color-pos)";
-  return (
-    <div className="p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <Label>{title} per day</Label>
-        <span className="tnum font-mono text-[12px] text-soft">{money(total)}</span>
-      </div>
-      <div className="space-y-3.5">
-        {flows.map((c, i) => (
-          <div key={c.k}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px]">{c.k}</span>
-              <div className="flex items-center gap-1.5">
-                <span className="tnum mr-1 font-mono text-[12px] text-soft">{money(c.v)}</span>
-                <Step onClick={() => allocate(kind, i, -500)} label={`Less on ${c.k}`}><Minus /></Step>
-                <Step onClick={() => allocate(kind, i, 500)} label={`More on ${c.k}`}><Plus /></Step>
-              </div>
-            </div>
-            <Meter value={(c.v / total) * 100} color={color} className="my-1.5" />
-            <div className="flex flex-wrap gap-x-3 text-[11.5px] text-faint">
-              {c.items.map(([n, v]) => (
-                <span key={n}>{n} <span className="tnum font-mono">{moneyK(v)}</span></span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="mt-4 border-t border-line pt-3 text-[11.5px] text-faint">Use − and + to move money. Changes apply from tomorrow.</p>
-    </div>
-  );
-}
-
-const Step = ({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label: string }) => (
-  <button onClick={(e) => { e.stopPropagation(); onClick(); }} aria-label={label} className="grid size-5 place-items-center rounded border border-line-strong text-muted transition-colors hover:bg-hover hover:text-fg [&_svg]:size-3">
-    {children}
-  </button>
-);
 
 // The Ledger arrives here, never as a popup: the latest headline, with a dot until it has been read.
 function PaperChip() {

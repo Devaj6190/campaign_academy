@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FACTIONS, GAINS, LOSSES, STAFF, STRONG, WEAK, type Faction, type Flow, type Staff, type View } from "./data";
+import { FACTIONS, LOSSES, STAFF, STRONG, WEAK, type Faction, type Flow, type Staff, type View } from "./data";
 import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
 import { DISTRICTS } from "./geo";
 import { shares } from "./demographics";
@@ -12,6 +12,9 @@ import { RIVALS } from "./engine/rivals";
 import { tacticOutcome, type Deliverer } from "./engine/tactic";
 import { electionResult, type ElectionResult } from "./engine/election";
 import type { Edition } from "./paper/edition";
+import { addGifts } from "./money/donors";
+import { avgIncome, burn, settle } from "./money/finance";
+import { ASKS, ENVELOPE_OF, START_MONEY, type Envelope, type Money } from "./money/rules";
 
 // One shared world state. Every screen is a view of this, so an action on one shows up on the others.
 // Behaviour is canned for now: the places marked "agent" and "model" are where real calls go.
@@ -29,7 +32,7 @@ export type Draft = { text: string; up: string[]; down: string[] };
 /** knock: how other groups moved because of this one (relations.ts), credited to the group that caused it. */
 export type LedgerEntry = { id: number; day: number; min: number; source: "staff" | "candidate" | "manifesto" | "tactic" | "rival" | "debate"; effect: Effect; knock: Record<string, { delta: number; from: string }> };
 
-export type RivalState = { cash: number; strength: Record<number, number>; memory: string[]; plan: { day: number; status: "idle" | "planning" | "ready" | "landed"; moves: Effect[]; memo?: string; mode?: "live" | "rules" } };
+export type RivalState = { cash: number; raised: number; spent: number; matchable: number; matchPaid: number; strength: Record<number, number>; memory: string[]; plan: { day: number; status: "idle" | "planning" | "ready" | "landed"; moves: Effect[]; memo?: string; mode?: "live" | "rules" } };
 
 type State = {
   view: View;
@@ -45,8 +48,10 @@ type State = {
   polls: PollRecord[];
   /** The campaign's own read of each district: updated where Cole or his staff worked, and citywide on poll days. */
   fieldRead: Record<number, number>;
+  /** Payroll (losses[0]); the daily budgets and income are in money. */
   losses: Flow[];
-  gains: Flow[];
+  /** The campaign's books: daily budgets, income, donors, public financing (lib/money). */
+  money: Money;
   tasks: { id: number; text: string; done: boolean }[];
   calendar: Record<number, string[]>;
   manifesto: string[];
@@ -82,14 +87,16 @@ type State = {
   go: (v: View) => void;
   tick: () => void;
   setSpeed: (s: number) => void;
-  allocate: (kind: "losses" | "gains", i: number, delta: number) => void;
+  /** Change tomorrow's budget for ads, field or events. */
+  budget: (env: Envelope, delta: number) => void;
+  /** Day-1 choice: join public financing (matching funds and a spending limit) or not. */
+  joinPublicFinancing: (yes: boolean) => void;
   toggleTask: (id: number) => void;
   addTask: (text: string) => void;
   select: (p: Partial<Pick<State, "district" | "faction" | "person" | "filter">>) => void;
   open: (o: Overlay) => void;
   instruct: (id: string, text: string) => void;
   hire: (id: string, pick: number) => void;
-  act: (kind: string, cost: number, bump: number, raise?: number) => void;
   commitPlank: (d: Draft) => void;
   runTactic: (by?: Deliverer) => void;
   speak: () => void;
@@ -98,8 +105,8 @@ type State = {
 };
 
 let uid = 10;
-const net = (s: Pick<State, "gains" | "losses">) => s.gains.reduce((a, c) => a + c.v, 0) - s.losses.reduce((a, c) => a + c.v, 0);
-export const netPerDay = net;
+/** Money in minus money out per day: last week's average income against payroll and tomorrow's budgets. */
+export const netPerDay = (s: Pick<State, "losses" | "money" | "day">) => avgIncome(s.money, s.day) - burn(s.losses[0]?.v ?? 0, s.money);
 
 const sent: Record<number, number> = {};
 for (const d of DISTRICTS) sent[d.cd] = STRONG.includes(d.cd) ? 62 + hash(d.cd) * 12 : WEAK.includes(d.cd) ? 22 + hash(d.cd) * 12 : 38 + hash(d.cd) * 18;
@@ -171,8 +178,8 @@ const NOON = 720;
 calibrate(sent);
 
 const START_RIVALS: Record<Rival, RivalState> = {
-  hale: { cash: RIVALS.hale.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
-  brandt: { cash: RIVALS.brandt.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
+  hale: { cash: RIVALS.hale.cash, raised: 0, spent: 0, matchable: 0, matchPaid: 0, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
+  brandt: { cash: RIVALS.brandt.cash, raised: 0, spent: 0, matchable: 0, matchPaid: 0, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
 };
 const DAY1_TRUTH = pollOf({ sent, day: 1, rivals: START_RIVALS });
 const DAY1_POLL = publish({ truth: DAY1_TRUTH, factions: FACTIONS, ledger: [] }, 1);
@@ -188,7 +195,7 @@ export const useGame = create<State>((set, get) => ({
   polls: [DAY1_POLL],
   fieldRead: { ...sent },
   losses: LOSSES,
-  gains: GAINS,
+  money: START_MONEY,
   tasks: [
     { id: 1, text: "Take the manifesto to five planks", done: false },
     { id: 2, text: "Hire a Policy Director", done: false },
@@ -235,20 +242,31 @@ export const useGame = create<State>((set, get) => ({
       const calendar = e.calendar ? { ...g.calendar, [booked]: [...(g.calendar[booked] ?? []), e.calendar] } : g.calendar;
       // A rival's move is paid by the rival and makes them stronger where it landed.
       let rivals = g.rivals;
-      let cash = g.cash - e.cost + e.raised;
+      let cash = g.cash;
+      let money = g.money;
       if (e.rival) {
         const r = g.rivals[e.rival.who];
         const strength = { ...r.strength };
         for (const [cd, d] of Object.entries(e.rival.strength)) strength[+cd] = Math.min(150, (strength[+cd] ?? 0) + d);
-        rivals = { ...g.rivals, [e.rival.who]: { ...r, cash: r.cash - e.cost + e.raised, strength } };
-        cash = g.cash;
+        rivals = { ...g.rivals, [e.rival.who]: { ...r, cash: r.cash - e.cost + e.raised, raised: r.raised + e.raised, spent: r.spent + e.cost, strength } };
+      } else {
+        // Paid from today's budget for that kind of work when it has room; otherwise (or when approved
+        // beyond the budget) straight from cash, which counts toward the spending limit at once.
+        const env = e.paidFrom === "cash" ? undefined : (e.paidFrom ?? ENVELOPE_OF[e.action as keyof typeof ENVELOPE_OF]);
+        if (env && e.cost && money.envelopes[env] - money.spent[env] >= e.cost) money = { ...money, spent: { ...money.spent, [env]: money.spent[env] + e.cost } };
+        else if (e.cost) { cash -= e.cost; money = { ...money, spentTotal: money.spentTotal + e.cost }; }
+        if (e.raised) {
+          const source = ASKS[e.action as keyof typeof ASKS]?.source ?? "Small donors";
+          money = { ...money, ...addGifts(money, e.gifts ?? [], e.asked ?? []), raisedTotal: money.raisedTotal + e.raised, income: [...money.income, { day: g.day, source, amount: e.raised }] };
+          cash += e.raised;
+        }
       }
       // The poll is not set by hand: it is what the districts now add up to.
       const truth = pollOf({ sent, day: g.day, rivals });
       // The campaign learns from its own field work at once; everywhere else waits for the next poll.
       const fieldRead = source === "staff" || source === "candidate" ? { ...g.fieldRead, ...Object.fromEntries(Object.keys(e.sent).map((cd) => [cd, sent[+cd]])) } : g.fieldRead;
       const entry: LedgerEntry = { id: uid++, day: g.day, min: g.min, source, effect: e, knock };
-      return { cash, sent, factions, calendar, rivals, truth, fieldRead, ledger: [...g.ledger, entry].slice(-5000) };
+      return { cash, money, sent, factions, calendar, rivals, truth, fieldRead, ledger: [...g.ledger, entry].slice(-5000) };
     }),
 
   go: (view) => set({ view }),
@@ -277,18 +295,26 @@ export const useGame = create<State>((set, get) => ({
       return;
     }
     // Day rolls over: money settles, the rivals' overnight moves land, debates are judged, and the paper arrives.
+    const books = settle({ day: s.day, cash: s.cash, payroll: s.losses[0]?.v ?? 0, money: s.money, polls: s.polls, ledger: s.ledger }, s.day);
     set({
       day: s.day + 1,
       min: DAY_START,
-      cash: s.cash + net(s),
+      cash: books.cash,
+      money: books.money,
       tasks: s.tasks.filter((t) => !t.done),
       news: { day: s.day + 1, opposition: [] },
     });
     void import("./engine/schedule").then((m) => m.overnight(s.day));
+    void import("./money/run").then((m) => m.morning(books.missedPayroll));
   },
 
-  allocate: (kind, i, delta) =>
-    set((s) => ({ [kind]: s[kind].map((c, j) => (j === i ? { ...c, v: Math.max(0, c.v + delta), items: c.items.map(([n, v], x) => [n, x === 0 ? Math.max(0, v + delta) : v] as [string, number]) } : c)) }) as Partial<State>),
+  budget: (env, delta) => set((s) => ({ money: { ...s.money, next: { ...s.money.next, [env]: Math.max(0, Math.min(40000, s.money.next[env] + delta)) } } })),
+  joinPublicFinancing: (yes) =>
+    set((s) => {
+      if (s.money.participant !== null || s.day > 1) return {};
+      const text = yes ? "Cole joined the city's public financing program: matching funds, and a spending limit." : "Cole declined public financing: no matching funds, no spending limit, bigger checks allowed.";
+      return { money: { ...s.money, participant: yes, events: [...s.money.events, { day: s.day, kind: yes ? "joined" : "declined", text }] } };
+    }),
 
   toggleTask: (id) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) })),
   addTask: (text) => set((s) => ({ tasks: [...s.tasks, { id: uid++, text, done: false }], calendar: { ...s.calendar, [s.day]: [...(s.calendar[s.day] ?? []), text] } })),
@@ -301,14 +327,6 @@ export const useGame = create<State>((set, get) => ({
       staff: s.staff.map((p) => (p.id === id ? { ...p, name: pick === 0 ? "Helen Voss" : "Kai Lindqvist", good: pick === 0 ? "Careful, experienced" : "Brilliant", weak: pick === 0 ? "Expensive" : "Abrasive", doing: "Settling in" } : p)),
       losses: s.losses.map((c, i) => (i === 0 ? { ...c, v: c.v + (pick === 0 ? 900 : 600) } : c)),
     })),
-
-  act: (kind, cost, bump, raise = 0) => {
-    const s = get();
-    const d = DISTRICTS.find((x) => x.cd === s.district);
-    if (!d) return;
-    set({ cash: s.cash - cost + raise, sent: { ...s.sent, [d.cd]: Math.min(95, s.sent[d.cd] + bump) } });
-    s.addTask(`${kind} · ${d.name}`);
-  },
 
   // A plank is permanent and moves the groups it pleases and angers, through the ledger like everything else.
   commitPlank: (d) => {
@@ -329,4 +347,7 @@ export const useGame = create<State>((set, get) => ({
 }));
 
 // The first morning's paper (later editions come from engine/schedule.ts overnight).
-if (typeof window !== "undefined") queueMicrotask(() => void import("./paper/run").then((m) => m.publishEdition()));
+if (typeof window !== "undefined") queueMicrotask(() => {
+  void import("./paper/run").then((m) => m.publishEdition());
+  void import("./money/run").then((m) => m.morning(false));
+});

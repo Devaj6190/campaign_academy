@@ -6,6 +6,7 @@ import { snapshot } from "./staff/run";
 import { useStaff } from "./staff/store";
 import { shortPlace } from "./staff/world";
 import { useGame } from "./store";
+import { canPay } from "./money/run";
 
 // The candidate in person. Better than staff, but scarce: two appearances a day, so the rest has to be
 // delegated. Runs through the same rules engine and lands in the same ledger as everything else.
@@ -33,7 +34,8 @@ export function appear(cd: number, id: Appearance): { ok: boolean; text: string;
   const g = useGame.getState();
   if (appearancesToday(g) >= DAILY) return { ok: false, text: `Cole has already made ${DAILY} appearances today. Send staff instead.` };
   const effect = preview(cd, id);
-  if (effect.cost > g.cash) return { ok: false, text: "Not enough cash for that." };
+  const pay = canPay(id, effect.cost);
+  if (!pay.ok) return { ok: false, text: pay.text };
   g.applyEffect(effect, "candidate");
   return { ok: true, text: effect.summary, effect };
 }

@@ -1,6 +1,7 @@
 import type { ActionId } from "../engine/catalog";
 import { clarity, fitScore, resolve, type Effect } from "../engine/resolve";
 import { hash } from "../util";
+import { ENVELOPE_OF, ENVELOPES, type Envelope } from "../money/rules";
 import type { Snapshot } from "./world";
 
 // The wire format between /api/staff/instruct and the browser: one JSON event per line.
@@ -29,6 +30,10 @@ export class RunCtx {
   raised = 0;
   effects: Effect[] = [];
   load: Record<string, number> = {};
+  /** Spent from each daily budget during this run. */
+  fromBudget: Record<Envelope, number> = { ads: 0, field: 0, events: 0 };
+  /** Spent from cash during this run. */
+  fromCash = 0;
   reported = false;
   quality: ReturnType<typeof clarity>;
   private n = 0;
@@ -50,8 +55,20 @@ export class RunCtx {
     if (!w.staff.some((s) => s.id === by && s.name)) return { ok: false, text: "That post is vacant now; nothing happened." };
     this.load[by] = (this.load[by] ?? 0) + 1;
     const effect = resolve(w, by, action, p, { quality: this.quality.mult, seed: this.req.runId * 31 + this.n++, load: this.load[by] });
-    if (effect.cost > this.left) return { ok: false, text: `Not done: it costs $${effect.cost.toLocaleString("en-US")} and only $${this.left.toLocaleString("en-US")} of this budget is left. Ask the campaigner for more.` };
-    if (effect.cost > w.cash - this.spent + this.raised) return { ok: false, text: "Not done: the campaign does not have the cash." };
+    if (effect.cost > this.left) return { ok: false, text: `Not done: it costs $${effect.cost.toLocaleString("en-US")} and only $${this.left.toLocaleString("en-US")} of this order's budget is left. Ask the campaigner for more.` };
+    // Approved money (a follow-up) is paid from cash; otherwise budget-paid work needs room in today's budget.
+    const env = this.req.followOf ? undefined : ENVELOPE_OF[action];
+    if (env && w.money) {
+      const left = w.money.left[env] - this.fromBudget[env];
+      const label = ENVELOPES.find((e) => e.id === env)!.label;
+      if (effect.cost > left) return { ok: false, text: `Not done: today's ${label} budget has $${Math.max(0, left).toLocaleString("en-US")} left and this costs $${effect.cost.toLocaleString("en-US")}. Ask the campaigner for the extra money.` };
+      this.fromBudget[env] += effect.cost;
+      effect.paidFrom = env;
+    } else {
+      if (effect.cost > w.cash - this.fromCash + this.raised) return { ok: false, text: "Not done: the campaign does not have the cash." };
+      this.fromCash += effect.cost;
+      effect.paidFrom = "cash";
+    }
     this.spent += effect.cost;
     this.raised += effect.raised;
     this.effects.push(effect);

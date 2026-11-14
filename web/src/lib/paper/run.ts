@@ -7,6 +7,7 @@ import { resolve } from "../engine/resolve";
 import { snapshot } from "../staff/run";
 import { useStaff } from "../staff/store";
 import { useGame } from "../store";
+import { canPay } from "../money/run";
 import { buildEdition, factsOf, type Edition, type Kind, type Story } from "./edition";
 import type { WriteResult } from "./newsroom";
 
@@ -58,7 +59,8 @@ export function respond(e: Edition, choice: "statement" | "staff" | "pass"): str
     const action = r.kind === "attack" ? "rapid_response" : "coalition_meeting";
     const faction = r.faction ?? (cd ? largestGroup(cd) : undefined);
     const effect = resolve(snapshot(), "candidate", action, { district: cd, faction }, { quality: 1, seed: g.day * 977 + (cd ?? 0), load: 0 });
-    if (effect.cost > g.cash) return "Not enough cash.";
+    const pay = canPay(action, effect.cost);
+    if (!pay.ok) return pay.text;
     g.applyEffect({ ...effect, summary: `Cole answered the Ledger's front page ("${e.lead.headline}"): ${effect.summary}` }, "candidate");
     patch(e.day, e.kind, (x) => ({ ...x, decision: "respond" }));
     return "Cole responded in person.";

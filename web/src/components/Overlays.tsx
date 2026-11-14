@@ -118,6 +118,7 @@ function Calendar() {
 // Bold moves are honest but risky. The risk is shown before you commit, and it decides whether the move backfires.
 function Tactic({ close }: { close: () => void }) {
   const run = useGame((s) => s.runTactic);
+  const adsLeft = useGame((s) => s.money.envelopes.ads - s.money.spent.ads);
   const result = useGame((s) => s.tacticResult);
   const world = useGame();
   const [by, setBy] = useState<Deliverer>("com");
@@ -139,7 +140,7 @@ function Tactic({ close }: { close: () => void }) {
       <h2 className="mt-4 font-serif text-[30px] leading-[1.1] tracking-tight">A contrast ad on Hale&apos;s council attendance</h2>
       <p className="mt-2 text-[13px] text-muted">Every claim in it is accurate. It is still a negative ad.</p>
       <dl className="mt-5 space-y-2 text-[13px]">
-        <div className="flex justify-between"><dt className="text-muted">Cost</dt><dd className="tnum font-mono">$8,000</dd></div>
+        <div className="flex justify-between"><dt className="text-muted">Cost</dt><dd className="tnum font-mono">$8,000 <span className="text-faint">from today&apos;s Ads budget (${Math.max(0, adsLeft).toLocaleString("en-US")} left)</span></dd></div>
         <div className="flex justify-between"><dt className="text-muted">If it lands</dt><dd className="text-pos">+3 with seniors</dd></div>
         <div className="flex justify-between"><dt className="text-muted">If it reads as an attack</dt><dd className="text-neg">−6 with seniors, lost volunteers</dd></div>
       </dl>
@@ -161,7 +162,7 @@ function Tactic({ close }: { close: () => void }) {
       <div className="mt-6 flex items-center gap-2">
         <Button variant="primary" onClick={close}>Hold off</Button>
         <Button onClick={close}>Ask for a positive version</Button>
-        <Button variant="ghost" className="ml-auto text-neg hover:text-neg" onClick={() => run(by)}>Run it</Button>
+        <Button variant="ghost" className="ml-auto text-neg hover:text-neg" disabled={adsLeft < 8000} title={adsLeft < 8000 ? "Not enough left in today's Ads budget. Raise tomorrow's in the top bar." : undefined} onClick={() => run(by)}>Run it</Button>
       </div>
     </div>
   );

@@ -56,17 +56,9 @@ export const STAFF: Staff[] = [
 
 export type Flow = { k: string; v: number; items: [string, number][] };
 
+/** Payroll: the one fixed daily cost (hiring and firing change it). Budgets and income live in lib/money. */
 export const LOSSES: Flow[] = [
   { k: "Staff", v: 9200, items: [["Directors", 5200], ["Organizers", 2900], ["Support", 1100]] },
-  { k: "Ads", v: 6000, items: [["Digital", 3500], ["Mail", 1700], ["Radio", 800]] },
-  { k: "Field", v: 4100, items: [["Field offices", 1900], ["Canvass literature", 1600], ["Volunteer food", 600]] },
-  { k: "Events", v: 2500, items: [["Venues", 1500], ["Sound and staging", 1000]] },
-];
-
-export const GAINS: Flow[] = [
-  { k: "Fundraisers", v: 8000, items: [["Dinners", 5000], ["House parties", 3000]] },
-  { k: "Small donors", v: 7400, items: [["Online", 5100], ["Text", 1400], ["At the door", 900]] },
-  { k: "Large donors", v: 3000, items: [["Call time", 3000]] },
 ];
 
 export const RECORD: { ok: boolean; text: string; liked: string; not: string }[] = [

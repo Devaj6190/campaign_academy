@@ -7,22 +7,21 @@ import { PLACES, type Snapshot } from "../staff/world";
 import { ACTION_IDS, ACTIONS } from "./catalog";
 import type { Effect } from "./resolve";
 import type { Rival } from "./poll";
-import { RIVALS, rivalEffect, ruleMoves } from "./rivals";
+import { RIVALS, rivalBudget, rivalEffect, ruleMoves } from "./rivals";
 
 // A rival campaign as a deep agent: it reads what Cole did, decides its moves for tonight, and makes them
 // through one tool that the rules engine scores. Runs on the smaller model; the fallback is ruleMoves.
 
 export const RIVAL_MODEL = STAFF_MODEL;
 
-export type PlanRequest = { who: Rival; snapshot: Snapshot; cash: number; memory: string[]; coleYesterday: string[]; gained: number[]; extra: boolean };
+export type PlanRequest = { who: Rival; snapshot: Snapshot; cash: number; spent: number; memory: string[]; coleYesterday: string[]; gained: number[]; extra: boolean };
 export type PlanResult = { moves: Effect[]; memo: string; mode: "live" | "rules" };
 
 const DISTRICTS = PLACES.map((p) => String(p.cd)) as [string, ...string[]];
 const text = (c: unknown) => (typeof c === "string" ? c : Array.isArray(c) ? c.map((b) => (b as { text?: string }).text ?? "").join(" ") : "").trim();
 
 export function rulePlan(req: PlanRequest): PlanResult {
-  const r = RIVALS[req.who];
-  const budget = Math.min(req.cash, r.perDay * (req.extra ? 1.6 : 1));
+  const budget = rivalBudget(req.who, { cash: req.cash, spent: req.spent, day: req.snapshot.day, extra: req.extra });
   const moves = ruleMoves(req.snapshot, req.who, req.gained, budget, req.extra).map((m, i) => rivalEffect(req.snapshot, req.who, m, req.snapshot.day * 100 + i));
   return { moves, memo: moves.map((m) => m.summary).join(" "), mode: "rules" };
 }
@@ -30,7 +29,7 @@ export function rulePlan(req: PlanRequest): PlanResult {
 export async function planLive(req: PlanRequest, signal?: AbortSignal): Promise<PlanResult> {
   const r = RIVALS[req.who];
   const w = req.snapshot;
-  const budget = Math.min(req.cash, r.perDay * (req.extra ? 1.6 : 1));
+  const budget = rivalBudget(req.who, { cash: req.cash, spent: req.spent, day: w.day, extra: req.extra });
   const cap = req.extra ? 3 : 2;
   const moves: Effect[] = [];
   let spent = 0;

@@ -3,6 +3,8 @@ import { hash } from "../util";
 import { ACTIONS, type ActionId } from "./catalog";
 import { CANDIDATE, profileFor, type Profile } from "../staff/roster";
 import { findBoros, findFactions, findPlaces, PLACES, placeName, shortPlace, type Snapshot } from "../staff/world";
+import { askGroups, freshness, giftsForAction, largeGiftBoost } from "../money/donors";
+import { ASKS, type Envelope, type Gift } from "../money/rules";
 
 // Deterministic rules. Same inputs, same outcome, so the server can tell an agent what happened and the
 // browser applies exactly that.
@@ -22,6 +24,11 @@ export type Effect = {
   calendar?: string;
   /** A rival move: who made it and how much stronger they got in each district (poll.ts). */
   rival?: { who: "hale" | "brandt"; strength: Record<number, number> };
+  /** Which daily budget paid, or "cash" (cheap actions, and money you approved beyond a budget). */
+  paidFrom?: Envelope | "cash";
+  /** Donors this brought in, and the groups it asked (they tire of being asked). */
+  gifts?: Gift[];
+  asked?: [string, number][];
   /** False when the job went to someone without the skills for it. */
   fit: boolean;
   summary: string;
@@ -76,7 +83,11 @@ export function resolve(
     factions.activists = r1((factions.activists ?? 0) - 1.5);
     factions.donors = r1((factions.donors ?? 0) + 2 * mod);
   }
-  const raised = a.raise ? r50((a.raise[0] + (a.raise[1] - a.raise[0]) * hash(ctx.seed, 29)) * mod) : 0;
+  // Asking the same people again yields less; staying out of public financing allows bigger checks.
+  const asked = w.money && ASKS[id] ? askGroups(id, { district, faction }) : undefined;
+  const yieldMult = w.money ? freshness(w.money.fatigue, asked ?? []) * (ASKS[id]?.large ? largeGiftBoost(w.money.participant) : 1) : 1;
+  const raised = a.raise ? r50((a.raise[0] + (a.raise[1] - a.raise[0]) * hash(ctx.seed, 29)) * mod * yieldMult) : 0;
+  const gifts = w.money && raised ? giftsForAction(id, raised, { district, faction }, w.money.participant) : undefined;
   const momentum = (a.momentum ?? 0) * mod;
 
   const place = district ? shortPlace(district) : "";
@@ -89,7 +100,7 @@ export function resolve(
       case "rally": return `Rally in ${place} drew ${n(500 * mod + 300 * luck)} people.`;
       case "house_party": return `House party in ${place} raised $${n(raised)}.`;
       case "donor_dinner": return `Donor dinner raised $${n(raised)}. Young activists grumbled.`;
-      case "call_time": return `Call time raised $${n(raised)} from ${n(8 + 10 * mod)} donors.`;
+      case "call_time": return `Call time raised $${n(raised)} from ${n(gifts?.reduce((a, g) => a + g.count, 0) ?? 8 + 10 * mod)} donors.`;
       case "email_blast": return `Email to ${fname.toLowerCase()} raised $${n(raised)}.`;
       case "digital_ads": return `Ads reached ${n(90000 * mod)} ${fname.toLowerCase()}.`;
       case "mail_piece": return `Mailed ${n(6000 * mod)} homes in ${place}.`;
@@ -104,7 +115,7 @@ export function resolve(
   })();
   const calendar = ["rally", "donor_dinner", "house_party", "coalition_meeting", "schedule_event"].includes(id) ? `${a.label}${district ? ` · ${shortPlace(district)}` : fname ? ` · ${fname}` : ""}` : undefined;
 
-  return { by, action: id, label: a.label, district, faction, cost, raised, sent, factions, momentum, calendar, fit, summary: fit ? summary : `${summary} (Not their strength, so it cost more and did less.)` };
+  return { by, action: id, label: a.label, district, faction, cost, raised, sent, factions, momentum, calendar, fit, gifts, asked, summary: fit ? summary : `${summary} (Not their strength, so it cost more and did less.)` };
 }
 
 /** How clearly an instruction was given. Feeds a small multiplier and the coaching card. */

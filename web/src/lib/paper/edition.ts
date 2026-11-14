@@ -1,4 +1,5 @@
 import { DISTRICTS, districtBy } from "../geo";
+import type { MoneyEvent } from "../money/rules";
 import type { Faction } from "../data";
 import { RIVALS } from "../engine/rivals";
 import type { PollRecord } from "../engine/polls";
@@ -27,6 +28,8 @@ export type Edition = {
   /** Every figure a writer may use. */
   numbers: string[];
   upTo: number;
+  /** Money news already reported (an index into money.events). */
+  moneyUpTo?: number;
   mode: "template" | "live";
   read: boolean;
   decision?: "respond" | "staff" | "pass";
@@ -42,6 +45,9 @@ type World = {
   staff: { id: string; name?: string }[];
   editions: Edition[];
   election: { result: ElectionResult } | null;
+  money?: { events: MoneyEvent[]; raisedTotal: number; spentTotal: number; matchPaid: number };
+  cash?: number;
+  rivals?: Record<"hale" | "brandt", { raised: number; spent: number; cash: number }>;
 };
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -87,6 +93,13 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
   const worst311 = [...DISTRICTS].filter((d) => !d.park && d.issues.length).sort((a, b) => b.issues[0][1] * (0.6 + hash(b.cd, w.day) * 0.8) - a.issues[0][1] * (0.6 + hash(a.cd, w.day) * 0.8))[0];
   const blitz = rival.find((l) => l.effect.district && (w.fieldRead[l.effect.district] ?? 0) >= 55);
   const biggest = [...cole].filter((l) => l.source !== "manifesto").sort((a, b) => b.effect.cost + b.effect.raised - (a.effect.cost + a.effect.raised))[0];
+  // Money news since the last edition: the serious kind leads ahead of a poll; the rest ahead of the trail.
+  const moneyNews = (w.money?.events ?? []).slice(prev?.moneyUpTo ?? 0);
+  const urgent = moneyNews.find((e) => e.kind === "fine" || e.kind === "quit" || e.kind === "missed" || e.kind === "broke");
+  const plain = moneyNews.find((e) => e.kind === "joined" || e.kind === "declined" || e.kind === "payment" || e.kind === "qualified");
+  const filings = w.money && w.rivals ? ` Latest filings: Cole has raised $${fmt(w.money.raisedTotal + w.money.matchPaid)} and spent $${fmt(w.money.spentTotal)}; Hale raised $${fmt(w.rivals.hale.raised)} and spent $${fmt(w.rivals.hale.spent)}; Brandt raised $${fmt(w.rivals.brandt.raised)} and spent $${fmt(w.rivals.brandt.spent)}.` : "";
+  const MONEY_HEAD: Record<MoneyEvent["kind"], string> = { fine: "Cole campaign fined for breaking the spending limit", quit: "Staffer quits Cole campaign over missed pay", missed: "Cole campaign misses payroll", broke: "Cole campaign runs short of cash", joined: "Cole opts into public financing", declined: "Cole turns down public financing", payment: "Public funds arrive for Cole", qualified: "Cole qualifies for matching funds" };
+  const moneyLead = (e: MoneyEvent): Edition["lead"] => ({ kicker: "Campaign money", headline: MONEY_HEAD[e.kind], body: `${e.text}${filings}` });
   const pollLine = (p: PollRecord) => `Hale ${p.hale}, Cole ${p.cole}, Brandt ${p.brandt}, undecided ${p.undecided} (${p.pollster}, ${fmt(p.n)} likely voters, margin of error ±${p.moe})`;
 
   // Front page, in order of news value.
@@ -98,9 +111,13 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
     lead = { kicker: "Election day", headline: "New York votes today", body: `The final poll: ${pollLine(latest)}. The race is decided in the districts below.` };
   } else if (debate) {
     lead = { kicker: "Debate night", headline: clean(debate.effect.summary).replace(/\.$/, ""), body: `The candidates met on stage with ${w.manifesto.length} planks in Cole's platform. ${freshPoll ? `The latest poll: ${pollLine(latest)}.` : "The next poll will show whether it moved anyone."}` };
+  } else if (urgent) {
+    lead = moneyLead(urgent);
   } else if (freshPoll) {
     const change = previous ? latest.cole - previous.cole : 0;
     lead = { kicker: "New poll", headline: `Hale ${latest.hale}, Cole ${latest.cole}, Brandt ${latest.brandt}`, body: `${pollLine(latest)}.${previous ? ` In the day ${previous.day} poll Cole stood at ${previous.cole}; ${change === 0 ? "no change beyond the margin" : Math.abs(change) <= latest.moe ? "a shift within the margin of error" : change > 0 ? "a real gain" : "a real slide"}.` : ""}` };
+  } else if (plain) {
+    lead = moneyLead(plain);
   } else if (backfire) {
     lead = { kicker: "Campaign trail", headline: "Cole's contrast ad backfires", body: `${clean(backfire.effect.summary)} Critics called it the first negative ad of the race.` };
   } else if (blitz) {
@@ -162,6 +179,7 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
     letters,
     numbers: [],
     upTo: w.ledger.at(-1)?.id ?? 0,
+    moneyUpTo: w.money?.events.length ?? 0,
     mode: "template",
     read: false,
   };

@@ -27,6 +27,7 @@ export function snapshot(): Snapshot {
     manifesto: g.manifesto,
     hires: s.hires,
     morale: s.morale,
+    money: { fatigue: g.money.fatigue, participant: g.money.participant, left: { ads: g.money.envelopes.ads - g.money.spent.ads, field: g.money.envelopes.field - g.money.spent.field, events: g.money.envelopes.events - g.money.spent.events } },
   };
 }
 
@@ -222,7 +223,8 @@ export function hire(post: string, c: Candidate) {
   useGame.setState((g) => ({ tasks: g.tasks.map((t) => (t.text.toLowerCase().includes(p.role.toLowerCase().split(",")[0].toLowerCase()) ? { ...t, done: true } : t)) }));
 }
 
-export function letGo(id: string) {
+/** quit: they walked (after missed paydays) rather than being let go. */
+export function letGo(id: string, quit = false) {
   const g = useGame.getState();
   const p = g.staff.find((x) => x.id === id);
   if (!p?.name || useStaff.getState().active[id]) return;
@@ -232,7 +234,7 @@ export function letGo(id: string) {
   payroll(-salary);
   // Colleagues notice.
   for (const x of g.staff) if (x.name && x.id !== id && (x.boss === p.boss || x.boss === id || x.id === p.boss)) bumpMorale(x.id, -5);
-  feed(id, `You let ${p.name} go. Payroll −$${salary.toLocaleString("en-US")}/day; the team is rattled.`, "neg");
+  feed(id, quit ? `${p.name} quit after two missed paydays. Payroll −$${salary.toLocaleString("en-US")}/day.` : `You let ${p.name} go. Payroll −$${salary.toLocaleString("en-US")}/day; the team is rattled.`, "neg");
 }
 
 export function reassign(id: string, boss: string) {

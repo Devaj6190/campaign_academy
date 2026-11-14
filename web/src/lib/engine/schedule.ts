@@ -6,6 +6,9 @@ import { debate, DEBATE_DAYS } from "./debate";
 import { isPollDay, publish } from "./polls";
 import type { Rival } from "./poll";
 import type { PlanResult } from "./rivalAgent";
+import { RIVALS } from "./rivals";
+import { GAME, NYC, PAYMENT_DAYS } from "../money/rules";
+import { hash } from "../util";
 
 // When things happen. Rivals plan from noon in the background and their moves land overnight, so the
 // morning paper can report them and nothing ever waits on an agent. A plan that is still running at the
@@ -32,7 +35,7 @@ async function plan(who: Rival, forDay?: number) {
   if (r.plan.day === day && r.plan.status !== "idle") return;
   setRival(who, () => ({ plan: { day, status: "planning", moves: [] } }));
   const { lines, gained } = coleToday();
-  const body = { who, snapshot: snapshot(), cash: r.cash, memory: r.memory, coleYesterday: lines, gained, extra: DEBATE_DAYS.includes(day) };
+  const body = { who, snapshot: snapshot(), cash: r.cash, spent: r.spent, memory: r.memory, coleYesterday: lines, gained, extra: DEBATE_DAYS.includes(day) };
   let out: PlanResult;
   try {
     const res = await fetch("/api/rivals/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -53,6 +56,19 @@ function land(who: Rival) {
   for (const e of r.plan.moves) useGame.getState().applyEffect(e, "rival");
   setRival(who, (cur) => ({ plan: { ...cur.plan, status: "landed" }, memory: [...cur.memory, `Day ${cur.plan.day}: ${cur.plan.memo || r.plan.moves.map((m) => m.summary).join(" ")}`].slice(-6) }));
   useGame.setState((g) => ({ news: { ...g.news, opposition: [...g.news.opposition, ...r.plan.moves.map((m) => m.summary)] } }));
+}
+
+/** The rivals' own fundraising overnight, and public funds for a participant on payment days. */
+function rivalIncome(today: number) {
+  for (const who of WHO) {
+    const def = RIVALS[who];
+    const income = Math.round(def.income * (0.8 + hash(today * 13, who === "hale" ? 3 : 5) * 0.4));
+    setRival(who, (r) => {
+      const matchable = r.matchable + Math.round(income * def.smallShare);
+      const owed = def.participant && PAYMENT_DAYS.includes(today) ? Math.max(0, Math.min(GAME.publicCap, matchable * NYC.ratio) - r.matchPaid) : 0;
+      return { cash: r.cash + income + owed, raised: r.raised + income + owed, matchable, matchPaid: r.matchPaid + owed };
+    });
+  }
 }
 
 /** Called at noon game time. */
@@ -77,6 +93,7 @@ export function overnight(ended: number) {
   // Poll mornings: a new poll is published and the campaign's map catches up with the whole city.
   // Rival moves still thinking land after this and show up in the next poll.
   const today = ended + 1;
+  rivalIncome(today);
   if (isPollDay(today)) {
     const g = useGame.getState();
     const p = publish(g, today);
