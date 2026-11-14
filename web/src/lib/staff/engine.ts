@@ -81,7 +81,7 @@ export function resolve(
       case "phone_bank": return `Made ${n(1200 * mod)} calls into ${place}. Support ${sign(sd)}.`;
       case "rally": return `Rally in ${place} drew ${n(500 * mod + 300 * luck)} people. Support ${sign(sd)}${fname ? `, ${fname} ${sign(fd)}` : ""}.`;
       case "house_party": return `House party in ${place} raised $${n(raised)}.`;
-      case "donor_dinner": return `Donor dinner raised $${n(raised)}. Young progressives grumbled.`;
+      case "donor_dinner": return `Donor dinner raised $${n(raised)}. Young activists grumbled.`;
       case "call_time": return `Call time raised $${n(raised)} from ${n(8 + 10 * mod)} donors.`;
       case "email_blast": return `Email to ${fname.toLowerCase()} raised $${n(raised)}. ${fname} ${sign(fd)}.`;
       case "digital_ads": return `Ads reached ${n(90000 * mod)} ${fname.toLowerCase()}. ${fname} ${sign(fd)}.`;
