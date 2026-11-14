@@ -1,8 +1,8 @@
 import { presence } from "../demographics";
 import { hash } from "../util";
 import { ACTIONS, type ActionId } from "./catalog";
-import { CANDIDATE, profileFor, type Profile } from "./roster";
-import { findBoros, findFactions, findPlaces, PLACES, placeName, shortPlace, type Snapshot } from "./world";
+import { CANDIDATE, profileFor, type Profile } from "../staff/roster";
+import { findBoros, findFactions, findPlaces, PLACES, placeName, shortPlace, type Snapshot } from "../staff/world";
 
 // Deterministic rules. Same inputs, same outcome, so the server can tell an agent what happened and the
 // browser applies exactly that.
@@ -20,6 +20,8 @@ export type Effect = {
   factions: Record<string, number>;
   momentum: number;
   calendar?: string;
+  /** A rival move: who made it and how much stronger they got in each district (poll.ts). */
+  rival?: { who: "hale" | "brandt"; strength: Record<number, number> };
   /** False when the job went to someone without the skills for it. */
   fit: boolean;
   summary: string;

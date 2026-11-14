@@ -7,6 +7,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { Dock, DockButton, Inspector, Label, Meter, Popover, Section, Tag, ViewHeader } from "@/components/ui";
 import { appear, APPEARANCES, appearancesToday, DAILY, preview, sendStaff, type Appearance } from "@/lib/candidate";
 import { groupsHere } from "@/lib/demographics";
+import { actor } from "@/lib/factionHistory";
 import { DISTRICTS, FETCHED, districtBy } from "@/lib/geo";
 import { sentimentOf, useGame } from "@/lib/store";
 import { clock, cn, heat, tone } from "@/lib/util";
@@ -95,6 +96,7 @@ export function MapView() {
             )}
           </AnimatePresence>
         </div>
+        <ElectionBanner />
         {tip && hovered && !hovered.park && (
           <div className="pointer-events-none fixed z-50 rounded-md border border-line-strong bg-raised px-2.5 py-1.5 text-[12px] shadow-xl" style={{ left: tip.x + 14, top: tip.y + 14 }}>
             {hovered.name}
@@ -156,7 +158,7 @@ function DistrictPanel({ cd }: { cd: number }) {
   const max = d.issues[0]?.[1] ?? 1;
   const recent = world.ledger.filter((l) => l.effect.district === cd || l.effect.sent[cd] !== undefined).slice(-5).reverse();
   const name = (id: string) => world.factions.find((f) => f.id === id)?.name ?? id;
-  const who = (l: (typeof recent)[number]) => (l.source === "candidate" ? "Cole" : world.staff.find((p) => p.id === l.effect.by)?.name?.split(" ")[0] ?? "Staff");
+  const who = (l: (typeof recent)[number]) => actor(l, world.staff).split(" ")[0];
   const groups = groupsHere(cd).slice(0, 5);
   const demo = d.demo;
   const race = demo ? ([["Hispanic", demo.race.hispanic, "#f0a23b"], ["Black", demo.race.black, "#b4b4bd"], ["White", demo.race.white, "#5b8def"], ["Asian", demo.race.asian, "#5fd08a"]] as const) : [];
@@ -258,5 +260,25 @@ function DistrictPanel({ cd }: { cd: number }) {
         ) : <p className="text-[12.5px] text-faint">No reports.</p>}
       </Section>
     </>
+  );
+}
+
+// Election night: results come in district by district on the map before the result card.
+function ElectionBanner() {
+  const election = useGame((s) => s.election);
+  if (!election) return null;
+  const shown = new Set(election.result.order.slice(0, election.shown));
+  const won = { cole: 0, hale: 0, brandt: 0 };
+  for (const r of election.result.byDistrict) if (shown.has(r.cd)) won[r.winner]++;
+  const n = Math.min(election.shown, election.result.order.length);
+  return (
+    <div className="pointer-events-none absolute top-20 left-1/2 z-30 -translate-x-1/2 rounded-xl border border-line-strong bg-raised/90 px-5 py-3 text-center shadow-2xl backdrop-blur">
+      <Label>Election night · {n} of {election.result.order.length} districts reporting</Label>
+      <div className="mt-1.5 flex gap-5 text-[13px]">
+        <span className="text-warm">Cole {won.cole}</span>
+        <span className="text-soft">Hale {won.hale}</span>
+        <span className="text-[#9d95e8]">Brandt {won.brandt}</span>
+      </div>
+    </div>
   );
 }

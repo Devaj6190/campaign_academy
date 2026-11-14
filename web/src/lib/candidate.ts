@@ -1,7 +1,7 @@
 "use client";
 
 import { largestGroup } from "./demographics";
-import { resolve, type Effect } from "./staff/engine";
+import { resolve, type Effect } from "./engine/resolve";
 import { snapshot } from "./staff/run";
 import { useStaff } from "./staff/store";
 import { shortPlace } from "./staff/world";

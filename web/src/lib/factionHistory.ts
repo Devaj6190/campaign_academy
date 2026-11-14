@@ -14,6 +14,8 @@ export function actor(l: LedgerEntry, staff: Staff[]) {
   if (l.source === "candidate") return "Cole";
   if (l.source === "manifesto") return "Your manifesto";
   if (l.source === "tactic") return "Contrast ad";
+  if (l.source === "debate") return "Debate";
+  if (l.source === "rival") return l.effect.by === "hale" ? "Hale" : "Brandt";
   return staff.find((p) => p.id === l.effect.by)?.name ?? "Staff";
 }
 

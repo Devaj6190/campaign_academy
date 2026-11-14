@@ -6,6 +6,7 @@ import { netPerDay, useGame } from "@/lib/store";
 import { cn, money, moneyK } from "@/lib/util";
 import { Dock, DockButton, Inspector, Label, Meter, Section } from "@/components/ui";
 import { ShaderBackground } from "@/components/ui21/dithering";
+import { districtBy } from "@/lib/geo";
 
 export function Profile() {
   const s = useGame();
@@ -118,15 +119,9 @@ export function Profile() {
             ))}
           </div>
         </Section>
-        <Section title="Opponents">
+        <Section title="Rivals">
           <div className="space-y-2">
-            {OPPONENTS.map((o) => (
-              <div key={o.id} className="rounded-lg border border-line bg-raised p-3">
-                <div className="text-[13px] font-medium">{o.name}</div>
-                <div className="text-[11.5px] text-muted">{o.tag}</div>
-                <div className="mt-1.5 text-[12px] text-soft">Strong with: {o.note.toLowerCase()}</div>
-              </div>
-            ))}
+            {OPPONENTS.map((o) => <RivalCard key={o.id} id={o.id} name={o.name} tag={o.tag} note={o.note} />)}
           </div>
         </Section>
         <Section title="Opening problems">
@@ -137,6 +132,34 @@ export function Profile() {
           </ol>
         </Section>
       </Inspector>
+    </div>
+  );
+}
+
+// What a rival campaign has been doing: their poll, money, last moves and where they've built strength.
+function RivalCard({ id, name, tag, note }: { id: "hale" | "brandt"; name: string; tag: string; note: string }) {
+  const r = useGame((s) => s.rivals[id]);
+  const poll = useGame((s) => s.poll[id]);
+  const ledger = useGame((s) => s.ledger);
+  const moves = ledger.filter((l) => l.source === "rival" && l.effect.by === id).slice(-3).reverse();
+  const strong = Object.entries(r.strength).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([cd]) => districtBy(+cd)?.name.split("-")[0]).filter(Boolean);
+  return (
+    <div className="rounded-lg border border-line bg-raised p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="text-[13px] font-medium">{name}</div>
+        <div className="tnum font-mono text-[12px]">{poll}%</div>
+      </div>
+      <div className="text-[11.5px] text-muted">{tag}</div>
+      <div className="mt-1.5 flex justify-between text-[11.5px] text-muted">
+        <span>{moneyK(r.cash)} in the bank</span>
+        <span className={cn(r.plan.status === "planning" && "breathe text-warm")}>{r.plan.status === "planning" ? "Planning tonight…" : r.plan.mode === "live" ? "AI campaign" : ""}</span>
+      </div>
+      <div className="mt-1.5 text-[12px] text-soft">Strong with: {strong.length ? strong.join(", ") : note.toLowerCase()}</div>
+      {!!moves.length && (
+        <ul className="mt-2 space-y-1 border-t border-line pt-2 text-[11.5px] text-muted">
+          {moves.map((l) => <li key={l.id}><span className="tnum font-mono text-faint">D{l.day}</span> {l.effect.summary}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
