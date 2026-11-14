@@ -8,7 +8,7 @@ import { Avatar, Button, Dock, DockButton, Label, Meter, Section, ViewHeader } f
 import { AgentPlan, type PlanTask } from "@/components/ui21/agent-plan";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import type { Staff } from "@/lib/data";
-import type { Effect } from "@/lib/staff/engine";
+import type { Effect } from "@/lib/engine/resolve";
 import { profileFor } from "@/lib/staff/roster";
 import { answerAsk, hire, letGo, loadCandidates, reassign } from "@/lib/staff/run";
 import { useStaff, type ChatItem, type Run } from "@/lib/staff/store";

@@ -4,8 +4,12 @@ import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
 import { DISTRICTS } from "./geo";
 import { shares } from "./demographics";
 import { hash } from "./util";
-import { effectOf, type Effect } from "./staff/engine";
+import { effectOf, type Effect } from "./engine/resolve";
 import { knockOns } from "./relations";
+import { calibrate, pollOf, type Rival } from "./engine/poll";
+import { RIVALS } from "./engine/rivals";
+import { tacticOutcome, type Deliverer } from "./engine/tactic";
+import type { ElectionResult } from "./engine/election";
 
 // One shared world state. Every screen is a view of this, so an action on one shows up on the others.
 // Behaviour is canned for now: the places marked "agent" and "model" are where real calls go.
@@ -21,7 +25,9 @@ export type Draft = { text: string; up: string[]; down: string[] };
 
 /** One change to the world, stamped with when it happened. Every view that explains "why" reads this. */
 /** knock: how other groups moved because of this one (relations.ts), credited to the group that caused it. */
-export type LedgerEntry = { id: number; day: number; min: number; source: "staff" | "candidate" | "manifesto" | "tactic"; effect: Effect; knock: Record<string, { delta: number; from: string }> };
+export type LedgerEntry = { id: number; day: number; min: number; source: "staff" | "candidate" | "manifesto" | "tactic" | "rival" | "debate"; effect: Effect; knock: Record<string, { delta: number; from: string }> };
+
+export type RivalState = { cash: number; strength: Record<number, number>; memory: string[]; plan: { day: number; status: "idle" | "planning" | "ready" | "landed"; moves: Effect[]; memo?: string; mode?: "live" | "rules" } };
 
 type State = {
   view: View;
@@ -49,9 +55,15 @@ type State = {
   overlay: Overlay;
   toasts: Toast[];
   tacticResult: "backfired" | "worked" | null;
-  /** Fractional poll movement; whole points reach the poll. */
-  momentum: number;
   ledger: LedgerEntry[];
+  /** Hale and Brandt: money, how strong they are in each district (feeds the poll), memory, tonight's plan. */
+  rivals: Record<Rival, RivalState>;
+  /** What the morning paper reports about the night before. */
+  news: { day: number; opposition: string[]; debate?: string };
+  /** Cole's poll at the end of each day, for trends and debates. */
+  pollHistory: number[];
+  /** Election night: the result and how many districts have reported so far. */
+  election: { result: ElectionResult; shown: number; done?: boolean } | null;
   /** The one write path for cash, district support, faction feeling and the poll (contract on #1). */
   applyEffect: (e: Effect, source: LedgerEntry["source"]) => void;
 
@@ -67,7 +79,7 @@ type State = {
   hire: (id: string, pick: number) => void;
   act: (kind: string, cost: number, bump: number, raise?: number) => void;
   commitPlank: (d: Draft) => void;
-  runTactic: () => void;
+  runTactic: (by?: Deliverer) => void;
   speak: () => void;
   dismiss: (id: number) => void;
   jumpToEvening: () => void;
@@ -132,13 +144,24 @@ export const sentimentOf = (s: Pick<State, "sent" | "filter" | "factions">, cd: 
 // Dev handle for driving the UI from the console: window.game.setState({ view: "map" })
 if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") queueMicrotask(() => ((window as unknown as { game: unknown }).game = useGame));
 
+// A game day is one real minute at 1x: 06:00 to 22:00 in 240 ticks of 250 ms.
+const MIN_PER_TICK = 4;
+const NOON = 720;
+// Tune the poll so day 1 reads as the README describes (Hale 38, Cole 31, Brandt 14, undecided 17).
+calibrate(sent);
+
+const START_RIVALS: Record<Rival, RivalState> = {
+  hale: { cash: RIVALS.hale.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
+  brandt: { cash: RIVALS.brandt.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
+};
+
 export const useGame = create<State>((set, get) => ({
   view: "profile",
   day: 1,
   min: DAY_START,
   speed: 1,
   cash: 412000,
-  poll: { cole: 31, hale: 38, brandt: 14 },
+  poll: pollOf({ sent, day: 1, rivals: START_RIVALS }),
   losses: LOSSES,
   gains: GAINS,
   tasks: [
@@ -164,13 +187,18 @@ export const useGame = create<State>((set, get) => ({
   overlay: "paper",
   toasts: [],
   tacticResult: null,
-  momentum: 0,
   ledger: [],
+  rivals: START_RIVALS,
+  news: { day: 1, opposition: [] },
+  pollHistory: [],
+  election: null,
 
   applyEffect: (e, source) =>
     set((g) => {
       const sent = { ...g.sent };
       for (const [cd, d] of Object.entries(e.sent)) sent[+cd] = Math.max(5, Math.min(95, (sent[+cd] ?? 50) + d));
+      // Momentum is citywide buzz: it nudges every district a little (it can be negative after a rival's move).
+      if (e.momentum) for (const cd of Object.keys(sent)) if (+cd % 100 <= 18) sent[+cd] = Math.max(5, Math.min(95, sent[+cd] + 0.8 * e.momentum));
       // Groups move together: winning one group warms its allies and cools its rivals (once, capped).
       const knock = knockOns(e.factions);
       const factions = g.factions.map((f) => {
@@ -179,14 +207,20 @@ export const useGame = create<State>((set, get) => ({
       });
       const booked = Math.min(30, g.day + 1); // events go on tomorrow's calendar
       const calendar = e.calendar ? { ...g.calendar, [booked]: [...(g.calendar[booked] ?? []), e.calendar] } : g.calendar;
-      // Whole points of momentum reach the poll, taken from the undecided share so it never sums past 100.
-      let momentum = g.momentum + e.momentum;
-      let gain = 0;
-      while (momentum >= 1) { momentum -= 1; gain += 1; }
-      const room = Math.max(0, 100 - g.poll.cole - g.poll.hale - g.poll.brandt);
-      const poll = gain ? { ...g.poll, cole: g.poll.cole + Math.min(gain, room) } : g.poll;
+      // A rival's move is paid by the rival and makes them stronger where it landed.
+      let rivals = g.rivals;
+      let cash = g.cash - e.cost + e.raised;
+      if (e.rival) {
+        const r = g.rivals[e.rival.who];
+        const strength = { ...r.strength };
+        for (const [cd, d] of Object.entries(e.rival.strength)) strength[+cd] = Math.min(150, (strength[+cd] ?? 0) + d);
+        rivals = { ...g.rivals, [e.rival.who]: { ...r, cash: r.cash - e.cost + e.raised, strength } };
+        cash = g.cash;
+      }
+      // The poll is not set by hand: it is what the districts now add up to.
+      const poll = pollOf({ sent, day: g.day, rivals });
       const entry: LedgerEntry = { id: uid++, day: g.day, min: g.min, source, effect: e, knock };
-      return { cash: g.cash - e.cost + e.raised, sent, factions, calendar, momentum, poll, ledger: [...g.ledger, entry].slice(-5000) };
+      return { cash, sent, factions, calendar, rivals, poll, ledger: [...g.ledger, entry].slice(-5000) };
     }),
 
   go: (view) => set({ view }),
@@ -198,18 +232,32 @@ export const useGame = create<State>((set, get) => ({
 
   tick: () => {
     const s = get();
-    const min = s.min + 2 * s.speed;
+    // Election night: results come in a few districts at a time, then the result card.
+    if (s.election) {
+      if (s.election.shown >= s.election.result.order.length) return s.election.done ? undefined : set({ overlay: "election", election: { ...s.election, done: true } });
+      return set({ election: { ...s.election, shown: s.election.shown + 2 } });
+    }
+    const min = s.min + MIN_PER_TICK * s.speed;
+    // At noon the rivals start planning tonight's moves in the background.
+    if (s.min < NOON && min >= NOON) void import("./engine/schedule").then((m) => m.planRivals());
     if (min < DAY_END) return set({ min });
-    // Day rolls over: money settles, the poll drifts, and the morning paper arrives. The clock never stops.
-    if (s.day >= 30) return set({ min: DAY_END, overlay: "election" });
+    if (s.day >= 30) {
+      if (s.min >= DAY_END) return;
+      set({ min: DAY_END });
+      void import("./engine/election").then(({ electionResult }) => set({ view: "map", district: null, overlay: null, election: { result: electionResult(get()), shown: 0 } }));
+      return;
+    }
+    // Day rolls over: money settles, the rivals' overnight moves land, debates are judged, and the paper arrives.
     set({
       day: s.day + 1,
       min: DAY_START,
       cash: s.cash + net(s),
-      poll: { ...s.poll, cole: s.poll.cole + Math.round(hash(s.day, 3) * 3 - 1) },
       tasks: s.tasks.filter((t) => !t.done),
+      pollHistory: [...s.pollHistory, s.poll.cole],
+      news: { day: s.day + 1, opposition: [] },
       overlay: "paper",
     });
+    void import("./engine/schedule").then((m) => m.overnight(s.day));
   },
 
   allocate: (kind, i, delta) =>
@@ -242,10 +290,11 @@ export const useGame = create<State>((set, get) => ({
     get().applyEffect(effectOf({ by: "manifesto", action: "plank", label: "Manifesto plank", summary: d.text, factions }), "manifesto");
   },
 
-  runTactic: () => {
-    const back = Math.random() < 0.55;
-    set({ tacticResult: back ? "backfired" : "worked" });
-    get().applyEffect(effectOf({ by: "tactic", action: "tactic", label: "Contrast ad", cost: 8000, summary: back ? "The contrast ad backfired with seniors." : "The contrast ad landed with seniors.", factions: { seniors: back ? -6 : 3 } }), "tactic");
+  // The contrast ad: honest but risky. The risk is computed from the situation and shown first (engine/tactic.ts).
+  runTactic: (by = "com") => {
+    const { backfired, effect } = tacticOutcome(get(), by);
+    set({ tacticResult: backfired ? "backfired" : "worked" });
+    get().applyEffect(effect, "tactic");
   },
 
   // Staff speak up when something in the world deserves it (src/lib/staff/speak.ts).

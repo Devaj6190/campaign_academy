@@ -1,8 +1,8 @@
 "use client";
 
 import { useGame } from "../store";
-import { ACTIONS } from "./catalog";
-import type { Effect } from "./engine";
+import { ACTIONS } from "../engine/catalog";
+import type { Effect } from "../engine/resolve";
 import { runOffline } from "./offline";
 import { RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
