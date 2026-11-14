@@ -26,11 +26,12 @@ export function MapView() {
   const district = useGame((s) => s.district);
   const select = useGame((s) => s.select);
   const done = useGame((s) => appearancesToday(s));
-  const sent = useGame((s) => s.sent);
+  const fieldRead = useGame((s) => s.fieldRead);
+  const polls = useGame((s) => s.polls);
   const [tip, setTip] = useState<{ x: number; y: number; cd: number } | null>(null);
   const [notice, setNotice] = useState<{ id: number; ok: boolean; text: string } | null>(null);
   const noticeId = useRef(0);
-  const world = { sent, filter, factions };
+  const world = { fieldRead, filter, polls };
   const sel = districtBy(district);
   const hovered = districtBy(tip?.cd ?? null);
   const current = factions.find((f) => f.id === filter);
@@ -172,12 +173,13 @@ function DistrictPanel({ cd }: { cd: number }) {
       {d.park ? (
         <Section title="No voters"><p className="text-[12.5px] text-muted">Park or airport land. Nobody votes from here.</p></Section>
       ) : (
-        <Section title="Support for Cole" right={<Tag kind="sim" />}>
+        <Section title="Your field read" right={<Tag kind="sim" />}>
           <div className="flex items-baseline gap-2">
             <span className="tnum font-mono text-[30px] leading-none font-medium tracking-tight" style={{ color: tone(v) }}>{v}%</span>
-            <span className="text-[12px] text-muted">{world.filter === "all" ? "of all voters" : `of ${name(world.filter).toLowerCase()}`}</span>
+            <span className="text-[12px] text-muted">{world.filter === "all" ? "support for Cole" : `support among ${name(world.filter).toLowerCase()}`}</span>
           </div>
           <Meter value={v} color={tone(v)} className="mt-3" />
+          <p className="mt-2 text-[11px] text-faint">From your own canvassing where you worked; the whole map refreshes when a new poll comes out.</p>
         </Section>
       )}
       {!d.park && (
@@ -185,12 +187,10 @@ function DistrictPanel({ cd }: { cd: number }) {
           {recent.length ? (
             <ol className="space-y-2">
               {recent.map((l) => {
-                const delta = l.effect.sent[cd];
                 return (
                   <li key={l.id} className="text-[12px] leading-snug">
                     <div className="flex items-center justify-between gap-2 text-[11px] text-faint">
                       <span className="tnum font-mono">Day {l.day} · {clock(l.min)}</span>
-                      {delta !== undefined && <span className={cn("tnum font-mono", delta >= 0 ? "text-pos" : "text-neg")}>{delta >= 0 ? "+" : ""}{delta}</span>}
                     </div>
                     <p className="text-soft"><span className="text-fg">{who(l)}</span> · {l.effect.summary.replace(/ \(Not their strength.*$/, "")}</p>
                   </li>

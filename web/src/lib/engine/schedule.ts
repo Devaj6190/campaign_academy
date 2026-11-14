@@ -3,6 +3,7 @@
 import { snapshot } from "../staff/run";
 import { useGame, type RivalState } from "../store";
 import { debate, DEBATE_DAYS } from "./debate";
+import { isPollDay, publish } from "./polls";
 import type { Rival } from "./poll";
 import type { PlanResult } from "./rivalAgent";
 
@@ -62,7 +63,7 @@ export function planRivals() {
 export function overnight(ended: number) {
   if (DEBATE_DAYS.includes(ended)) {
     const g = useGame.getState();
-    const d = debate({ day: ended, manifesto: g.manifesto, ledger: g.ledger, pollHistory: g.pollHistory });
+    const d = debate({ day: ended, manifesto: g.manifesto, ledger: g.ledger, polls: g.polls });
     g.applyEffect(d.effect, "debate");
     useGame.setState((s) => ({ news: { ...s.news, debate: d.story } }));
   }
@@ -71,5 +72,13 @@ export function overnight(ended: number) {
     if (r.plan.day === ended && r.plan.status === "ready") land(who);
     // Never started (e.g. the clock jumped past noon): plan now; it lands when it arrives.
     else if (r.plan.day !== ended) void plan(who, ended);
+  }
+  // Poll mornings: a new poll is published and the campaign's map catches up with the whole city.
+  // Rival moves still thinking land after this and show up in the next poll.
+  const today = ended + 1;
+  if (isPollDay(today)) {
+    const g = useGame.getState();
+    const p = publish(g, today);
+    useGame.setState({ polls: [...g.polls, p], poll: { cole: p.cole, hale: p.hale, brandt: p.brandt }, fieldRead: { ...g.sent } });
   }
 }

@@ -134,10 +134,12 @@ function Clock() {
   const speed = useGame((s) => s.speed);
   const setSpeed = useGame((s) => s.setSpeed);
   const poll = useGame((s) => s.poll);
+  // Only published polls are ever shown: opinion is not visible between them (engine/polls.ts).
+  const latest = useGame((s) => s.polls[s.polls.length - 1]);
   const late = min > DAY_END - 120; // last two hours of the day
   return (
     <div className="flex items-center justify-end gap-4">
-      <div className="hidden w-40 xl:block" title="Latest poll">
+      <div className="hidden w-40 xl:block" title={`${latest.pollster}, day ${latest.day}: ${latest.n.toLocaleString("en-US")} likely voters, margin of error ±${latest.moe}`}>
         <div className="tnum mb-1 flex justify-between font-mono text-[11px]">
           <span className="text-warm">Cole {poll.cole}</span>
           <span className="text-muted">Hale {poll.hale}</span>
@@ -149,6 +151,7 @@ function Clock() {
           <div className="bg-white/20 transition-[width] duration-500" style={{ width: `${poll.brandt}%` }} />
           <div className="flex-1 bg-white/[0.06]" />
         </div>
+        <div className="mt-0.5 text-right text-[9.5px] text-faint">poll as of day {latest.day} · ±{latest.moe}</div>
       </div>
       <div className="w-[104px]">
         <div className="flex items-baseline justify-between">

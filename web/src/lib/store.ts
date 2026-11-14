@@ -7,6 +7,7 @@ import { hash } from "./util";
 import { effectOf, type Effect } from "./engine/resolve";
 import { knockOns } from "./relations";
 import { calibrate, pollOf, type Rival } from "./engine/poll";
+import { publish, type PollRecord } from "./engine/polls";
 import { RIVALS } from "./engine/rivals";
 import { tacticOutcome, type Deliverer } from "./engine/tactic";
 import type { ElectionResult } from "./engine/election";
@@ -35,7 +36,14 @@ type State = {
   min: number;
   speed: number;
   cash: number;
+  /** The latest PUBLISHED poll: all anyone (player, staff, rivals) ever sees of public opinion. */
   poll: { cole: number; hale: number; brandt: number };
+  /** The true opinion, moved by every Effect. Internal: only the engine and election night read it. */
+  truth: { cole: number; hale: number; brandt: number };
+  /** Every poll published so far (engine/polls.ts). */
+  polls: PollRecord[];
+  /** The campaign's own read of each district: updated where Cole or his staff worked, and citywide on poll days. */
+  fieldRead: Record<number, number>;
   losses: Flow[];
   gains: Flow[];
   tasks: { id: number; text: string; done: boolean }[];
@@ -61,7 +69,6 @@ type State = {
   /** What the morning paper reports about the night before. */
   news: { day: number; opposition: string[]; debate?: string };
   /** Cole's poll at the end of each day, for trends and debates. */
-  pollHistory: number[];
   /** Election night: the result and how many districts have reported so far. */
   election: { result: ElectionResult; shown: number; done?: boolean } | null;
   /** The one write path for cash, district support, faction feeling and the poll (contract on #1). */
@@ -134,11 +141,19 @@ function planFor(staff: Staff[], id: string, title: string, statuses: PlanStatus
 }
 
 /** Sentiment for one district under the current filter. Simulated. */
-export const sentimentOf = (s: Pick<State, "sent" | "filter" | "factions">, cd: number) => {
-  if (s.filter === "all") return s.sent[cd];
-  // Support among one group here = how that group feels citywide, shifted by this district's lean.
-  const f = s.factions.find((x) => x.id === s.filter)!;
-  return Math.max(5, Math.min(95, f.feel + (s.sent[cd] - 50) * 0.6));
+/** What the map shows: the campaign's own field read, never the true opinion (engine/polls.ts). */
+export const sentimentOf = (s: Pick<State, "fieldRead" | "filter" | "polls">, cd: number) => {
+  const read = s.fieldRead[cd] ?? 50;
+  if (s.filter === "all") return read;
+  // Support among one group here = how the latest poll says that group feels, shifted by this district's lean.
+  const g = s.polls[s.polls.length - 1]?.groups[s.filter];
+  return Math.max(5, Math.min(95, (g?.feel ?? 50) + (read - 50) * 0.6));
+};
+
+/** Each group's feeling as the latest poll measured it (what every screen shows). */
+export const polledFactions = (s: Pick<State, "factions" | "polls">) => {
+  const g = s.polls[s.polls.length - 1]?.groups ?? {};
+  return s.factions.map((f) => ({ ...f, feel: g[f.id]?.feel ?? f.feel }));
 };
 
 // Dev handle for driving the UI from the console: window.game.setState({ view: "map" })
@@ -154,6 +169,8 @@ const START_RIVALS: Record<Rival, RivalState> = {
   hale: { cash: RIVALS.hale.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
   brandt: { cash: RIVALS.brandt.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
 };
+const DAY1_TRUTH = pollOf({ sent, day: 1, rivals: START_RIVALS });
+const DAY1_POLL = publish({ truth: DAY1_TRUTH, factions: FACTIONS, ledger: [] }, 1);
 
 export const useGame = create<State>((set, get) => ({
   view: "profile",
@@ -161,7 +178,10 @@ export const useGame = create<State>((set, get) => ({
   min: DAY_START,
   speed: 1,
   cash: 412000,
-  poll: pollOf({ sent, day: 1, rivals: START_RIVALS }),
+  poll: { cole: DAY1_POLL.cole, hale: DAY1_POLL.hale, brandt: DAY1_POLL.brandt },
+  truth: DAY1_TRUTH,
+  polls: [DAY1_POLL],
+  fieldRead: { ...sent },
   losses: LOSSES,
   gains: GAINS,
   tasks: [
@@ -190,7 +210,6 @@ export const useGame = create<State>((set, get) => ({
   ledger: [],
   rivals: START_RIVALS,
   news: { day: 1, opposition: [] },
-  pollHistory: [],
   election: null,
 
   applyEffect: (e, source) =>
@@ -218,9 +237,11 @@ export const useGame = create<State>((set, get) => ({
         cash = g.cash;
       }
       // The poll is not set by hand: it is what the districts now add up to.
-      const poll = pollOf({ sent, day: g.day, rivals });
+      const truth = pollOf({ sent, day: g.day, rivals });
+      // The campaign learns from its own field work at once; everywhere else waits for the next poll.
+      const fieldRead = source === "staff" || source === "candidate" ? { ...g.fieldRead, ...Object.fromEntries(Object.keys(e.sent).map((cd) => [cd, sent[+cd]])) } : g.fieldRead;
       const entry: LedgerEntry = { id: uid++, day: g.day, min: g.min, source, effect: e, knock };
-      return { cash, sent, factions, calendar, rivals, poll, ledger: [...g.ledger, entry].slice(-5000) };
+      return { cash, sent, factions, calendar, rivals, truth, fieldRead, ledger: [...g.ledger, entry].slice(-5000) };
     }),
 
   go: (view) => set({ view }),
@@ -253,7 +274,6 @@ export const useGame = create<State>((set, get) => ({
       min: DAY_START,
       cash: s.cash + net(s),
       tasks: s.tasks.filter((t) => !t.done),
-      pollHistory: [...s.pollHistory, s.poll.cole],
       news: { day: s.day + 1, opposition: [] },
       overlay: "paper",
     });

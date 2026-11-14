@@ -62,9 +62,9 @@ export function MapCanvas({ onHover, onSelect }: { onHover: (t: { x: number; y: 
   const cbs = useRef({ onHover, onSelect });
   useEffect(() => { cbs.current = { onHover, onSelect }; });
 
-  const sent = useGame((s) => s.sent);
+  const fieldRead = useGame((s) => s.fieldRead);
   const filter = useGame((s) => s.filter);
-  const factions = useGame((s) => s.factions);
+  const polls = useGame((s) => s.polls.length);
   const district = useGame((s) => s.district);
   const ledger = useGame((s) => s.ledger.length);
   const election = useGame((s) => s.election);
@@ -151,7 +151,7 @@ export function MapCanvas({ onHover, onSelect }: { onHover: (t: { x: number; y: 
   }, []);
 
   // Recolour whenever support, the group filter or group feelings change.
-  useEffect(paint, [sent, filter, factions]);
+  useEffect(paint, [fieldRead, filter, polls]);
 
   // Fly to the selected district and tilt so its buildings stand up; zoom back out when cleared.
   useEffect(() => focus(map.current, ready.current, district), [district]);

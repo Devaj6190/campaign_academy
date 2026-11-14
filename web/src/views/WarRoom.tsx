@@ -12,7 +12,6 @@ import type { Effect } from "@/lib/engine/resolve";
 import { profileFor } from "@/lib/staff/roster";
 import { answerAsk, hire, letGo, loadCandidates, reassign } from "@/lib/staff/run";
 import { useStaff, type ChatItem, type Run } from "@/lib/staff/store";
-import { shortPlace } from "@/lib/staff/world";
 import { useGame } from "@/lib/store";
 import { clock, cn } from "@/lib/util";
 
@@ -392,13 +391,11 @@ function ChatRow({ c, index, id, onSuggest }: { c: ChatItem; index: number; id: 
 
 function Receipt({ e }: { e: Effect }) {
   const staff = useGame((s) => s.staff);
-  const factions = useGame((s) => s.factions);
   const who = staff.find((p) => p.id === e.by)?.name?.split(" ")[0] ?? "Staff";
+  // Only what the campaign can count. How opinion moved is only known from the next poll.
   const chips: [string, "pos" | "neg" | "soft"][] = [];
   if (e.cost) chips.push([`−$${e.cost.toLocaleString("en-US")}`, "neg"]);
   if (e.raised) chips.push([`+$${e.raised.toLocaleString("en-US")}`, "pos"]);
-  for (const [cd, d] of Object.entries(e.sent)) chips.push([`${shortPlace(+cd)} ${d >= 0 ? "+" : ""}${d}`, d >= 0 ? "pos" : "neg"]);
-  for (const [f, d] of Object.entries(e.factions)) chips.push([`${factions.find((x) => x.id === f)?.name ?? f} ${d >= 0 ? "+" : ""}${d}`, d >= 0 ? "pos" : "neg"]);
   return (
     <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="rounded-lg border border-dashed border-line-strong bg-white/[0.015] px-3 py-2">
       <div className="flex items-center gap-1.5 text-[11px] text-muted">

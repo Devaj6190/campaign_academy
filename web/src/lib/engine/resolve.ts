@@ -81,26 +81,23 @@ export function resolve(
 
   const place = district ? shortPlace(district) : "";
   const fname = w.factions.find((f) => f.id === faction)?.name ?? "";
-  const sd = district ? sent[district] : 0;
-  const fd = faction ? factions[faction] : 0;
   const n = (x: number) => Math.round(x).toLocaleString("en-US");
-  const sign = (x: number) => (x >= 0 ? `+${x}` : `${x}`);
   const summary = (() => {
     switch (id) {
-      case "canvass": return `Knocked ${n(700 * mod + 400 * luck)} doors in ${place}. Support ${sign(sd)}.`;
-      case "phone_bank": return `Made ${n(1200 * mod)} calls into ${place}. Support ${sign(sd)}.`;
-      case "rally": return `Rally in ${place} drew ${n(500 * mod + 300 * luck)} people. Support ${sign(sd)}${fname ? `, ${fname} ${sign(fd)}` : ""}.`;
+      case "canvass": return `Knocked ${n(700 * mod + 400 * luck)} doors in ${place}.`;
+      case "phone_bank": return `Made ${n(1200 * mod)} calls into ${place}.`;
+      case "rally": return `Rally in ${place} drew ${n(500 * mod + 300 * luck)} people.`;
       case "house_party": return `House party in ${place} raised $${n(raised)}.`;
       case "donor_dinner": return `Donor dinner raised $${n(raised)}. Young activists grumbled.`;
       case "call_time": return `Call time raised $${n(raised)} from ${n(8 + 10 * mod)} donors.`;
-      case "email_blast": return `Email to ${fname.toLowerCase()} raised $${n(raised)}. ${fname} ${sign(fd)}.`;
-      case "digital_ads": return `Ads reached ${n(90000 * mod)} ${fname.toLowerCase()}. ${fname} ${sign(fd)}.`;
-      case "mail_piece": return `Mailed ${n(6000 * mod)} homes in ${place}. ${fname} ${sign(fd)}, support ${sign(sd)}.`;
-      case "press_pitch": return mod > 0.95 ? `Two outlets picked up the story. ${fname} ${sign(fd)}.` : `One small outlet ran it. ${fname} ${sign(fd)}.`;
-      case "rapid_response": return `Response went out within the hour. ${fname} ${sign(fd)}.`;
+      case "email_blast": return `Email to ${fname.toLowerCase()} raised $${n(raised)}.`;
+      case "digital_ads": return `Ads reached ${n(90000 * mod)} ${fname.toLowerCase()}.`;
+      case "mail_piece": return `Mailed ${n(6000 * mod)} homes in ${place}.`;
+      case "press_pitch": return mod > 0.95 ? `Two outlets picked up the story.` : `One small outlet ran it.`;
+      case "rapid_response": return `Response went out within the hour.`;
       case "volunteer_training": return `Trained ${n(14 * mod + 6)} new volunteers in ${place}.`;
-      case "coalition_meeting": return `Met ${fname.toLowerCase()} leaders. ${fname} ${sign(fd)}.`;
-      case "policy_brief": return `Brief for ${fname.toLowerCase()} is out. ${fname} ${sign(fd)}.`;
+      case "coalition_meeting": return `Met ${fname.toLowerCase()} leaders.`;
+      case "policy_brief": return `Brief for ${fname.toLowerCase()} is out.`;
       case "voter_targeting": return `Built a ${n(9000 * mod)}-voter target list for ${place}.`;
       case "schedule_event": return `On the calendar for day ${w.day + 1}.`;
     }

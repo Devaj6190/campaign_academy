@@ -6,10 +6,10 @@ import { Fit } from "@/components/Fit";
 import { Button, Dock, DockButton, Inspector, Label, Meter, Section, Tag, ViewHeader } from "@/components/ui";
 import { FACTIONS } from "@/lib/data";
 import { CITYWIDE, whereTheyLive } from "@/lib/demographics";
-import { biggestReason, causes, feelHistory } from "@/lib/factionHistory";
+import { causes } from "@/lib/factionHistory";
 import { districtBy } from "@/lib/geo";
 import { relationsOf, strongest } from "@/lib/relations";
-import { useGame } from "@/lib/store";
+import { polledFactions, useGame } from "@/lib/store";
 import { clock, cn, feelWord, tone } from "@/lib/util";
 
 // Bubble positions: rough seeds, then pushed apart once so circles can never overlap.
@@ -35,7 +35,9 @@ const LINES = strongest(8);
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 export function Factions() {
-  const factions = useGame((s) => s.factions);
+  const raw = useGame((s) => s.factions);
+  const polls = useGame((s) => s.polls);
+  const factions = polledFactions({ factions: raw, polls });
   const faction = useGame((s) => s.faction);
   const select = useGame((s) => s.select);
   const open = useGame((s) => s.open);
@@ -114,7 +116,9 @@ export function Factions() {
 }
 
 function Overview() {
-  const factions = useGame((s) => s.factions);
+  const raw = useGame((s) => s.factions);
+  const polls = useGame((s) => s.polls);
+  const factions = polledFactions({ factions: raw, polls });
   const select = useGame((s) => s.select);
   return (
     <>
@@ -150,19 +154,23 @@ function Spark({ values }: { values: number[] }) {
 }
 
 function FactionPanel({ id, showOnMap }: { id: string; showOnMap: (id: string) => void }) {
-  const factions = useGame((s) => s.factions);
+  const raw = useGame((s) => s.factions);
+  const polls = useGame((s) => s.polls);
   const ledger = useGame((s) => s.ledger);
   const staff = useGame((s) => s.staff);
-  const day = useGame((s) => s.day);
   const select = useGame((s) => s.select);
   const go = useGame((s) => s.go);
+  const factions = polledFactions({ factions: raw, polls });
   const sel = factions.find((f) => f.id === id)!;
   const names = Object.fromEntries(factions.map((f) => [f.id, f.name]));
-  const list = causes(id, ledger, staff, names);
-  const history = feelHistory(id, ledger, day);
-  const top = biggestReason(list);
-  const start = FACTIONS.find((f) => f.id === id)!.feel;
-  const change = Math.round((sel.feel - start) * 10) / 10;
+  // Opinion is only known from polls: the line has one point per poll, and the events since the
+  // previous poll are listed without any claim about how much each one moved them.
+  const latest = polls[polls.length - 1];
+  const previous = polls[polls.length - 2];
+  const list = causes(id, ledger, staff, names).filter((c) => !previous || c.id > previous.upTo);
+  const history = polls.map((p) => p.groups[id]?.feel ?? 50);
+  const start = polls[0]?.groups[id]?.feel ?? FACTIONS.find((f) => f.id === id)!.feel;
+  const change = Math.round(sel.feel - start);
   const rels = relationsOf(id);
   const size = CITYWIDE[id];
   const places = whereTheyLive(id);
@@ -175,7 +183,7 @@ function FactionPanel({ id, showOnMap }: { id: string; showOnMap: (id: string) =
         <div className="mt-3 grid grid-cols-2 gap-2">
           <div className="rounded-lg border border-line bg-raised px-3 py-2.5">
             <div className="text-[15px] font-medium" style={{ color: tone(sel.feel) }}>{feelWord(sel.feel)} <span className="tnum font-mono text-[12px] text-muted">{Math.round(sel.feel)}</span></div>
-            <div className="text-[11.5px] text-muted">Toward Cole{change ? <span className={change > 0 ? "text-pos" : "text-neg"}> · {change > 0 ? "+" : ""}{change} since day 1</span> : ""}</div>
+            <div className="text-[11.5px] text-muted">±{latest.groups[id]?.moe ?? 5} · {latest.pollster}, day {latest.day}{change ? <span className={change > 0 ? "text-pos" : "text-neg"}> · {change > 0 ? "+" : ""}{change} since the first poll</span> : ""}</div>
           </div>
           <div className="rounded-lg border border-line bg-raised px-3 py-2.5">
             <div className="tnum text-[15px] font-medium">{pct(size?.share ?? 0)}</div>
@@ -184,26 +192,25 @@ function FactionPanel({ id, showOnMap }: { id: string; showOnMap: (id: string) =
         </div>
       </div>
 
-      <Section title="How they've felt" right={<Tag kind="sim" />}>
+      <Section title="In the polls" right={<Tag kind="sim" />}>
         <Spark values={history} />
-        {top && <p className="mt-2 text-[12px] text-soft">Biggest reason: <span className="text-fg">{top.who}</span> <span className={cn("tnum font-mono", top.delta >= 0 ? "text-pos" : "text-neg")}>{top.delta >= 0 ? "+" : ""}{top.delta}</span></p>}
+        <p className="mt-2 text-[11.5px] text-muted">One point per published poll. Polls carry a margin of error, so read the trend, not one number.</p>
       </Section>
 
-      <Section title="Why it changed">
+      <Section title={previous ? `What happened since the day ${previous.day} poll` : "What has happened so far"}>
         {list.length ? (
           <ol className="space-y-2">
             {list.slice(0, 8).map((c) => (
               <li key={c.id} className="text-[12px] leading-snug">
                 <div className="flex justify-between gap-2 text-[11px] text-faint">
                   <span className="tnum font-mono">Day {c.day} · {clock(c.min)}</span>
-                  <span className={cn("tnum font-mono", c.delta >= 0 ? "text-pos" : "text-neg")}>{c.delta >= 0 ? "+" : ""}{c.delta}</span>
                 </div>
                 <p className="text-soft"><span className="text-fg">{c.who}</span> · {c.what}</p>
-                {c.because && <p className="text-[11px] text-muted">Because {c.because} moved, and they move {(rels.find((r) => r.id === c.becauseId)?.weight ?? 0) > 0 ? "together" : "apart"}.</p>}
+                {c.because && <p className="text-[11px] text-muted">Aimed at {c.because}, who {(rels.find((r) => r.id === c.becauseId)?.weight ?? 0) > 0 ? "tend to move with" : "tend to pull against"} this group.</p>}
               </li>
             ))}
           </ol>
-        ) : <p className="text-[12.5px] text-faint">Nothing has moved them yet. Policy, appearances and staff work all show up here.</p>}
+        ) : <p className="text-[12.5px] text-faint">Nothing aimed at them since the last poll. Policy, appearances and staff work all show up here; the next poll shows how opinion moved.</p>}
       </Section>
 
       <Section title="Who they are"><p className="text-[13px] leading-relaxed text-soft">{sel.about}</p></Section>
