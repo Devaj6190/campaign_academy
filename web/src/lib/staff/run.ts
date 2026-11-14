@@ -85,7 +85,7 @@ function handle(director: string, runId: number, e: RunEvent) {
     case "action": {
       apply(e.effect);
       const where = e.effect.district ? ` in ${shortPlace(e.effect.district)}` : "";
-      useStaff.setState((s) => ({ job: { ...s.job, [e.effect.by]: `${ACTIONS[e.effect.action].doing}${where}` } }));
+      useStaff.setState((s) => ({ job: { ...s.job, [e.effect.by]: `${e.effect.action in ACTIONS ? ACTIONS[e.effect.action as keyof typeof ACTIONS].doing : e.effect.label}${where}` } }));
       pushChat(director, { k: "receipt", effect: e.effect, by: e.effect.by });
       if (e.effect.by !== director) pushChat(e.effect.by, { k: "receipt", effect: e.effect, by: e.effect.by });
       feed(e.effect.by, e.effect.summary, e.effect.raised > e.effect.cost ? "pos" : undefined);

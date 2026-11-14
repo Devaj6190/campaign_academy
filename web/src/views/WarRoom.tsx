@@ -8,7 +8,6 @@ import { Avatar, Button, Dock, DockButton, Label, Meter, Section, ViewHeader } f
 import { AgentPlan, type PlanTask } from "@/components/ui21/agent-plan";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import type { Staff } from "@/lib/data";
-import { ACTIONS } from "@/lib/staff/catalog";
 import type { Effect } from "@/lib/staff/engine";
 import { profileFor } from "@/lib/staff/roster";
 import { answerAsk, hire, letGo, loadCandidates, reassign } from "@/lib/staff/run";
@@ -404,7 +403,7 @@ function Receipt({ e }: { e: Effect }) {
     <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="rounded-lg border border-dashed border-line-strong bg-white/[0.015] px-3 py-2">
       <div className="flex items-center gap-1.5 text-[11px] text-muted">
         {e.district ? <MapPin className="size-3" /> : <CircleDollarSign className="size-3" />}
-        <span className="font-medium text-soft">{ACTIONS[e.action].label}</span>
+        <span className="font-medium text-soft">{e.label}</span>
         <span>· {who}</span>
         {!e.fit && <span className="ml-auto rounded bg-neg/15 px-1 text-[10px] text-neg">Wrong person</span>}
       </div>

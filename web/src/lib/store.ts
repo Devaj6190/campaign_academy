@@ -4,7 +4,8 @@ import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
 import { DISTRICTS } from "./geo";
 import { shares } from "./demographics";
 import { hash } from "./util";
-import type { Effect } from "./staff/engine";
+import { effectOf, type Effect } from "./staff/engine";
+import { knockOns } from "./relations";
 
 // One shared world state. Every screen is a view of this, so an action on one shows up on the others.
 // Behaviour is canned for now: the places marked "agent" and "model" are where real calls go.
@@ -19,7 +20,8 @@ export type Toast = { id: number; staff: string; text: string };
 export type Draft = { text: string; up: string[]; down: string[] };
 
 /** One change to the world, stamped with when it happened. Every view that explains "why" reads this. */
-export type LedgerEntry = { id: number; day: number; min: number; source: "staff" | "candidate"; effect: Effect };
+/** knock: how other groups moved because of this one (relations.ts), credited to the group that caused it. */
+export type LedgerEntry = { id: number; day: number; min: number; source: "staff" | "candidate" | "manifesto" | "tactic"; effect: Effect; knock: Record<string, { delta: number; from: string }> };
 
 type State = {
   view: View;
@@ -169,7 +171,12 @@ export const useGame = create<State>((set, get) => ({
     set((g) => {
       const sent = { ...g.sent };
       for (const [cd, d] of Object.entries(e.sent)) sent[+cd] = Math.max(5, Math.min(95, (sent[+cd] ?? 50) + d));
-      const factions = g.factions.map((f) => (e.factions[f.id] ? { ...f, feel: Math.max(5, Math.min(95, f.feel + e.factions[f.id])) } : f));
+      // Groups move together: winning one group warms its allies and cools its rivals (once, capped).
+      const knock = knockOns(e.factions);
+      const factions = g.factions.map((f) => {
+        const d = (e.factions[f.id] ?? 0) + (knock[f.id]?.delta ?? 0);
+        return d ? { ...f, feel: Math.max(5, Math.min(95, f.feel + d)) } : f;
+      });
       const booked = Math.min(30, g.day + 1); // events go on tomorrow's calendar
       const calendar = e.calendar ? { ...g.calendar, [booked]: [...(g.calendar[booked] ?? []), e.calendar] } : g.calendar;
       // Whole points of momentum reach the poll, taken from the undecided share so it never sums past 100.
@@ -178,8 +185,8 @@ export const useGame = create<State>((set, get) => ({
       while (momentum >= 1) { momentum -= 1; gain += 1; }
       const room = Math.max(0, 100 - g.poll.cole - g.poll.hale - g.poll.brandt);
       const poll = gain ? { ...g.poll, cole: g.poll.cole + Math.min(gain, room) } : g.poll;
-      const entry: LedgerEntry = { id: uid++, day: g.day, min: g.min, source, effect: e };
-      return { cash: g.cash - e.cost + e.raised, sent, factions, calendar, momentum, poll, ledger: [...g.ledger, entry].slice(-400) };
+      const entry: LedgerEntry = { id: uid++, day: g.day, min: g.min, source, effect: e, knock };
+      return { cash: g.cash - e.cost + e.raised, sent, factions, calendar, momentum, poll, ledger: [...g.ledger, entry].slice(-5000) };
     }),
 
   go: (view) => set({ view }),
@@ -228,19 +235,17 @@ export const useGame = create<State>((set, get) => ({
     s.addTask(`${kind} · ${d.name}`);
   },
 
-  commitPlank: (d) =>
-    set((s) => ({
-      manifesto: [...s.manifesto, d.text],
-      factions: s.factions.map((f) => (d.up.includes(f.id) ? { ...f, feel: Math.min(95, f.feel + 6) } : d.down.includes(f.id) ? { ...f, feel: Math.max(5, f.feel - 8) } : f)),
-    })),
+  // A plank is permanent and moves the groups it pleases and angers, through the ledger like everything else.
+  commitPlank: (d) => {
+    set((s) => ({ manifesto: [...s.manifesto, d.text] }));
+    const factions = Object.fromEntries([...d.up.map((id) => [id, 6]), ...d.down.map((id) => [id, -8])]);
+    get().applyEffect(effectOf({ by: "manifesto", action: "plank", label: "Manifesto plank", summary: d.text, factions }), "manifesto");
+  },
 
   runTactic: () => {
     const back = Math.random() < 0.55;
-    set((s) => ({
-      cash: s.cash - 8000,
-      tacticResult: back ? "backfired" : "worked",
-      factions: s.factions.map((f) => (f.id === "seniors" ? { ...f, feel: f.feel + (back ? -6 : 3) } : f)),
-    }));
+    set({ tacticResult: back ? "backfired" : "worked" });
+    get().applyEffect(effectOf({ by: "tactic", action: "tactic", label: "Contrast ad", cost: 8000, summary: back ? "The contrast ad backfired with seniors." : "The contrast ad landed with seniors.", factions: { seniors: back ? -6 : 3 } }), "tactic");
   },
 
   // Staff speak up when something in the world deserves it (src/lib/staff/speak.ts).

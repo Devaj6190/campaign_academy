@@ -30,7 +30,7 @@ export function shares(cd: number): Record<string, number> | null {
     unions: UNIONS[b],
     smallbiz: SMALLBIZ[b],
     donors: Math.min(0.2, (d.income / 200000) * 0.15),
-    progressives: Math.min(0.25, (d.age20to24 / 100) * r * 3),
+    activists: Math.min(0.25, (d.age20to24 / 100) * r * 3),
   };
 }
 
@@ -67,3 +67,26 @@ export function groupsHere(cd: number) {
 
 /** The group a town hall in this district would meet: the one most over-represented here. */
 export const largestGroup = (cd: number) => groupsHere(cd)[0]?.id ?? "renters";
+
+// Citywide size of each group, for the factions screen. The census groups are computed from the 59
+// districts (renters by households, the rest by population); the others are rough public estimates.
+const ESTIMATES: Record<string, number> = { transit: 0.55, unions: 0.2, smallbiz: 0.08, donors: 0.02, activists: 0.1 };
+export const CITYWIDE: Record<string, { share: number; real: boolean; basis: string }> = (() => {
+  const ds = [...DEMO.values()];
+  const hh = ds.reduce((a, d) => a + d.households, 0);
+  const pop = ds.reduce((a, d) => a + d.pop, 0);
+  const byPop = (k: "over65" | "otherLang" | "age20to24") => ds.reduce((a, d) => a + (d.pop * d[k]) / 100, 0) / pop;
+  const renters = ds.reduce((a, d) => a + (d.households * d.renters) / 100, 0) / hh;
+  return {
+    renters: { share: renters, real: true, basis: "of households rent" },
+    homeowners: { share: 1 - renters, real: true, basis: "of households own" },
+    seniors: { share: byPop("over65"), real: true, basis: "of residents are 65+" },
+    immigrants: { share: byPop("otherLang"), real: true, basis: "speak another language at home" },
+    students: { share: byPop("age20to24"), real: true, basis: "of residents are 20 to 24" },
+    ...Object.fromEntries(Object.entries(ESTIMATES).map(([k, share]) => [k, { share, real: false, basis: "estimated" }])),
+  };
+})();
+
+/** Districts where a group is most concentrated. */
+export const whereTheyLive = (id: string, n = 5) =>
+  [...DEMO.keys()].map((cd) => ({ cd, share: shares(cd)![id] ?? 0 })).sort((a, b) => b.share - a.share).slice(0, n);

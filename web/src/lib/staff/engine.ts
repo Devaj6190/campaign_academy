@@ -9,7 +9,8 @@ import { findBoros, findFactions, findPlaces, PLACES, placeName, shortPlace, typ
 
 export type Effect = {
   by: string;
-  action: ActionId;
+  /** A catalog action, or a change that comes from the manifesto or a tactic. */
+  action: ActionId | "plank" | "tactic";
   label: string;
   district?: number;
   faction?: string;
@@ -23,6 +24,9 @@ export type Effect = {
   fit: boolean;
   summary: string;
 };
+
+/** An Effect that doesn't come from the catalog (a manifesto plank, a tactic): fill in the zeros. */
+export const effectOf = (p: Partial<Effect> & Pick<Effect, "by" | "action" | "label" | "summary">): Effect => ({ cost: 0, raised: 0, sent: {}, factions: {}, momentum: 0, fit: true, ...p });
 
 export const profileOf = (w: Pick<Snapshot, "staff" | "hires">, id: string): Profile => {
   if (id === "candidate") return CANDIDATE;
@@ -67,7 +71,7 @@ export function resolve(
   }
   // Fundraising from the rich is noticed by the people who dislike the rich.
   if (id === "donor_dinner") {
-    factions.progressives = r1((factions.progressives ?? 0) - 1.5);
+    factions.activists = r1((factions.activists ?? 0) - 1.5);
     factions.donors = r1((factions.donors ?? 0) + 2 * mod);
   }
   const raised = a.raise ? r50((a.raise[0] + (a.raise[1] - a.raise[0]) * hash(ctx.seed, 29)) * mod) : 0;

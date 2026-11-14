@@ -39,7 +39,7 @@ export const FACTION_WORDS: Record<string, string[]> = {
   seniors: ["senior", "older", "elderly", "retire"],
   unions: ["union", "labor", "labour", "worker", "picket"],
   smallbiz: ["small business", "small-business", "merchant", "shop", "bodega", "restaurant"],
-  progressives: ["progressive", "left", "activist", "brandt"],
+  activists: ["progressive", "left", "activist", "brandt"],
   donors: ["donor", "real estate", "wealthy", "developer"],
   students: ["student", "college", "campus", "young"],
 };
