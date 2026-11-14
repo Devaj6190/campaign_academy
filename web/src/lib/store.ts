@@ -63,7 +63,7 @@ type State = {
   /** Cole's poll at the end of each day, for trends and debates. */
   pollHistory: number[];
   /** Election night: the result and how many districts have reported so far. */
-  election: { result: ElectionResult; shown: number } | null;
+  election: { result: ElectionResult; shown: number; done?: boolean } | null;
   /** The one write path for cash, district support, faction feeling and the poll (contract on #1). */
   applyEffect: (e: Effect, source: LedgerEntry["source"]) => void;
 
@@ -231,7 +231,7 @@ export const useGame = create<State>((set, get) => ({
     const s = get();
     // Election night: results come in a few districts at a time, then the result card.
     if (s.election) {
-      if (s.election.shown >= s.election.result.order.length) return s.overlay === "election" ? undefined : set({ overlay: "election" });
+      if (s.election.shown >= s.election.result.order.length) return s.election.done ? undefined : set({ overlay: "election", election: { ...s.election, done: true } });
       return set({ election: { ...s.election, shown: s.election.shown + 2 } });
     }
     const min = s.min + MIN_PER_TICK * s.speed;

@@ -28,7 +28,11 @@ export const PLACES = (raw as unknown as { districts: RawD[] }).districts
   .map((d) => ({ cd: d.cd, name: d.name, boro: BOROS[Math.floor(d.cd / 100)], issue: d.issues[0]?.[0] ?? "", parts: d.name.toLowerCase().split("-").map((s) => s.trim()) }));
 
 export const placeName = (cd?: number) => PLACES.find((p) => p.cd === cd)?.name ?? "the city";
-export const shortPlace = (cd?: number) => placeName(cd).split("-")[0];
+export const shortPlace = (cd?: number) => {
+  const full = placeName(cd);
+  const first = full.split("-")[0];
+  return first.length < 5 ? full : first; // "Mid-Island", not "Mid"
+};
 
 // Words a player might use for each faction.
 export const FACTION_WORDS: Record<string, string[]> = {
