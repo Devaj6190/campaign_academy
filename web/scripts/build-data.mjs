@@ -55,6 +55,7 @@ for (const cd of voting) {
     age20to24: pct(v.pop20t24?.percent),
     race: { white: pct(v.wtnh?.percent), black: pct(v.blnh?.percent), asian: pct(v.asnnh?.percent), hispanic: pct(v.hsp1?.percent) },
     citizens18: v.cvpop18pl?.sum ?? null,
+    households: v.ochu2?.sum ?? null,
   };
 }
 

@@ -1,4 +1,4 @@
-import type { ActionId, Skill } from "./catalog";
+import type { ActionId, Skill } from "../engine/catalog";
 
 // How each person actually works, beyond the one-line "good at / weak at" on the profile.
 // The engine uses the numbers; the agents use the voice.

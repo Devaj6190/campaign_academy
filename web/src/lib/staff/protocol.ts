@@ -1,5 +1,5 @@
-import type { ActionId } from "./catalog";
-import { clarity, fitScore, resolve, type Effect } from "./engine";
+import type { ActionId } from "../engine/catalog";
+import { clarity, fitScore, resolve, type Effect } from "../engine/resolve";
 import { hash } from "../util";
 import type { Snapshot } from "./world";
 

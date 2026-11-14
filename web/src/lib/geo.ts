@@ -2,7 +2,7 @@ import raw from "./nyc.json";
 
 // Real NYC community districts (NYC Open Data), projected once into SVG path strings.
 /** Census ACS 5-year estimates (NYC Planning FactFinder). Percentages are 0-100. */
-export type Demo = { pop: number; income: number; renters: number; age: number; otherLang: number; over65: number; age20to24: number; race: { white: number; black: number; asian: number; hispanic: number }; citizens18: number };
+export type Demo = { pop: number; income: number; renters: number; age: number; otherLang: number; over65: number; age20to24: number; race: { white: number; black: number; asian: number; hispanic: number }; citizens18: number; households: number };
 /** 2025 mayoral general election: votes cast, turnout of voting-age citizens, share of the city, rank by turnout. */
 export type Vote = { votes: number; turnout: number; share: number; rank: number };
 type RawDistrict = { cd: number; name: string; issues: [string, number][]; demo: Demo | null; vote: Vote | null; polys: number[][][][] };
