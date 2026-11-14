@@ -35,8 +35,8 @@ export function Profile() {
                 <h1 className="mt-2 font-serif text-[64px] leading-[0.95] tracking-tight">Adrian Cole</h1>
                 <p className="mt-3 text-[14px] text-soft">Council Member, western Queens. Running for Mayor of New York City.</p>
                 <div className="mt-4 flex flex-wrap gap-1.5">
-                  {["Pragmatic centre-left", "Progressive on housing", "Moderate on policing", "Pro small business"].map((t, i) => (
-                    <span key={t} className={cn("rounded-full border px-2.5 py-0.5 text-[11.5px]", i === 0 ? "border-line-strong text-fg" : "border-line text-muted")}>{t}</span>
+                  {["Housing near transit", "Better buses", "Level police funding", "Small-business relief"].map((t) => (
+                    <span key={t} className={cn("rounded-full border px-2.5 py-0.5 text-[11.5px]", "border-line text-soft")}>{t}</span>
                   ))}
                 </div>
               </div>
