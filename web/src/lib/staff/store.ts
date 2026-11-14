@@ -15,7 +15,8 @@ export type ChatItem =
   | { k: "note"; text: string };
 
 export type Job = { to: string; job: string; done: boolean; summary?: string };
-export type Run = { id: number; text: string; items: PlanItem[]; jobs: Job[]; status: "running" | "done" };
+/** origin: the order this run carries out (its own text, or the order an approved ask continues). */
+export type Run = { id: number; text: string; origin: string; follow: boolean; items: PlanItem[]; jobs: Job[]; status: "running" | "done" };
 export type FeedItem = { id: number; day: number; min: number; who: string; text: string; tone?: "pos" | "neg" | "warm" };
 export type Packet = { id: number; from: string; to: string };
 

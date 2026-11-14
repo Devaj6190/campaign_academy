@@ -68,7 +68,8 @@ function apply(e: Effect) {
   let gain = 0;
   while (m >= 1) { m -= 1; gain += 1; }
   useStaff.setState({ momentum: m });
-  if (gain) useGame.setState((g) => ({ poll: { ...g.poll, cole: Math.min(60, g.poll.cole + gain) } }));
+  // Gains come out of the undecided share, so the poll never sums past 100.
+  if (gain) useGame.setState((g) => ({ poll: { ...g.poll, cole: g.poll.cole + Math.min(gain, Math.max(0, 100 - g.poll.cole - g.poll.hale - g.poll.brandt)) } }));
 }
 
 function handle(director: string, runId: number, e: RunEvent) {
@@ -117,6 +118,7 @@ function handle(director: string, runId: number, e: RunEvent) {
       break;
     case "report":
       pushChat(director, { k: "report", text: e.text, ask: e.ask, state: e.ask ? "open" : "approved", spent: e.spent, raised: e.raised });
+      if (current()?.follow) break; // an approved ask continues an order that was already graded
       pushChat(director, { k: "coach", clarity: e.clarity, fit: e.fit, missing: e.missing, text: e.coaching });
       // Clear orders to the right person lift morale; vague ones and misfits wear people down.
       bumpMorale(director, e.clarity >= 3 ? 3 : e.clarity <= 1 ? -3 : 0);
@@ -132,7 +134,7 @@ function handle(director: string, runId: number, e: RunEvent) {
   }
 }
 
-export async function instruct(id: string, text: string, extra = 0) {
+export async function instruct(id: string, text: string, extra = 0, followOf?: string) {
   const s = useStaff.getState();
   if (s.active[id]) {
     pushChat(id, { k: "note", text: `${first(id)} is still on the last job. Wait for the report.` });
@@ -141,11 +143,11 @@ export async function instruct(id: string, text: string, extra = 0) {
   const runId = Date.now() % 1e9;
   const history: Line[] = (s.chat[id] ?? []).flatMap((c) => (c.k === "me" || c.k === "them" ? [{ who: c.k, text: c.text }] : c.k === "report" ? [{ who: "them" as const, text: c.text }] : []));
   pushChat(id, { k: "me", text });
-  useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
+  useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, origin: followOf ?? text, follow: !!followOf, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
   setBusy(id, "down");
   feed("you", `You → ${first(id)}: ${text}`);
 
-  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget: BASE_BUDGET + extra, runId };
+  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget: followOf ? extra : BASE_BUDGET, runId, followOf };
   const on = (e: RunEvent) => handle(id, runId, e);
   try {
     const res = await fetch("/api/staff/instruct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
@@ -169,6 +171,14 @@ export async function instruct(id: string, text: string, extra = 0) {
     console.warn("[staff] falling back to local simulation:", err);
     if (!useStaff.getState().runs[id]?.find((r) => r.id === runId)?.jobs.length) await runOffline(new RunCtx(req, on));
   } finally {
+    // Whatever happened, nobody on this run stays stuck looking busy.
+    for (const j of useStaff.getState().runs[id]?.find((r) => r.id === runId)?.jobs ?? []) {
+      if (!j.done) {
+        setBusy(j.to);
+        useStaff.setState((s) => ({ job: Object.fromEntries(Object.entries(s.job).filter(([k]) => k !== j.to)) }));
+      }
+    }
+    useStaff.setState((s) => ({ runs: { ...s.runs, [id]: (s.runs[id] ?? []).map((r) => (r.id === runId ? { ...r, status: "done" as const, jobs: r.jobs.map((j) => ({ ...j, done: true })) } : r)) } }));
     setBusy(id);
     useStaff.setState((st) => { const active = { ...st.active }; delete active[id]; return { active }; });
   }
@@ -179,7 +189,8 @@ export function answerAsk(id: string, index: number, yes: boolean) {
   if (item?.k !== "report" || !item.ask || item.state !== "open") return;
   const ask = item.ask;
   useStaff.setState((s) => ({ chat: { ...s.chat, [id]: s.chat[id].map((c, i) => (i === index && c.k === "report" ? { ...c, state: yes ? "approved" : "declined" } : c)) } }));
-  if (yes) instruct(id, `Approved: another $${ask.amount.toLocaleString("en-US")} ${ask.reason}. Go ahead.`, ask.amount);
+  const origin = useStaff.getState().runs[id]?.find((r) => r.status === "done")?.origin;
+  if (yes) instruct(id, `Approved: another $${ask.amount.toLocaleString("en-US")} ${ask.reason}. Go ahead.`, ask.amount, origin);
   else {
     pushChat(id, { k: "them", text: "Understood. We'll make do." });
     bumpMorale(id, -2);

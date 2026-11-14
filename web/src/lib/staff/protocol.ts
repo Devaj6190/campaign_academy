@@ -9,7 +9,8 @@ export type Ask = { amount: number; reason: string };
 export type PlanItem = { title: string; status: "pending" | "in-progress" | "completed" };
 export type Line = { who: "me" | "them"; text: string };
 
-export type RunRequest = { director: string; text: string; snapshot: Snapshot; history: Line[]; budget: number; runId: number };
+/** followOf: the original order when this run is an approved follow-up; targets and clarity come from it. */
+export type RunRequest = { director: string; text: string; snapshot: Snapshot; history: Line[]; budget: number; runId: number; followOf?: string };
 
 export type RunEvent =
   | { t: "start"; mode: "live" | "offline" }
@@ -36,7 +37,7 @@ export class RunCtx {
     public req: RunRequest,
     public emit: (e: RunEvent) => void,
   ) {
-    this.quality = clarity(req.text);
+    this.quality = clarity(req.followOf ?? req.text);
   }
 
   get left() {

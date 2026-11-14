@@ -65,14 +65,15 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
   const me = w.staff.find((s) => s.id === req.director)!;
   const first = me.name!.split(" ")[0];
   const team = describeTeam(w, req.director);
-  const actions = pickActions(req.text, req.director);
+  const basis = req.followOf ?? req.text;
+  const actions = pickActions(basis, req.director);
   const wait = (ms: number) => sleep(jitter(req.runId + ms, ms) * pace);
 
   // Each job goes to the teammate whose skills fit best; turf breaks ties. The director does it if nobody fits.
   const jobs = actions.map((a, i) => {
-    const districts = pickDistricts(w, req.text);
+    const districts = pickDistricts(w, basis);
     const district = ACTIONS[a].needs.district ? districts[i % districts.length] : undefined;
-    const faction = ACTIONS[a].needs.faction ? pickFaction(w, req.text, a) : undefined;
+    const faction = ACTIONS[a].needs.faction ? pickFaction(w, basis, a) : undefined;
     const ranked = [...team].sort((x, y) => score(y) - score(x));
     function score(p: (typeof team)[number]) {
       const sk = ACTIONS[a].skills;
@@ -84,7 +85,7 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
 
   emit({ t: "start", mode: "offline" });
   await wait(700);
-  emit({ t: "say", text: team.length ? `On it. ${jobs.map((j) => j.whoName.split(" ")[0]).filter((n, i, a) => a.indexOf(n) === i).join(" and ")} will take this.` : `On it. I'll handle this myself; nobody reports to me yet.` });
+  emit({ t: "say", text: team.length ? `On it. ${jobs.map((j) => j.whoName.split(" ")[0]).filter((n, i, a) => a.indexOf(n) === i).join(" and ")} will take this.` : me.boss ? "On it." : `On it. I'll handle this myself; nobody reports to me yet.` });
   const items = jobs.map((j) => ({ title: `${ACTIONS[j.a].label}${j.district ? ` in ${shortPlace(j.district)}` : j.faction ? ` for ${w.factions.find((f) => f.id === j.faction)?.name}` : ""}`, status: "pending" as const }));
   emit({ t: "plan", items });
   await wait(900);
@@ -105,10 +106,12 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
   const prof = profileOf(w, req.director);
   const overspender = prof.cost > 1.1;
   const blocked = notes.some((n) => n.startsWith("Not done: it costs"));
-  const ask = blocked || overspender ? { amount: overspender ? 3000 : 5000, reason: blocked ? "to finish the job" : "to run another round while we have momentum" } : null;
+  const ask = !req.followOf && (blocked || overspender) ? { amount: overspender ? 3000 : 5000, reason: blocked ? "to finish the job" : "to run another round while we have momentum" } : null;
   const head = ctx.effects.length ? `Done. Spent $${ctx.spent.toLocaleString("en-US")}${ctx.raised ? `, raised $${ctx.raised.toLocaleString("en-US")}` : ""}.` : "Couldn't get it done.";
   const best = ctx.effects.find((e) => Object.keys(e.sent).length || Object.keys(e.factions).length);
-  const coaching = ctx.quality.missing.length
+  const coaching = req.followOf
+    ? ""
+    : ctx.quality.missing.length
     ? `Clearer next time: say ${ctx.quality.missing.join(", ")}. ${first} had to guess, and guesses cost money.`
     : ctx.effects.some((e) => !e.fit)
       ? `Clear instruction, but part of it went to someone without the skills. Check who is best placed before you ask.`

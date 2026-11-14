@@ -4,7 +4,7 @@ import { ArrowDownRight, ArrowUp, Check, CircleDollarSign, FlaskConical, Loader2
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Fit } from "@/components/Fit";
-import { Avatar, Button, Dock, DockButton, Label, Meter, Popover, Section, ViewHeader } from "@/components/ui";
+import { Avatar, Button, Dock, DockButton, Label, Meter, Section, ViewHeader } from "@/components/ui";
 import { AgentPlan, type PlanTask } from "@/components/ui21/agent-plan";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import type { Staff } from "@/lib/data";
@@ -65,6 +65,8 @@ export function WarRoom() {
   const directors = staff.filter((p) => !p.boss && p.name);
   const [confirmFor, setConfirmFor] = useState<string | null>(null);
   const confirm = !!person && confirmFor === person;
+  // Reassigning opens a chooser in the side panel (a menu inside the dock would be clipped by its scroll area).
+  const [moving, setMoving] = useState<string | null>(null);
 
   return (
     <div className="flex h-full">
@@ -99,12 +101,7 @@ export function WarRoom() {
                 if (!child || !pos[child.id]) return null;
                 const up = child.id === k.from;
                 const d = edge(pos[child.boss ?? "you"], pos[child.id], !!child.boss, up);
-                return (
-                  <g key={k.id}>
-                    <circle r="7" fill="var(--color-warm)" opacity="0.5" filter="url(#glow)"><animateMotion dur="1.1s" path={d} fill="freeze" /></circle>
-                    <circle r="3" fill={up ? "var(--color-pos)" : "#fff"}><animateMotion dur="1.1s" path={d} fill="freeze" /></circle>
-                  </g>
-                );
+                return <Spark key={k.id} d={d} up={up} />;
               })}
             </svg>
             <Node at={YOU} name="You" role="The campaigner" you />
@@ -116,20 +113,7 @@ export function WarRoom() {
         <Dock label={sel ? (sel.name ?? `${sel.role} · vacant`) : "Nobody selected"}>
           {sel?.name && <DockButton primary icon={<MessageSquare />} label="Instruct" onClick={() => document.getElementById("instruct")?.focus()} />}
           {sel?.name && sel.boss && (
-            <Popover
-              align="center"
-              className="bottom-full top-auto mb-2 mt-0 w-[220px] p-1.5"
-              trigger={() => <DockButton icon={<Shuffle />} label="Reassign" sub={`to ${directors.filter((d) => d.id !== sel.boss).length} others`} />}
-            >
-              <Label className="block px-2 pt-1 pb-1.5">Report to</Label>
-              {directors.filter((d) => d.id !== sel.boss).map((d) => (
-                <button key={d.id} onClick={() => reassign(sel.id, d.id)} className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-hover">
-                  <Avatar name={d.name} size={22} />
-                  <span className="min-w-0 flex-1 truncate">{d.name}</span>
-                  <span className="truncate text-[11px] text-faint">{d.role.split(" ")[0]}</span>
-                </button>
-              ))}
-            </Popover>
+            <DockButton icon={<Shuffle />} label="Reassign" sub={`to ${directors.filter((d) => d.id !== sel.boss).length} others`} onClick={() => setMoving(moving === sel.id ? null : sel.id)} />
           )}
           {sel?.name && (
             <DockButton
@@ -145,9 +129,22 @@ export function WarRoom() {
         </Dock>
       </section>
       <aside className="flex w-[320px] shrink-0 flex-col border-l border-line bg-surface xl:w-[380px]">
-        {sel ? sel.name ? <Person key={sel.id} p={sel} /> : <Vacancy key={sel.id} p={sel} /> : <Overview pick={pick} />}
+        {sel ? sel.name ? <Person key={sel.id} p={sel} moving={moving === sel.id} done={() => setMoving(null)} /> : <Vacancy key={sel.id} p={sel} /> : <Overview pick={pick} />}
       </aside>
     </div>
+  );
+}
+
+// A spark running along an edge. SMIL animations added after load start at once only when begun explicitly.
+function Spark({ d, up }: { d: string; up: boolean }) {
+  const a = useRef<SVGAnimateMotionElement>(null);
+  const b = useRef<SVGAnimateMotionElement>(null);
+  useEffect(() => { a.current?.beginElement(); b.current?.beginElement(); }, []);
+  return (
+    <g>
+      <circle r="7" fill="var(--color-warm)" opacity="0.5" filter="url(#glow)"><animateMotion ref={a} begin="indefinite" dur="1.1s" path={d} fill="freeze" /></circle>
+      <circle r="3" fill={up ? "var(--color-pos)" : "#fff"}><animateMotion ref={b} begin="indefinite" dur="1.1s" path={d} fill="freeze" /></circle>
+    </g>
   );
 }
 
@@ -264,7 +261,7 @@ function toPlan(runs: Run[] | undefined, staff: Staff[]): PlanTask[] {
   });
 }
 
-function Person({ p }: { p: Staff }) {
+function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => void }) {
   const chat = useStaff((s) => s.chat[p.id]);
   const runs = useStaff((s) => s.runs[p.id]);
   const thinking = useStaff((s) => !!s.active[p.id]);
@@ -313,6 +310,19 @@ function Person({ p }: { p: Staff }) {
             {!!team.length && <span className="flex items-center gap-1 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10.5px] text-muted"><Users className="size-3" />{team.filter((t) => t.name).length} on team</span>}
           </div>
         </Section>
+        {moving && (
+          <Section title={`Move ${first} to`} right={<button onClick={done} className="text-[11px] text-faint hover:text-fg">Cancel</button>}>
+            <div className="-mx-2">
+              {staff.filter((d) => !d.boss && d.name && d.id !== p.boss).map((d) => (
+                <button key={d.id} onClick={() => { reassign(p.id, d.id); done(); }} className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] transition-colors hover:bg-hover">
+                  <Avatar name={d.name} size={24} />
+                  <span className="min-w-0 flex-1 truncate">{d.name}</span>
+                  <span className="truncate text-[11px] text-faint">{d.role}</span>
+                </button>
+              ))}
+            </div>
+          </Section>
+        )}
         {!!plan.length && (
           <Section title="Plan" right={<span className="text-[10.5px] text-faint">Click a job for detail</span>}>
             <AgentPlan tasks={plan} />

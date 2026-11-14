@@ -38,7 +38,9 @@ export async function speakUp() {
   const g = useGame.getState();
   const pick = triggers()[0];
   const t: Trigger = pick ?? (() => {
-    const [who, text] = QUIPS[Math.floor(Math.random() * QUIPS.length)];
+    // Canned lines only when they are still true.
+    const quips = QUIPS.filter(([who, text]) => g.staff.some((p) => p.id === who && p.name) && !(/Bronx/.test(text) && g.staff.find((p) => p.id === "ox")?.name));
+    const [who, text] = quips[Math.floor(Math.random() * quips.length)] ?? QUIPS[3];
     return { key: `quip-${who}`, who, situation: text, text, suggest: "" };
   })();
   const p = g.staff.find((x) => x.id === t.who);

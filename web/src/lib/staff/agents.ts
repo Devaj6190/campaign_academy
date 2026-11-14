@@ -125,7 +125,10 @@ ${world(w)}`,
   emit({ t: "start", mode: "live" });
   const seen = new Set<string>();
   const pending = new Map<string, string>();
-  const messages = [...req.history.slice(-8).map((l) => ({ role: l.who === "me" ? "user" : "assistant", content: l.text })), { role: "user", content: req.text }];
+  const past = req.history.slice(-8).map((l) => ({ role: l.who === "me" ? "user" : "assistant", content: l.text }));
+  while (past[0]?.role === "assistant") past.shift(); // the conversation must open with the campaigner
+  const ask = req.followOf ? `${req.text}\n(This continues my earlier order: "${req.followOf}". Use the extra budget on that, and do not ask for more this time.)` : req.text;
+  const messages = [...past, { role: "user", content: ask }];
 
   const stream = await agent.stream({ messages }, { streamMode: "updates", recursionLimit: 80, signal });
   for await (const chunk of stream as AsyncIterable<Record<string, unknown>>) {

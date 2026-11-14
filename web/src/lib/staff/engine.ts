@@ -106,7 +106,7 @@ export function clarity(text: string) {
   const where = findPlaces(text).length > 0 || findBoros(text).length > 0;
   const who = findFactions(text).length > 0;
   const when = /\b(today|tonight|tomorrow|this week|by (mon|tues|wednes|thurs|fri|satur|sun)day|by friday|weekend|day \d+|before)\b/.test(t);
-  const what = /(canvass|door|knock|rally|phone|call|email|ad|ads|mail|press|story|fundrais|donor|raise|dinner|party|train|volunteer|meet|brief|target|list|schedule|book|respond|hit back)/.test(t);
+  const what = /\b(canvass|doors?|knock|rally|phone|calls?|e-?mail|ads?\b|mail|press|story|fundrais|donors?|raise|dinner|party|train|volunteers?|meet|brief|target|list|schedule|book|respond|hit back|draft|plan|write|build|recruit|hire)/.test(t);
   const words = t.split(/\s+/).filter(Boolean).length;
   const score = [where, who, when, what].filter(Boolean).length + (words >= 8 ? 0.5 : 0) - (words < 4 ? 1 : 0);
   const missing = [!what && "what to do", !where && "where", !who && "who it's for", !when && "by when"].filter(Boolean) as string[];
