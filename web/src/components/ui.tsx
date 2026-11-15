@@ -13,8 +13,8 @@ export function Button({ variant = "outline", size = "md", className, ...p }: Bt
     <button
       {...p}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center gap-2 font-display font-semibold tracking-[0.07em] whitespace-nowrap uppercase transition-colors disabled:pointer-events-none disabled:opacity-40",
-        size === "sm" ? "h-7 px-3.5 text-[11.5px]" : "h-9 px-5 text-[12.5px]",
+        "inline-flex shrink-0 items-center justify-center gap-2 font-display font-semibold whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40",
+        size === "sm" ? "h-7 px-3.5 text-[12.5px]" : "h-9 px-5 text-[13.5px]",
         variant === "primary" && "btn-gold",
         variant === "outline" && "btn-pill",
         variant === "ghost" && "text-muted underline decoration-line-strong underline-offset-4 hover:text-gold-bright hover:decoration-gold",
@@ -25,20 +25,19 @@ export function Button({ variant = "outline", size = "md", className, ...p }: Bt
 }
 
 export const Label = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <span className={cn("font-display text-[11px] font-medium tracking-[0.1em] text-gold/75 uppercase", className)}>{children}</span>
+  <span className={cn("font-display text-[12px] font-medium text-gold/80", className)}>{children}</span>
 );
 
 /** Marks a number or section as coming from real data or from the simulation. */
 export const Tag = ({ kind }: { kind: "real" | "sim" }) => (
-  <span className={cn("border px-1.5 py-px font-display text-[10.5px] font-medium tracking-[0.08em] uppercase", kind === "real" ? "border-pos/25 text-pos" : "border-warm/25 text-warm")}>
+  <span className={cn("rounded-full border px-2 py-px font-display text-[11px] font-medium", kind === "real" ? "border-pos/25 text-pos" : "border-warm/25 text-warm")}>
     {kind === "real" ? "Real data" : "Simulated"}
   </span>
 );
 
 export const Meter = ({ value, color = "var(--color-gold)", className }: { value: number; color?: string; className?: string }) => (
-  <div className={cn("relative h-[5px] overflow-hidden bg-white/[0.09]", className)}>
-    <i className="ticks absolute inset-0 z-[1]" />
-    <div className="h-full transition-[width] duration-500" style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: `linear-gradient(90deg, color-mix(in srgb, ${color} 45%, transparent), ${color})` }} />
+  <div className={cn("relative h-[5px] overflow-hidden rounded-full bg-white/[0.09]", className)}>
+    <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: `linear-gradient(90deg, color-mix(in srgb, ${color} 45%, transparent), ${color})` }} />
   </div>
 );
 
@@ -56,7 +55,6 @@ export function Avatar({ name, size = 40, className }: { name?: string; size?: n
 export const Section = ({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) => (
   <section className="px-5 pt-5 pb-3 first:pt-0">
     <div className="plate -mx-5 mb-3.5 flex h-8 items-center gap-2.5 px-5">
-      <i className="diamond" />
       <Label className="flex-1 text-gold-bright">{title}</Label>
       {right}
     </div>
@@ -69,12 +67,8 @@ export const Inspector = ({ children }: { children: ReactNode }) => <aside class
 export const ViewHeader = ({ title, sub, right }: { title: string; sub: string; right?: ReactNode }) => (
   <header className="relative flex min-h-[84px] shrink-0 items-center justify-between gap-4 px-8 py-4">
     <div className="min-w-0">
-      <div className="flex items-center gap-3.5">
-        <i className="diamond size-[7px] bg-gold-bright" />
-        <h1 className="gilt font-display text-[25px] leading-none font-semibold tracking-[0.08em] whitespace-nowrap uppercase">{title}</h1>
-        <span className="h-px w-28 bg-gradient-to-r from-gold/80 to-transparent" />
-      </div>
-      <p className="mt-2 pl-[21px] text-[14px] leading-snug text-soft">{sub}</p>
+      <h1 className="gilt font-display text-[28px] leading-none font-semibold whitespace-nowrap">{title}</h1>
+      <p className="mt-2 text-[14px] leading-snug text-soft">{sub}</p>
     </div>
     {right}
   </header>
@@ -83,25 +77,15 @@ export const ViewHeader = ({ title, sub, right }: { title: string; sub: string; 
 /** Floating action bar at the bottom of a view. Its contents change from screen to screen. */
 export const Dock = ({ label, children }: { label?: string; children: ReactNode }) => (
   <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex items-center justify-center px-4">
-    <DockRail />
     <motion.div
       layout
       transition={{ duration: 0.25, ease }}
-      className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border border-gold/60 bg-[#0b0906] p-1.5 shadow-[0_18px_44px_-14px_rgba(0,0,0,0.9)]"
+      className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-2xl border border-line-strong bg-[#0f0d09] p-1.5 shadow-[0_18px_44px_-14px_rgba(0,0,0,0.9)]"
     >
       {label && <div className="hidden max-w-[190px] shrink-0 truncate border-r border-line px-3 text-[12px] text-muted @[760px]:block">{label}</div>}
       {children}
     </motion.div>
-    <DockRail flip />
   </div>
-);
-
-const DockRail = ({ flip }: { flip?: boolean }) => (
-  <span className={cn("hidden min-w-0 flex-1 items-center @[820px]:flex", flip && "flex-row-reverse")}>
-    <span className={cn("h-px flex-1 from-gold/70 to-transparent", flip ? "bg-gradient-to-r" : "bg-gradient-to-l")} />
-    <i className="size-[7px] shrink-0 rounded-full border border-gold bg-bg" />
-    <span className="h-px w-3 shrink-0 bg-gold/70" />
-  </span>
 );
 
 export function DockButton({ icon, label, sub, primary, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { icon: ReactNode; label: string; sub?: string; primary?: boolean }) {
@@ -109,13 +93,13 @@ export function DockButton({ icon, label, sub, primary, ...p }: ButtonHTMLAttrib
     <button
       {...p}
       className={cn(
-        "flex h-11 shrink-0 items-center gap-2.5 px-4 text-left transition-colors [&_svg]:size-4",
-        primary ? "btn-gold" : "text-fg hover:bg-gold/15 hover:text-gold-bright [&_svg]:text-gold",
+        "flex h-11 shrink-0 items-center gap-2.5 rounded-xl px-4 text-left transition-colors [&_svg]:size-4",
+        primary ? "btn-gold !rounded-xl" : "text-fg hover:bg-gold/10 hover:text-gold-bright [&_svg]:text-gold",
       )}
     >
       {icon}
       <span className="leading-tight">
-        <span className="block font-display text-[12.5px] font-semibold tracking-[0.06em] uppercase">{label}</span>
+        <span className="block font-display text-[13.5px] font-semibold">{label}</span>
         {sub && <span className={cn("hidden font-mono text-[10.5px] @[680px]:block", primary ? "text-[#1a1206]/65" : "text-faint")}>{sub}</span>}
       </span>
     </button>
@@ -151,7 +135,7 @@ export function Popover({ trigger, children, align = "center", className }: { tr
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.16, ease }}
             className={cn(
-              "frame panel absolute top-full z-50 mt-2 border border-line-strong shadow-[0_24px_60px_-12px_rgba(0,0,0,0.9)]",
+              "panel absolute top-full z-50 mt-2 overflow-hidden rounded-xl border border-line-strong shadow-[0_24px_60px_-12px_rgba(0,0,0,0.9)]",
               align === "center" && "left-1/2 -translate-x-1/2",
               align === "start" && "left-0",
               align === "end" && "right-0",
@@ -191,12 +175,11 @@ export function Dialog({ open, onClose, children, side, plate, className }: { op
             exit={side ? { x: 40, opacity: 0 } : { y: 10, scale: 0.98, opacity: 0 }}
             transition={{ duration: 0.26, ease }}
             className={cn(
-              "frame panel relative flex flex-col overflow-hidden border-line-strong bg-[#0b0906]/90 shadow-[0_40px_100px_-20px_rgba(0,0,0,1)]",
-              side ? "h-full w-[480px] border-l" : "max-h-full w-full border",
+              "panel relative flex flex-col overflow-hidden border-line-strong shadow-[0_40px_100px_-20px_rgba(0,0,0,1)]",
+              side ? "h-full w-[480px] border-l" : "max-h-full w-full rounded-2xl border",
               className,
             )}
           >
-            {!side && <span className="rule absolute inset-x-0 top-0 z-[2]" />}
             <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 z-10 grid size-7 place-items-center rounded-full border border-line-strong text-muted transition-colors hover:border-gold hover:text-gold-bright">
               <X className="size-4" />
             </button>

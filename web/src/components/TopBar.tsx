@@ -11,7 +11,7 @@ import { SidebarBody } from "./Sidebar";
 import { Label, Meter, Popover } from "./ui";
 
 // The sections of the tool, in the order a student meets them: the case first, then the material behind it. Add new views here.
-const VIEWS: [View, string][] = [["case", "Case"], ["profile", "Profile"], ["war", "War room"], ["map", "Map"], ["factions", "Voter groups"]];
+const VIEWS: [View, string][] = [["case", "Case"], ["profile", "Profile"], ["war", "War room"], ["map", "Map"], ["factions", "Factions"]];
 
 // Sections on the left, money in the centre, the poll and the date on the right.
 // The money plate hangs below the bar. Everything it shows is read from the case and the student's decisions so far.

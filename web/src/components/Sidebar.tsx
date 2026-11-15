@@ -75,7 +75,6 @@ function Tasks() {
   return (
     <section>
       <div className="plate mb-3 flex h-8 items-center gap-2.5 px-5">
-        <i className="diamond" />
         <Label className="flex-1 text-gold-bright">Tasks</Label>
         <span className="tnum font-mono text-[11px] text-gold/80">{tasks.filter((t) => !t.done).length} left</span>
       </div>
