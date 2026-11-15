@@ -58,6 +58,9 @@ export const useCase = create<CaseState>((set) => ({
   restart: () => set(fresh()),
 }));
 
+// Dev handle for driving the case from the console, like window.game: window.caseStore.getState().decide(...)
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") queueMicrotask(() => ((window as unknown as { caseStore: unknown }).caseStore = useCase));
+
 export const currentCase = (id: string) => CASES.find((c) => c.id === id) ?? CASES[0];
 
 const options = (picks: Record<string, Pick>) => Object.fromEntries(Object.entries(picks).map(([k, v]) => [k, v.option]));

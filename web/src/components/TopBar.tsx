@@ -201,7 +201,7 @@ function Day() {
   const date = new Date(today).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   return (
     <div className="w-[168px]" title={`${longDate(today)}. Primary on ${longDate(c.electionDate)}.`}>
-      <div className="flex items-baseline justify-between leading-none whitespace-nowrap">
+      <div className="flex items-baseline justify-between gap-2 leading-none whitespace-nowrap">
         <span className="font-display text-[10px] font-medium tracking-[0.1em] text-muted uppercase">{daysLeft ? `${daysLeft} days left` : "Primary day"}</span>
         <span className="tnum font-mono text-[13px]">{date}</span>
       </div>

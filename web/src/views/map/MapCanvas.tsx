@@ -4,7 +4,7 @@ import { Map as MLMap, NavigationControl, setWorkerUrl, type StyleSpecification 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import adResult from "@/lib/cases/mayor2013-ad.json";
-import { mapValue } from "@/lib/cases/store";
+import { mapValue, useCase } from "@/lib/cases/store";
 import { groupsHere } from "@/lib/demographics";
 import { DISTRICTS } from "@/lib/geo";
 import { sentimentOf, useGame } from "@/lib/store";
@@ -172,7 +172,9 @@ export function MapCanvas({ onHover, onSelect, real = false }: { onHover: (t: Ti
   }, []);
 
   // Recolour whenever support, the group filter or group feelings change.
-  useEffect(paint, [sent, filter, factions]);
+  // The case moves while the map is open: a decision is made, the campaign reaches the next one, a staff job lands.
+  const picks = useCase((s) => s.picks), at = useCase((s) => s.at), work = useCase((s) => s.work);
+  useEffect(paint, [sent, filter, factions, picks, at, work]);
 
   // Swap between the student's campaign and the real result.
   useEffect(() => { if (map.current && ready.current) show(map.current, real); }, [real]);
