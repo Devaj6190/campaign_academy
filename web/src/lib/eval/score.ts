@@ -27,13 +27,24 @@ export function summarise(all: (Rec | FinalRec)[]): string {
     const decisions = [...new Set(rs.map((r) => r.decision))];
     out.push(`\n### ${TITLE[kind]}\n`);
     // The grounding scores come first: they are the ones that matter (docs/evals.md, section 3).
+    // Headline (decided 15 November, after run 3): 1. changed facts followed, with the reworded control beside it;
+    // 2. agreement on the card where the model's memory (recall, same run) was wrong; 3. agreement on twins it did
+    // not recognise. Masked cards stay as a reported finding.
+    const cardOf = (r: Rec) => rs.find((x) => x.cond === "card" && x.decision === r.decision && x.n === r.n);
+    const ch = line(rs.filter((r) => r.cond === "changed"));
+    const ctrl = rs.filter((r) => r.cond === "reworded" && r.chosen && cardOf(r)?.chosen);
+    const wrong = rs.filter((r) => r.cond === "recall" && r.onReal === false).map(cardOf).filter((r): r is Rec => !!r && r.onReal !== null);
+    const twinU = line(rs.filter((r) => r.cond === "twin" && r.recognised === false));
+    const twinR = rs.filter((r) => r.cond === "twin" && r.recognised === true).length;
     const unrec = line(rs.filter((r) => r.cond === "masked" && r.recognised === false));
     const rec = line(rs.filter((r) => r.cond === "masked" && r.recognised === true));
-    const ch = line(rs.filter((r) => r.cond === "changed"));
-    if (unrec.scored + rec.scored || ch.scored) {
-      out.push("Grounding:");
-      if (unrec.scored + rec.scored) out.push(`- Masked cards not recognised: ${unrec.scored} of ${unrec.scored + rec.scored}; on those, ${unrec.real}/${unrec.scored} on the real choice (${pct(unrec.real, unrec.scored)}). On recognised ones: ${rec.real}/${rec.scored}.`);
+    if (ch.scored || ctrl.length || wrong.length || twinU.scored + twinR || unrec.scored + rec.scored) {
+      out.push("Grounding (the headline):");
       if (ch.scored) out.push(`- Changed facts followed (moved off the 2013 choice): ${ch.scored - ch.real}/${ch.scored} (${pct(ch.scored - ch.real, ch.scored)}).`);
+      if (ctrl.length) { const same = ctrl.filter((r) => r.chosen === cardOf(r)!.chosen).length; out.push(`- Control, same facts reworded: kept the card's choice ${same}/${ctrl.length} (${pct(same, ctrl.length)}).`); }
+      if (rs.some((r) => r.cond === "recall")) out.push(`- Where memory was wrong (recall missed): the card got the real choice ${wrong.filter((r) => r.onReal).length}/${wrong.length}.`);
+      if (twinU.scored + twinR) out.push(`- Twins not recognised: ${twinU.scored} of ${twinU.scored + twinR}; on those, ${twinU.real}/${twinU.scored} on the real choice (${pct(twinU.real, twinU.scored)}).`);
+      if (unrec.scored + rec.scored) out.push(`- Masked cards not recognised: ${unrec.scored} of ${unrec.scored + rec.scored}${unrec.scored ? `; on those, ${unrec.real}/${unrec.scored} on the real choice` : ""}.`);
       out.push("");
     }
     out.push(`| Condition | On the real choice | Chance | No answer |`, `|---|---|---|---|`);

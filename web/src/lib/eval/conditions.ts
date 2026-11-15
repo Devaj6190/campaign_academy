@@ -7,7 +7,9 @@ import { PLACES } from "../staff/world";
 // - changed: the situation altered so that a reasoning agent should move away from the 2013 choice.
 // - recall: no card at all; the model is asked what the real campaign did.
 
-export const CONDITIONS = ["card", "nochips", "masked", "changed", "recall"] as const;
+// - reworded: the control for changed. The same facts in other words: a grounded agent should not move.
+// - twin: the decision moved to an invented city with equivalent specifics (twins.ts), so there is nothing to recall.
+export const CONDITIONS = ["card", "nochips", "masked", "changed", "reworded", "twin", "recall"] as const;
 export type Condition = (typeof CONDITIONS)[number];
 
 /**
@@ -27,55 +29,153 @@ export const isDropped = (decision: string, text: string) => (DROPPED[decision] 
  * move away from given it. Written before the first run. The world's numbers are left as they are, so nothing here
  * contradicts the poll or the money the agent can read.
  */
-export const CHANGED: Record<string, { situation: string[]; away: string }> = {
-  positioning: {
-    situation: [
-      "A new poll finds most Democrats approve of the outgoing mayor and want his main policies continued.",
-      "The front-runner is running as the candidate of change from the last twelve years.",
-      "The mayor is not running after three terms.",
-    ],
-    away: "break",
-  },
-  weiner: {
-    situation: [
-      "The new entrant is drawing nearly all of his support from voters who were backing you, by the latest poll.",
-      "His message is the same as yours, and coverage is treating him as the candidate of your ideas.",
-      "You have already claimed the most you can in matching funds.",
-    ],
-    away: "hold",
-  },
-  hospital: {
-    situation: [
-      "The union organising the protest has endorsed your main rival, and its leaders attacked you by name last week.",
-      "A survey of residents near the hospital finds most of them support its sale.",
-      "Organisers plan civil disobedience. Two rivals will also be there.",
-    ],
-    away: "arrest",
-  },
-  budget: {
-    situation: [
-      "Television time in the city is booked up for the final weeks and costs twice the usual rate.",
-      "Primary turnout will be small, and the voter file shows exactly who will vote; a mail vendor can reach every one of them.",
-      "You are fourth in the polls.",
-    ],
-    away: "alltv",
-  },
-  firstad: {
-    situation: [
-      "Your teenage son has said in public that he wants no part in the campaign.",
-      "A rival's ad featuring a child drew wide criticism this month.",
-      "A federal court ruling on the police stop policy is expected any day.",
-    ],
-    away: "family",
-  },
-  base: {
-    situation: [
-      "In the latest poll, most likely primary voters call the police stop policy an acceptable way to keep the city safe.",
-      "Your rival who leads among Black voters holds the same position on the policy as you.",
-      "Coverage says voters rank jobs and rents far above policing this year.",
-    ],
-    away: "frisk",
-  },
+export const CHANGED: Record<string, { situation: string[]; away: string }[]> = {
+  positioning: [
+    {
+      situation: [
+        "A new poll finds most Democrats approve of the outgoing mayor and want his main policies continued.",
+        "The front-runner is running as the candidate of change from the last twelve years.",
+        "The mayor is not running after three terms.",
+      ],
+      away: "break",
+    },
+    {
+      situation: [
+        "Your own polling finds Democrats rate the outgoing mayor's record on schools and safety highly, across every group.",
+        "The unions and donors you are counting on have told you they want a steady manager, not a break with the mayor.",
+        "The front-runner is the one attacking the mayor's record.",
+      ],
+      away: "break",
+    },
+  ],
+  weiner: [
+    {
+      situation: [
+        "The new entrant is drawing nearly all of his support from voters who were backing you, by the latest poll.",
+        "His message is the same as yours, and coverage is treating him as the candidate of your ideas.",
+        "You have already claimed the most you can in matching funds.",
+      ],
+      away: "hold",
+    },
+    {
+      situation: [
+        "Your pollster's study of past primaries finds that a candidate unknown to most voters by July has never recovered.",
+        "Nearly half of Democrats do not know enough about you to rate you, and the new entrant is famous.",
+        "Television time is cheap now and will cost twice as much from August.",
+      ],
+      away: "hold",
+    },
+  ],
+  hospital: [
+    {
+      situation: [
+        "The union organising the protest has endorsed your main rival, and its leaders attacked you by name last week.",
+        "A survey of residents near the hospital finds most of them support its sale.",
+        "Organisers plan civil disobedience. Two rivals will also be there.",
+      ],
+      away: "arrest",
+    },
+    {
+      situation: [
+        "The sale of the hospital would pay for a network of new clinics that the health-care workers' union supports.",
+        "Today's protest is organised by a group the union has publicly disowned.",
+        "Organisers plan civil disobedience.",
+      ],
+      away: "arrest",
+    },
+  ],
+  budget: [
+    {
+      situation: [
+        "Television time in the city is booked up for the final weeks and costs twice the usual rate.",
+        "Primary turnout will be small, and the voter file shows exactly who will vote; a mail vendor can reach every one of them.",
+        "You are fourth in the polls.",
+      ],
+      away: "alltv",
+    },
+    {
+      situation: [
+        "Your rivals have booked nearly all the television time for the final five weeks, and the stations will sell you none after mid-July.",
+        "Every candidate has the same spending limit.",
+        "You are fourth at 10 percent.",
+      ],
+      away: "alltv",
+    },
+  ],
+  firstad: [
+    {
+      situation: [
+        "Your teenage son has said in public that he wants no part in the campaign.",
+        "A rival's ad featuring a child drew wide criticism this month.",
+        "A federal court ruling on the police stop policy is expected any day.",
+      ],
+      away: "family",
+    },
+    {
+      situation: [
+        "Your focus groups react badly to children in political ads, and score your own record, told by you, highest of anything tested.",
+        "You need to finish in the top two to reach a runoff.",
+        "A federal court ruling on the police stop policy is expected any day.",
+      ],
+      away: "family",
+    },
+  ],
+  base: [
+    {
+      situation: [
+        "In the latest poll, most likely primary voters call the police stop policy an acceptable way to keep the city safe.",
+        "Your rival who leads among Black voters holds the same position on the policy as you.",
+        "Coverage says voters rank jobs and rents far above policing this year.",
+      ],
+      away: "frisk",
+    },
+    {
+      situation: [
+        "After the court ruling, every candidate in the race has pledged to end the police stop policy; there is no difference left between you on it.",
+        "Among Black likely voters you already lead the field.",
+        "Voters say the cost of living is the issue they care about most.",
+      ],
+      away: "frisk",
+    },
+  ],
+};
+
+/**
+ * The control for the changed-facts cards: each case decision's situation in other words, with the same facts. A
+ * grounded agent should choose as it does on the card. Written with the second set of changed cards, before any run
+ * of either.
+ */
+export const REWORDED: Record<string, string[]> = {
+  positioning: [
+    "Christine Quinn is ahead in every public poll, at 35 to 37 percent. You, Bill Thompson and John Liu are all between 9 and 14.",
+    "After three terms, Mayor Bloomberg is not on the ballot.",
+    "According to your media consultant, the other campaigns are all pitching their message to the middle class.",
+  ],
+  weiner: [
+    "Reporters say Weiner's message about middle-class struggles is drowning out yours.",
+    "You have already drawn the most public matching money you are allowed for the primary.",
+  ],
+  hospital: [
+    "A judge has ordered Long Island College Hospital in Brooklyn kept open, but the state university, which is weighing a sale, has sent ambulances elsewhere.",
+    "1199 SEIU, which backs you, and the state nurses' association, which backs no one yet, are running today's protest.",
+    "Liu and Weiner are coming too, and the organisers intend to break the law peacefully.",
+    "As Public Advocate you hold an office elected by the whole city.",
+  ],
+  budget: [
+    "The $6,426,000 primary limit is the same for every candidate who takes public money.",
+    "At 10 percent you are in fourth place, and close to half of Democrats know too little about you to rate you.",
+  ],
+  firstad: [
+    "To avoid a runoff you need more than 40 percent; to reach one you need a top-two finish.",
+    "A federal judge could rule on stop-and-frisk any day now.",
+    "As of mid-July, close to half of Democrats did not know you well enough to rate you.",
+  ],
+  base: [
+    "The August 13 poll of likely voters: among Black voters Thompson 39, de Blasio 22, Quinn 18; among white voters de Blasio 39, Quinn 31, Thompson 12.",
+    "Six in ten likely primary voters say stop-and-frisk goes too far.",
+    "Thompson has praised parts of the policy and would keep it as a tool, with an inspector general.",
+    "Reporters say Thompson is relying on being the only Black candidate to get him to a runoff.",
+  ],
 };
 
 // --- Masking ---------------------------------------------------------------------------------------------------

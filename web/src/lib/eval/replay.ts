@@ -7,7 +7,8 @@ import { writers } from "../staff/memos";
 import { snapshot } from "../staff/run";
 import { describeWorld, PLACES, type Snapshot } from "../staff/world";
 import { hash } from "../util";
-import { CHANGED, isDropped, mask, recognised, type Condition } from "./conditions";
+import { CHANGED, isDropped, mask, recognised, REWORDED, type Condition } from "./conditions";
+import { TWIN_NAMES, TWIN_PERSON, twinPlatform, TWINS } from "./twins";
 import { decideLive, decideRules, optionLines, probe, recall, system, type Card, type CardOption, type Choice, type Trace } from "./decider";
 import { HELD_OUT } from "./heldout";
 import { factsBefore, PEOPLE, personNamed, type Person } from "./people";
@@ -21,8 +22,9 @@ export type Kind = "case" | "adviser" | "heldout" | "free";
 export type Rec = {
   kind: Kind; cond: Condition; decision: string; person: string; n: number;
   chosen: string | null; taken: string; onReal: boolean | null;
-  /** changed only: the 2013 choice a reasoning agent should move away from. */
+  /** changed only: the 2013 choice a reasoning agent should move away from, and which changed version this was. */
   away?: string;
+  variant?: number;
   order: string[]; why: string; read: string[]; mode: "live" | "rules"; ms: number;
   memos?: { director: string; option: string }[];
   probe?: string; recognised?: boolean;
@@ -123,6 +125,31 @@ export function caseCard(c: Case, d: Decision, i: number, n: number, memos: Memo
   return { card: { decision: d.id, today: d.date, title: d.title, person: personOf(who, d.date), ask, body, options, read: { map: t.map, groups: t.groups, paper: paperBefore(c, d.date) } }, dropped };
 }
 
+/**
+ * A case decision's structural twin (twins.ts): the same decision in an invented city. The poll and the money are
+ * the real campaign's on the day, under the twin's names. No map and no paper (both would name the city); the voter
+ * groups without the borough ones. No memos (they were written about the real card).
+ */
+function twinCard(c: Case, d: Decision, i: number, n: number): Card {
+  const tw = TWINS[d.id];
+  const w = snapshot({ at: i + 1, date: d.date });
+  const poll = Object.entries(w.poll).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([id, v]) => `${id === c.follow ? "You" : (TWIN_NAMES[id] ?? id)} ${Math.round(v)}`).join(", ");
+  const options: CardOption[] = shuffle(d.options, n, d.id).map((o, k) => {
+    const cost = -(o.effect.budget ?? 0);
+    return { key: KEYS[k], id: o.id, label: tw.options[o.id].label, detail: tw.options[o.id].detail, cost: cost > 0 ? cost : undefined, up: o.preview.up, down: o.preview.down };
+  });
+  const platform = twinPlatform(i);
+  const body = [
+    tw.since?.length ? `Since your last decision:\n${tw.since.map((x) => `- ${x}`).join("\n")}` : "",
+    `The situation:\n${tw.situation.map((x) => `- ${x}`).join("\n")}`,
+    tw.constraints,
+    `The latest poll: ${poll}. Left to spend under the limit: ${usd(w.cash)}.`,
+    `Your platform so far:\n${platform.map((p) => `- ${p}`).join("\n")}`,
+  ].filter(Boolean).join("\n\n");
+  const groups = w.factions.filter((f) => !["brooklyn", "manhattan", "queens-si", "bronx"].includes(f.id)).map((f) => `${f.name}: ${Math.round(f.feel)}% support you; ${f.size}% of likely voters`).join("\n");
+  return { decision: d.id, today: `${d.constraints.daysLeft} days before the primary`, title: tw.title, person: { name: TWIN_PERSON.name, role: TWIN_PERSON.role, facts: TWIN_PERSON.facts(i) }, ask: "decide", body, options, read: { groups, map: "No district map is available for this city.", paper: "No press archive is available." } };
+}
+
 type Job = { rec: Omit<Rec, "chosen" | "onReal" | "why" | "read" | "mode" | "ms" | "prompt" | "order">; card: Card; who: Person; recallAs?: { who: string; date: string } };
 
 export async function replay(o: ReplayOptions): Promise<Rec[]> {
@@ -136,20 +163,31 @@ export async function replay(o: ReplayOptions): Promise<Rec[]> {
     for (const [i, d] of c.decisions.entries()) {
       if (!want(d.id) || !(o.kinds.includes("case") || o.kinds.includes("adviser"))) continue;
       arriveAt(c, i);
-      const needsMemos = o.conds.some((x) => x !== "recall" && x !== "changed");
+      const needsMemos = o.conds.some((x) => !["recall", "changed", "twin"].includes(x));
       const memos = needsMemos ? await memosFor(d, i) : [];
       const memoRecs = memos.map((m) => ({ director: m.director, option: m.option }));
       log(`built ${d.id} run ${n + 1}`);
       for (const cond of o.conds) {
         if (o.kinds.includes("case")) {
-          let d2 = d, mm = memos;
+          const base = { kind: "case" as const, cond, decision: d.id, person: me.id, n, taken: d.taken ?? "" };
           if (cond === "changed") {
-            d2 = { ...d, since: undefined, situation: CHANGED[d.id].situation.map((text) => ({ text, sources: [] })) };
+            // Each changed version gets memos written about its own situation.
+            for (const [v, ch] of CHANGED[d.id].entries()) {
+              const d2 = { ...d, since: undefined, situation: ch.situation.map((text) => ({ text, sources: [] })) };
+              arriveAt(c, i);
+              const mm = await memosFor(d2, i);
+              const { card } = caseCard(c, d2, i, n, mm, me, "decide", true);
+              jobs.push({ rec: { ...base, away: ch.away, variant: v, memos: mm.map((m) => ({ director: m.director, option: m.option })) }, card, who: me });
+            }
+          } else if (cond === "twin") {
             arriveAt(c, i);
-            mm = await memosFor(d2, i);
+            jobs.push({ rec: base, card: twinCard(c, d, i, n), who: me });
+          } else {
+            // reworded: the same facts in other words; the memos were written from the same facts, so they stay.
+            const d2 = cond === "reworded" ? { ...d, situation: REWORDED[d.id].map((text) => ({ text, sources: [] })) } : d;
+            const { card, dropped } = caseCard(c, d2, i, n, cond === "recall" ? [] : memos, me, "decide", cond !== "nochips");
+            jobs.push({ rec: { ...base, memos: cond === "recall" ? undefined : memoRecs, dropped }, card: cond === "masked" ? masked(card, me) : card, who: me, recallAs: cond === "recall" ? { who: `${me.name}'s campaign`, date: d.date } : undefined });
           }
-          const { card, dropped } = caseCard(c, d2, i, n, cond === "recall" ? [] : mm, me, "decide", cond !== "nochips");
-          jobs.push({ rec: { kind: "case", cond, decision: d.id, person: me.id, n, taken: d.taken ?? "", away: cond === "changed" ? CHANGED[d.id].away : undefined, memos: cond === "recall" ? undefined : mm.map((m) => ({ director: m.director, option: m.option })), dropped }, card: cond === "masked" ? masked(card, me) : card, who: me, recallAs: cond === "recall" ? { who: `${me.name}'s campaign`, date: d.date } : undefined });
         }
         // Advisers: the record names who argued for what. Only the card and masked conditions apply.
         if (o.kinds.includes("adviser") && (cond === "card" || cond === "masked")) {
@@ -171,7 +209,7 @@ export async function replay(o: ReplayOptions): Promise<Rec[]> {
         const options = order.map((x, k) => ({ key: KEYS[k], id: x.id, label: x.label, detail: x.detail }));
         const card: Card = { decision: h.id, today: h.date, title: h.title, person: personOf(who, h.date), ask: "decide", body: `The situation:\n${h.situation.map((x) => `- ${x.text}`).join("\n")}`, options, read: { paper: paperBefore(c, h.date) } };
         for (const cond of o.conds) {
-          if (cond === "nochips" || cond === "changed") continue; // held-out cards have no chips, and no changed version
+          if (cond !== "card" && cond !== "masked" && cond !== "recall") continue; // held-out cards have no chips, changed, reworded or twin versions
           jobs.push({ rec: { kind: "heldout", cond, decision: h.id, person: who.id, n, taken: h.taken }, card: cond === "masked" ? masked(card, who) : card, who, recallAs: cond === "recall" ? { who: who.name, date: h.date } : undefined });
         }
       }
@@ -191,7 +229,7 @@ export async function replay(o: ReplayOptions): Promise<Rec[]> {
       try {
         ch = j.recallAs ? (o.live ? await recall(j.card, j.recallAs.who, j.recallAs.date, trace) : { key: null, why: "No key: recall needs the model.", read: [], mode: "rules", ms: 0 })
           : o.live ? await decideLive(j.card, trace) : decideRules(j.card, j.rec.cond !== "nochips");
-        if (j.rec.cond === "masked") answer = o.live ? await probe(j.card, trace) : undefined;
+        if (j.rec.cond === "masked" || j.rec.cond === "twin") answer = o.live ? await probe(j.card, trace) : undefined;
       } catch (err) {
         ch = { key: null, why: `Error: ${(err as Error).message}`, read: [], mode: o.live ? "live" : "rules", ms: 0 };
       }

@@ -1,6 +1,6 @@
 // npm run eval — do the agents decide as the real people did? (#28; src/lib/eval/)
 //
-//   npm run eval -- replay [--n 5] [--cond card,nochips,masked,changed,recall] [--kinds case,adviser] [--only weiner,base] [--concurrency 4] [--dry]
+//   npm run eval -- replay [--n 5] [--cond card,nochips,masked,changed,reworded,twin,recall] [--kinds case,adviser] [--only weiner,base] [--concurrency 4] [--dry]
 //   npm run eval -- heldout --frozen [--n 5] [--cond card,masked,recall]
 //   npm run eval -- free [--runs 3] [--weekly 7] [--orders 2]
 //   npm run eval -- score eval/runs/<file>.jsonl
@@ -81,7 +81,7 @@ if (mode === "free") {
 const { replay } = await jiti.import("../src/lib/eval/replay.ts");
 const opts = {
   n: Number(flag("n", 5)),
-  conds: list("cond", mode === "heldout" ? "card,masked,recall" : "card,nochips,masked,changed,recall"),
+  conds: list("cond", mode === "heldout" ? "card,masked,recall" : "card,nochips,masked,changed,reworded,twin,recall"),
   kinds: mode === "heldout" ? ["heldout"] : list("kinds", "case,adviser"),
   only: flag("only", false) ? list("only", "") : undefined,
   concurrency: Number(flag("concurrency", 4)),
