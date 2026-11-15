@@ -99,8 +99,13 @@ export type Plank = {
   dislikedBy?: Claim;
 };
 
-/** What the press was reporting. `summary` is a paraphrase, never the article's own text. */
-export type Press = { date: string; outlet: string; summary: string; source: string };
+/**
+ * What the press was reporting. `summary` is a paraphrase, never the article's own text.
+ * `impact` (1 to 5) is how much the item moved this race, wherever it happened; the paper ranks by it, not by place.
+ * `outside` marks an event from beyond the city. It is never shown as a label; it only keeps the item off the lead.
+ * `estimate` marks a tie to the race that is our inference, not the source's: shown as an estimate, never moves numbers.
+ */
+export type Press = { date: string; outlet: string; summary: string; source: string; impact?: number; outside?: boolean; estimate?: boolean };
 
 /** One point on the money timeline, from a public filing. */
 export type Filing = { date: string; candidate: string; raised: number; spent: number; cash: number; source: string; estimate?: boolean };
@@ -171,7 +176,8 @@ export function missingSources(c: Case): string[] {
     ...(p.by && !people.has(p.by) ? [`(plank by unknown candidate ${p.by})`] : []),
     ...(p.reactions ?? []).flatMap((r) => (r.groups ?? []).filter((g) => !groups.has(g)).map((g) => `(reaction tied to unknown group ${g})`)),
   ]);
-  return [...new Set([...claims.flatMap((x) => x.sources).filter((id) => !known.has(id)), ...unsourced, ...platform])];
+  const press = c.press.filter((p) => p.impact !== undefined && !(Number.isInteger(p.impact) && p.impact >= 1 && p.impact <= 5)).map((p) => `(press impact out of 1 to 5: ${p.summary.slice(0, 40)})`);
+  return [...new Set([...claims.flatMap((x) => x.sources).filter((id) => !known.has(id)), ...unsourced, ...platform, ...press])];
 }
 
 export type World = { budget: number; poll: Record<string, number>; groups: Record<string, number> };

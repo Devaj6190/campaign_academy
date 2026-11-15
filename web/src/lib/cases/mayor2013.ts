@@ -46,6 +46,10 @@ const sources: Source[] = [
   src("spb-hyers", "Summary of a Washington Post profile of Bill Hyers", "SaintPetersBlog", undefined, "https://saintpetersblog.com/must-read-profile-of-charlie-crists-new-campaign-manager", "reporting"),
   src("gg-walzak", "In Communications Move, de Blasio Chooses Campaign Over City Hall", "Gotham Gazette", "2016-10-24", "https://www.gothamgazette.com/city/6589-in-communications-move-de-blasio-chooses-campaign-over-city-hall", "reporting"),
   src("gqr", "Congratulations to Bill de Blasio", "Greenberg Quinlan Rosner", "2013-09-16", "https://www.gqrr.com/news/congratulations-to-bill-de-blasio-2", "campaign"),
+  // Outside events a published source ties to this race (research pass, 15 November 2026; each page loaded and read).
+  src("wfuv-0425", "Democrats in Mayor Race Spar Over Issues of Public Safety", "WFUV", "2013-04-25", "https://wfuv.org/content/democrats-mayor-race-spar-over-issues-public-safety", "reporting"),
+  src("aj-trayvon", "Sex, race and Trayvon Martin in NY politics", "Al Jazeera", "2013-08-08", "https://www.aljazeera.com/blogs/americas/2013/07/84626.html", "analysis"),
+  src("fa-detroit", "NYC's Good Times May Sour As Detroit's Did, Mayor Bloomberg Says", "Bloomberg News, via Financial Advisor", "2013-08-06", "https://www.fa-mag.com/news/nyc-s-good-times-may-sour-as-detroit-s-did--mayor-bloomberg-says-15105.html?print", "reporting"),
   src("nation-0813", "A Populist Insurgency in New York City", "The Nation", "2013-08-13", "https://www.thenation.com/?p=107906", "analysis"),
   src("trd-0702", "Bill de Blasio calls for greater affordable housing to lessen \"tale of two cities\"", "The Real Deal", "2013-07-02", "https://therealdeal.com/new-york/2013/07/02/bill-de-blasio-calls-for-greater-affordable-housing-to-lessen-tale-of-two-cities/", "reporting"),
   src("nextcity-0903", "Bill de Blasio Is Running on Change, but Can New Yorkers Believe in It?", "Next City", "2013-09-03", "https://nextcity.org/equityfactor/entry/bill-de-blasio-is-running-on-change-but-can-new-yorkers-believe-in-it", "analysis"),
@@ -268,8 +272,9 @@ export const mayor2013: Case = {
         notes: [
           c("Anthony Weiner enters the race by video with $4.8 million. That day's poll: Quinn 25, Weiner 15, de Blasio 10, Thompson 10.", "cbs-weiner", "q-0522"),
           c("You raised $240,000 in the last filing period. Thompson raised $600,000 and Quinn $510,000.", "dna-0514"),
+          c("After the Boston Marathon bombing, a forum turned on whether to keep Police Commissioner Ray Kelly. Quinn would keep him; you would not.", "wfuv-0425"),
         ],
-        shift: { poll: { deblasio: -2, quinn: -11, thompson: -1, liu: -3, weiner: 15 } },
+        shift: { poll: { deblasio: -2, quinn: -10, thompson: -1, liu: -3, weiner: 15 } },
       },
       situation: [
         c("Coverage says the new entrant's talk of middle-class struggles is crowding out your message.", "wnyc-lucky"),
@@ -371,9 +376,11 @@ export const mayor2013: Case = {
         notes: [
           c("On July 23 Weiner admitted to further explicit messages sent after he left Congress. He fell from first to fourth within a week.", "dna-0723", "q-0813"),
           c("Liu was denied public matching funds on August 5.", "wnyc-liu"),
+          c("After the Zimmerman verdict in Florida, Thompson sharpened his attack on stop-and-frisk to win Black voters leaving Weiner.", "aj-trayvon"),
+          c("Citing Detroit's bankruptcy, Mayor Bloomberg told voters to pick a mayor who would refuse retroactive raises for city workers.", "fa-detroit"),
           c("Polls of likely voters at the end of July: Quinn 26 or 27, with you, Thompson and Weiner between 15 and 21.", "q-0813", "m-0725"),
         ],
-        shift: { poll: { deblasio: 6, quinn: 5, thompson: 9, weiner: -9, liu: -1 }, groups: { black: 3, white: 5, hispanic: 4, union: 3 } },
+        shift: { poll: { deblasio: 6, quinn: 5, thompson: 10, weiner: -9, liu: -1 }, groups: { black: 3, white: 5, hispanic: 4, union: 3 } },
       },
       situation: [
         c("You need to finish in the top two to reach a runoff, or pass 40 percent to avoid one.", "cfb-ao"),
@@ -456,13 +463,17 @@ export const mayor2013: Case = {
   },
 
   press: [
-    { date: "2013-01-14", outlet: "DNAinfo", summary: "Mayoral hopefuls reported six months of fundraising. Quinn held the largest reserve; de Blasio's campaign said it was nearing the spending limit once matching funds were counted.", source: "dna-0114" },
-    { date: "2013-05-22", outlet: "CBS New York", summary: "Weiner entered by video with a large war chest. De Blasio's spokesman said the race was wide open.", source: "cbs-weiner" },
-    { date: "2013-07-10", outlet: "DNAinfo", summary: "De Blasio was arrested for disorderly conduct at a protest over the possible sale of a Brooklyn hospital.", source: "dna-arrest" },
-    { date: "2013-07-24", outlet: "DNAinfo", summary: "After Weiner's new admissions, de Blasio and Albanese called for him to leave the race; Quinn said that was for Weiner and the voters.", source: "dna-0724" },
-    { date: "2013-08-08", outlet: "VIN News", summary: "De Blasio's first television ad, featuring his teenage son, presented him as the one Democrat who would break from the incumbent and end stop-and-frisk.", source: "vin-ad" },
-    { date: "2013-08-12", outlet: "DNAinfo", summary: "A federal judge ruled stop-and-frisk unconstitutional. Quinn, de Blasio and Liu pledged to drop any appeal.", source: "dna-0812" },
-    { date: "2013-08-26", outlet: "NewsOne", summary: "Thompson released an ad accusing de Blasio's stop-and-frisk ad of misrepresenting his position.", source: "newsone-0826" },
+    { date: "2013-01-14", outlet: "DNAinfo", summary: "Mayoral hopefuls reported six months of fundraising. Quinn held the largest reserve; de Blasio's campaign said it was nearing the spending limit once matching funds were counted.", source: "dna-0114", impact: 2 },
+    { date: "2013-04-25", outlet: "WFUV", summary: "Ten days after the Boston Marathon bombing, a Democratic forum opened on counterterrorism and turned into a fight over Police Commissioner Ray Kelly. Quinn would keep him; de Blasio, Thompson and Liu would not.", source: "wfuv-0425", impact: 2, outside: true },
+    { date: "2013-05-22", outlet: "CBS New York", summary: "Weiner entered by video with a large war chest. De Blasio's spokesman said the race was wide open.", source: "cbs-weiner", impact: 4 },
+    { date: "2013-07-10", outlet: "DNAinfo", summary: "De Blasio was arrested for disorderly conduct at a protest over the possible sale of a Brooklyn hospital.", source: "dna-arrest", impact: 2 },
+    { date: "2013-07-24", outlet: "DNAinfo", summary: "After Weiner's new admissions, de Blasio and Albanese called for him to leave the race; Quinn said that was for Weiner and the voters.", source: "dna-0724", impact: 5 },
+    { date: "2013-08-06", outlet: "Bloomberg News", summary: "Citing Detroit's bankruptcy, Mayor Bloomberg warned that the next mayor must hold down pension and health costs and refuse retroactive raises. Liu and de Blasio had not ruled them out.", source: "fa-detroit", impact: 2, outside: true },
+    { date: "2013-08-08", outlet: "Al Jazeera", summary: "After the Zimmerman verdict in Florida, Thompson sharpened his attack on stop-and-frisk in a Brooklyn church, a bid for Black voters leaving Weiner.", source: "aj-trayvon", impact: 3, outside: true },
+    { date: "2013-08-08", outlet: "VIN News", summary: "De Blasio's first television ad, featuring his teenage son, presented him as the one Democrat who would break from the incumbent and end stop-and-frisk.", source: "vin-ad", impact: 5 },
+    { date: "2013-08-12", outlet: "DNAinfo", summary: "A federal judge ruled stop-and-frisk unconstitutional. Quinn, de Blasio and Liu pledged to drop any appeal.", source: "dna-0812", impact: 5 },
+    { date: "2013-08-13", outlet: "The Nation", summary: "The Nation cast de Blasio's \"tale of two cities\" campaign as an early test of a national argument among Democrats over inequality.", source: "nation-0813", impact: 2, outside: true, estimate: true },
+    { date: "2013-08-26", outlet: "NewsOne", summary: "Thompson released an ad accusing de Blasio's stop-and-frisk ad of misrepresenting his position.", source: "newsone-0826", impact: 3 },
   ],
 
   finance: [],
