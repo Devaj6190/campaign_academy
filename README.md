@@ -4,9 +4,9 @@
 
 The first case is the 2013 Democratic primary for Mayor of New York. You run it from inside Bill de Blasio's campaign, which started in fourth place. The calendar runs. At the six moments where the real campaign had to decide something, the clock stops and you decide instead. Between decisions you direct a staff of live AI agents, the rival campaigns move against you, and a morning paper reports it all. On election night you see your result beside the certified one.
 
-> **About this README (15 Nov 2026).** This is a working snapshot written to help make the demo video. It is not the final README (that is issue #56).
-> - It describes `main` at `18bf5a8`.
-> - It folds in every doc in the repo, plus the evals report (`docs/evals.md`).
+> **About this README (15 Nov 2026).** This is the big rough draft. Everything is in; it gets made beautiful next, and the Devpost is written from it. It is not the final README (that is issue #56).
+> - It describes `main` at `881fdc9`, after the evals with held-out results (#75, §9), the end-of-election debrief agent (#73, §5b) and the appearances notice (#74) merged. The image-led version is `README_PROPOSED.md`.
+> - It folds in every doc in the repo.
 > - Where a doc and the code disagree, the code on `main` wins.
 >
 > **Live site:** `campaign-academy.vercel.app` is stuck at `bbee564` (#67). Vercel's daily deploy limit blocked the later merges (#65, #68, #69, #70). A fresh deploy from Devank's Vercel account is under way; until then, demo from a local production build (see [Run it](#13-run-it)).
@@ -18,6 +18,7 @@ The first case is the 2013 Democratic primary for Mayor of New York. You run it 
 3. [A tour of the app, screen by screen](#3-a-tour-of-the-app-screen-by-screen)
 4. [The two-minute demo](#4-the-two-minute-demo)
 5. [The AI: live agents, Gemini, iMessage](#5-the-ai-live-agents-gemini-imessage)
+   - 5b. [How the agents work: LangChain deep agents in depth](#5b-how-the-agents-work-langchain-deep-agents-in-depth)
 6. [Real and simulated, kept apart](#6-real-and-simulated-kept-apart)
 7. [The case: the 2013 race](#7-the-case-the-2013-race)
 8. [How accurate the simulation is](#8-how-accurate-the-simulation-is)
@@ -113,6 +114,7 @@ This is a shot list. Everything here is on `main` today.
   - Then **What changed** (animated before → after bars, with "See it on the map"), **What the real campaign did**, and "Carry on with the campaign" or "Give your staff work first".
   - The same card opens over any screen when the clock reaches a decision.
 - **Debrief:** "Your election night", "What really happened" (certified shares and votes), "Your decisions against the record" (what followed, what was said afterwards), "Play it again", and the sources.
+  - **Your debrief** (PR #73, on `feat/debrief`): below "Your election night", a read-only deep agent writes a cited analysis of all six decisions and a review of how you ran your staff and handled the rivals. It takes 25–35 s. With no key, or if the run fails, the existing debrief stands.
 
 ### Profile
 - A photo card of de Blasio. **Platform** shows the cited record, your choices so far and the rivals' platforms.
@@ -143,7 +145,7 @@ This is a shot list. Everything here is on `main` today.
 - MapLibre with real streets, the 59 community districts, and 3D buildings when you fly in (right-drag to tilt).
 - **Colour by:** Your support, Last decision (arrows and point labels), or a census group.
 - **Click a district** for support, voter groups, "Who lives here" (census) and 311 requests.
-- **Dock:** **Knock doors**, **Hold a rally**, **House party** (the candidate, two appearances a day, priced) and **Send staff**. Districts glow when work lands.
+- **Dock:** **Knock doors**, **Hold a rally**, **House party** (the candidate, two appearances a day, priced) and **Send staff**. Once the day's two are used the buttons dim, and pressing one says "Today's two appearances are done." (PR #74). Districts glow when work lands.
 - **Election night:** the app switches to the Map by itself.
   - Districts count in one by one ("N of 65 reporting") with the 40% line, then the verdict.
   - Toggle **Your campaign / Your election night / Real result 2013** (Assembly Districts).
@@ -206,6 +208,7 @@ The full click-by-click script, rehearsed on `main` with #64 and #65, is in [`do
 Every live part has a rules fallback, so the app always runs. With no key the War room says "Simulated staff · no API key".
 
 ### Staff: LangChain `deepagents` (LangChain track)
+*The technical version, with every deep agent, its features, guards and limits, is §5b.*
 - **Each director is a `createDeepAgent`** (`web/src/lib/staff/agents.ts`) with its own team as subagents.
   - It plans with `write_todos` and hands work down with the `task` tool. The **Thinking** panel shows this live.
   - It keeps a memory file of what worked in this campaign (`/memory/AGENTS.md`), capped at 12 dated lines per post and cleared on restart.
@@ -268,6 +271,80 @@ Every live part has a rules fallback, so the app always runs. With no key the Wa
   - Each call-time session uses one of the candidate's two appearances that day.
 - **Warnings:** a runway warning, and the Finance Director speaks up if the plan will run the money out.
 - A new campaign starts on the default plan (one Brooklyn canvass, one call-time session and one press pitch a week), which is the routine the engine is fitted with.
+
+---
+
+## 5b. How the agents work: LangChain deep agents in depth
+
+Campaign Academy runs on LangChain's `deepagents` harness (`deepagents` 1.16.5, the latest release; `langchain` 1.6.6, `@langchain/langgraph` 1.7.4, `@langchain/anthropic` 1.6.5). A deep agent is a model in a tool-calling loop (LangChain's `createAgent`, compiled to a LangGraph graph) with a stack of middleware around it: planning, a virtual filesystem, subagents through a `task` tool, memory files, summarization and prompt caching. Since deepagents v0.7 the harness is a kit you configure; planning, for one, is opt-in. Below is every place the app builds a deep agent, what each one uses, and where it stops.
+
+### Where deep agents run
+
+| Agent | File | Model | deepagents features used |
+|---|---|---|---|
+| Staff director (one per post) | `web/src/lib/staff/agents.ts` | `claude-opus-5-5`, effort low | `createDeepAgent`, subagents via `task` (in parallel), `memory` (`/memory/AGENTS.md`), a harness profile, custom tools |
+| Staff under a director | same | `claude-haiku-5-5`, effort low | `SubAgent` specs in isolated mode, each with its own model, prompt and one tool |
+| Rival campaigns (Quinn, Thompson, Liu, Weiner) | `web/src/lib/engine/rivalAgent.ts` | `claude-haiku-5-5`, effort low | `createDeepAgent` with one custom tool |
+| End-of-election debrief (PR #73) | `web/src/lib/debrief/` | `claude-sonnet-5-5`, effort low | `createDeepAgent`, `write_todos` (`todoListMiddleware`), virtual filesystem, filesystem permissions, subagents via `task` in parallel, custom tools |
+| Evals campaigner (#28, `feat/evals`) | `web/src/lib/eval/decider.ts`, `free.ts` | `claude-opus-5-5`, effort medium (decisions) or low (weekly orders) | `createDeepAgent` with read tools and one decision tool, LangSmith tracing |
+
+Everything else that talks to a model is a single LangChain `ChatAnthropic` call, not a deep agent: the decision memos, plank shaping, unprompted remarks, wrap-up lines, hiring shortlists, and the Claude fallback for the paper and the stances. The morning paper itself is written by Gemini.
+
+### Staff: a director and the people under them
+- **One deep agent per order.** Each order builds the director fresh from a snapshot the browser sends (`/api/staff/instruct`). The game state lives in the browser, so the server keeps nothing between orders.
+- **Delegation through `task`.** The director's team members are `SubAgent` specs: name, description (role, strengths, weaknesses), their own model, their own prompt in their own voice, and one tool. The director hands each job to the right person with `task`, and independent jobs run in parallel. Each subagent sees only its brief, so its context stays isolated from the director's.
+- **Acting through the engine only.** Staff act with one custom tool, `take_action`. It calls the same rules engine as the rest of the game (`lib/engine/resolve.ts`), which prices and scores the action. The `why` field comes first in the schema, so the reason is written before the choice; it streams to the War room as the staffer's thought.
+- **The director's own tools:**
+  - `send_report` ends an order;
+  - `propose` answers a question with two or three options, each priced by the engine, not the model;
+  - `take_action` only when nobody reports to the director.
+- **Memory as a deepagents memory file.** Each post's memory is written into the run's files as `/memory/AGENTS.md` and loaded into the prompt by deepagents' `MemoryMiddleware`. It holds two kinds of line, capped at 12 per post: the exact record of each order, written by code from the run's results, and one lesson per order that the director chooses to keep.
+- **A harness profile per model.** `registerHarnessProfile` hides the deepagents file tools and turns off the general-purpose subagent for both staff models. Staff delegate only to real colleagues and act only through the catalog.
+- **Proactive staff.** Directors come back three campaign days after their team's work, with what changed and what the rivals did there since. Staff also speak up unprompted (money, weak groups, rival moves, a new front page), at most once every three days and the same worry at most every fourteen.
+- **Streaming.** The route streams the agent with `streamMode: "updates"` and turns each step into an NDJSON event: thought, delegate, action, job-done, report or proposals. The War room animates the hand-offs from these events.
+
+### Rival campaigns
+- After each of the student's decisions, every rival still in the race plans its next stretch as a deep agent, all four in parallel. Each is told its real standing and its platform on record, what the student's campaign did since, and its own last four moves.
+- It acts through one tool, `make_move`: at most two moves on $150,000, scored by the same engine as the student's staff. The rival gains the points its move is worth, and the student loses half of them where it landed.
+- It shares the staff's harness profile (no file tools) and runs with `invoke`, not streaming.
+
+### The end-of-election debrief (PR #73)
+- **When:** once, after election day, as a section on the debrief screen beside the existing comparison of decisions.
+- **A virtual filesystem as context.** The student's whole campaign (orders, staff thinking and reports, coaching, money asks, options picked, memos, rival moves, planks) and the case's sourced 2013 record are laid out as files: `/campaign/...` for what the student did, which is simulated, and `/record/...` for what really happened, with source ids on every line. The record is built on the server from the case file, so the browser cannot change it. The agent reads only what it needs, instead of getting one huge prompt.
+- **Planning and parallel subagents.** It plans with `write_todos`, then sends six `decision_analyst` subagents (one per decision) and a `campaign_reviewer` in one turn, so they run in parallel. Each records its part through a tool; the main agent finishes with `submit_debrief`.
+- **Read-only by construction.** deepagents filesystem permissions deny every write, edit and delete for the agent and every subagent. Its record tools only fill this run's result, and nothing it returns reaches the campaign.
+- **Its own model on purpose.** Harness profiles are global to the server and keyed by model. The staff's profile hides the file tools for Opus and Haiku, so the debrief runs on Sonnet 5.5 to keep its file tools without touching the staff.
+- **Checked output.** Every citation must be one of the case's sources, and every figure must appear in the files; anything else is dropped.
+
+### The evals harness (#28, branch `feat/evals`)
+- A campaigner deep agent plays de Blasio, and other agents play the real advisers and rivals. Each sees only facts dated on or before the decision. It can read the map, the voter groups and the paper through read tools before it decides through one `decide` tool, which asks it to name the facts its choice rests on.
+- In the free run it holds a weekly meeting through an `order` tool, and the game's own live staff and rivals carry the orders out.
+- Every run is traced in LangSmith (project `campaign-academy-evals`), with tags and metadata per decision and condition. Section 9 has the method and results.
+
+### Guards around every live agent
+- **No invented numbers** (`staff/numbers.ts`). A `Ledger` holds every figure an agent was shown: the case, the order, and its own tool results. A report or answer with any other figure is sent back once; after that the sentence carrying it is dropped. Memos, remarks, wrap-ups and the debrief use the same check.
+- **No hindsight** (`staff/memo.ts`). Every staff prompt gives the date and says nothing after it is known. `withoutHindsight` drops any sentence that reaches past the date ("won the primary", "Mayor de Blasio", "in the real race", a year after 2013) from reports, thoughts, remarks and memos.
+- **Memos never choose.** Left to choose, the model picked 2013's real option at all six decisions, because it recognises the race. So a fixed rotation assigns each memo writer an option, and the model only writes the case for it.
+- **Budgets.** Each order has one budget for the whole team, read from the order text ($80,000 by default, at most $250,000, never more than the campaign has). Every tool reply says what is left of this order's budget, and the prompt says that is not the campaign's cash. The engine refuses anything over budget.
+- **The engine moves the numbers.** No model ever sets a poll figure, a cost or an effect. Planks and stances name the groups they serve and offend; code sizes the effect.
+
+### What is live, and what falls back to rules
+- **With an Anthropic key,** the staff, rivals, memos, remarks, hiring shortlists, planks and debrief are live.
+- **Without a key,** each one has a rules fallback that emits the same events or the same shape of result, so the screens behave the same:
+  - staff: a keyword planner (`staff/offline.ts`);
+  - rivals: two moves against the student's strongest group and district (`rulePlan`);
+  - memos: a fixed reason per post (`rulesMemo`);
+  - planks: a keyword shaper (`manifesto/rules.ts`);
+  - the debrief: the plain decision-by-decision comparison.
+- **Partial failure.** A live staff run that fails before spending anything reruns in the rules simulation. One that fails after spending closes with a partial report. The War room labels which mode is running.
+
+### Limits we found
+- **The director has never had `write_todos`.** Since deepagents v0.7 the to-do tool is opt-in through `todoListMiddleware`. The director's prompt still asks for it, and the War room still listens for it, but the staff agents don't add the middleware. So the plan checklist fills in only in the rules simulation. Building the director offline shows it is given `send_report`, `delete` and `task`, plus `propose`. The debrief agent does wire `write_todos`.
+- **`delete` is visible to the director.** v0.7 added `delete` to the default file tools, and the staff profile hides the other file tools but not this one. The only file is the memory file, which the browser rebuilds on every order.
+- **No checkpointer, store or interrupts.** Each order is a fresh run with the last eight lines of chat resent; memory lives in the browser save. A request for more money ends the run, and approving it starts a new run instead of resuming the old one.
+- **Prompt caching helps only within a run.** The day's numbers sit in the system prompt, so it changes every order.
+- **The model knows 2013.** Agents can recognise the race from the options alone. That is why memos are assigned an option and the hindsight filter exists, and why the evals score grounding (changed facts followed, agreement where memory is wrong, unrecognised twins) rather than plain agreement.
+- **Tracing.** With the LangSmith variables set, every LangChain run is traced. The debrief route flushes its trace before it returns. The staff route streams and does not flush yet, so some staff traces may be dropped when the function stops on Vercel.
 
 ---
 
@@ -389,7 +466,11 @@ The tunable numbers (money scale, caps, rival budgets, plank sizes, spill, donor
 
 ## 9. Evals: do the agents decide as the real people did?
 
-We tested it with no student. A campaigner agent plays Bill de Blasio, and the staff, rivals and memos are the live agents. Each real person is played from verified research, knowing only what was true before each date. Their choices are compared with what the real people chose in 2013. The full report, with every run, is [`docs/evals.md`](docs/evals.md). Code in `web/src/lib/eval/`, run with `npm run eval` in `web/`; every run is saved in `web/eval/runs/` and traced in LangSmith.
+Issue #28. The short version comes first, as the evals session wrote it for the README (`feat/evals` at `5afe8c6`). The detail below it is taken from `docs/evals.md` on `feat/evals` (PR #75), through run 7 and the held-out run. Tuning is frozen at `bdd01be`. The code is in `web/src/lib/eval/`, run with `npm run eval` in `web/`. Every run's requests, replies and summary are saved in `web/eval/runs/` and traced in LangSmith (project `campaign-academy-evals`).
+
+### In short
+
+We tested it with no student. A campaigner agent plays Bill de Blasio, and the staff, rivals and memos are the live agents. Each real person is played from verified research, knowing only what was true before each date. Their choices are compared with what the real people chose in 2013.
 
 **The catch: the model already knows this race.** Asked with no card at all what de Blasio's campaign did, it names the real choice at five of the six decisions. So plain agreement (about 90% on the cards) mostly measures memory. Hiding names didn't help: the model recognised the race on all but one masked card, and on every "twin" moved to an invented city, from the shape of the race alone.
 
@@ -420,6 +501,174 @@ What this shows:
 On decisions it was never tuned on, the card adds almost nothing to memory. The misses are moments of personal caution: Liu and Weiner stepping back from arrest at the hospital protest, and Quinn declining to tell Weiner to quit. Played as those people, the agents chose a bolder line.
 
 **The honest summary:** the agents are grounded in the evidence they are given, and the free run behaves like a real campaign. But they do not reproduce what the real people chose beyond what the model already remembers. Two prompt changes aimed at grounding made no measurable difference.
+(The 11 of 11 adds up runs 2, 4, 6 and 7: 3 + 2 + 3 + 3.)
+
+### The question
+When an agent stands in for a real person, does it decide as that person did? The LangChain judges asked this on 14 November. The case has six real decision points, each with what the campaign really chose (`Decision.taken`).
+
+### Setup
+- **No student.** A campaigner agent plays Bill de Blasio. The staff, rivals and memos are the game's own live agents (deepagents on Claude).
+- **Real people, as themselves.** Each agent playing a real person gets a profile built only from verified facts in the research doc (`web/src/lib/eval/people.ts`).
+- **Only what was known on the day.** Each fact carries the date it became true, and an agent sees only facts dated before its decision. A fact that is itself the answer to a scored decision is left out of every profile.
+- **The campaigner sees what a student sees:** the decision card (memos, chips, money, platform), plus the map, voter groups and paper, which it can open before deciding. In the free run it also reads its staff's reports and the rivals' moves.
+- **What no agent ever sees:** `taken`, `did`, `followed`, `saidAfter` or `advice`.
+
+### What is scored
+- **Agreement:** how often an agent chose what the real person chose. Chance is about 24%.
+- **Not the final vote share.** The simulation is fitted to the real result, so vote share measures the fitting, not the agents.
+- **The headline is grounding, not agreement.** The model knows this race, and masking can't hide it, so the question is whether its choices follow the facts in front of it. Three scores:
+  1. **Changed facts followed**, beside a control. A card rewritten so the facts point away from the 2013 choice should move a grounded agent. The same facts reworded (the control) should not.
+  2. **Agreement where memory is wrong.** Where recall with no card picks the wrong option and the card still leads to the real one, that agreement can't be memory.
+  3. **Agreement on twins the model doesn't recognise.** A twin moves the decision to an invented city, Halvern, with equivalent specifics.
+
+### What is run
+
+| Kind | What it is |
+|---|---|
+| **Replay** | Each decision on its own, arriving with the real earlier choices, no staff work and no rival moves |
+| **Adviser fidelity** | The three advisers the record names. An agent plays that person and says which option they'd argue for |
+| **Held out** | Eleven more real decisions, never used while tuning, run once at the end |
+| **Free run** | The whole system from 27 Jan to 10 Sep. The campaigner gives up to two orders a week and decides at each decision; staff, rivals and memos are live |
+
+| Condition | What changes | What it tells us |
+|---|---|---|
+| `card` | Nothing | Plain agreement |
+| `nochips` | Up/down chips removed | How much the chips (fitted to the record) give away |
+| `masked` | People, places, dates, outlets and identifying figures replaced, then a recognition probe | Whether masking hides the race |
+| `changed` | The situation rewritten so a reasoning agent should move away from the 2013 choice (two versions per decision) | Facts or memory? |
+| `reworded` | The same situation in other words | The control: does wording alone move it? |
+| `twin` | Moved to Halvern: an ombudsman for the Public Advocate, a luxury property tax for school meals instead of an income tax for pre-K, police sweeps in public housing instead of stop-and-frisk, an expenses scandal | Judgement with memory switched off |
+| `recall` | No card: "which of these did the real campaign do?" | Pure memory |
+
+Option order is shuffled per run.
+
+**Held-out set** (`web/src/lib/eval/heldout.ts`): eleven real decisions written from verified facts before any run, five of them rivals' choices. Among them: Quinn keeping Commissioner Kelly; Weiner staying in the race; de Blasio and Quinn pledging to drop any stop-and-frisk appeal; Thompson's ad calling a claim false. The script refuses to run them without `--frozen`, and each report prints the file's hash (`591f8b618429`).
+
+**Keeping it honest:**
+- **Card lines from the future are dropped.** Two lines on the cards weren't known on their dates: the 22 May card's mid-July poll, and the 15 July card's teachers' union spending. The eval leaves them out of the cards and the memos.
+- Each condition runs N times, with seeded luck, and every request and reply is saved.
+- **The rules fallback is a baseline, not a measurement.** Without a key the chips decide, and they land on the real choice at 2 of 6 decisions.
+
+### Results so far
+
+**Run 1, replay, N = 3** (`b28d704`):
+
+| Condition | Real choice | Chance |
+|---|---|---|
+| card | 18/18 | 24% |
+| nochips | 16/18 | 24% |
+| masked | 16/18 | 24% |
+| recall | 15/15 | 24% |
+| changed (stuck to 2013) | 9/18 | |
+
+- **The agreement is memory:** with no card, it named the real choice every time.
+- **Masking names wasn't enough:** it recognised 26 of 27 masked cards from the platform (the $500,000 pre-K tax, paid sick days).
+- **Changed facts split the decisions:** it followed new facts every time at budget and both ads, and never at positioning, Weiner or the hospital.
+- **It reads before deciding:** all 90 card decisions opened the map, groups or paper first.
+- **A leak was found and fixed:** a dropped card line reached a staff memo.
+- **Adviser fidelity 6/9:** Del Cecato 6/6, Hyers on Weiner 0/3.
+
+**Run 2, after the fixes, N = 3** (`9054c39`):
+- card 18/18, nochips 18/18, masked 15/18, recall 15/18, changed followed 9/18.
+- All 27 masked cards were recognised: a famous candidate's platform can't be masked.
+- **At the second ad, memory is wrong and the card is right.** With no card it misremembered the ad (0/3). Given the card, it chose stop-and-frisk every time. That's the clearest case of the card, not memory, producing the real choice.
+
+**Run 3, tuning 1, N = 3** (`87c97f8`):
+- Tuning 1 tells the campaigner the facts it's given are this campaign's facts, even where they differ from memory.
+- card 17/18, masked 13/18, changed followed 10/18, which is within noise. Tuning 1 made no clear difference.
+
+**Run 4, the new headline with twins and controls, N = 3** (`75662fe`):
+
+| Grounding score | Result |
+|---|---|
+| Changed facts followed (moved off the 2013 choice) | **26/36 (72%)**: 11/18 on the first versions, 15/18 on the second |
+| Control: same facts reworded, kept the card's choice | **17/18 (94%)** |
+| Where memory was wrong, the card got the real choice | **2/2** (both at the second ad) |
+| Twins the probe didn't recognise | 0 of 18 (the probe was leading; neutral from run 5) |
+
+Plain agreement in run 4: card 16/18, nochips 15/18, masked 14/18, reworded 17/18, recall 16/18, twin 13/18. Adviser fidelity 6/9.
+
+- **The agent follows the facts, not the wording.** Changed facts moved it 72% of the time; rewording alone left it 94% of the time. That's the strongest grounding result so far.
+- **Where memory and the card disagree, the card wins:** 2/2 at the second ad. At budget it went the other way: memory knew the real choice (3/3), and the card mostly didn't take it (1/3).
+
+**Run 5, masked and twin cards with a neutral probe, N = 3** (`b69da82`):
+- The probe no longer says names were replaced; it only asks whether the decision comes from a real election.
+- masked 14/18 on the real choice, twin 12/18. **Recognised as the real race: 18/18 masked, 18/18 twin.**
+- **Nothing hides this race.** The model named the 2013 New York primary on every masked card and every twin, mapping each invented person to the real one ("Ellen Marsh is Christine Quinn").
+- So the twins can't give the clean score they were built for. The grounding evidence has to come from changed facts against their control, and from the decisions where memory is wrong.
+- **Recognising the race doesn't make the agent replay it.** At Weiner, the agent left the 2013 choice in five of six twin runs (runs 4 and 5), though the probe recognised every twin.
+
+**Run 6, tuning 2, N = 3** (`96fcf73`):
+- Tuning 2: the agent's reason must name the facts it rests on and the one fact that would most change its mind.
+- Changed facts followed 25/36 (69%), control 16/18 (89%), memory wrong and card right 3/3. **No difference**, like tuning 1.
+- **The hospital kept 2013 on all six changed cards, and the reasons showed why: the chips.** "C is the only option expected to raise my poll standing." The changed cards rewrote the facts but kept the chips set for the real situation. From run 7, changed and reworded cards have no chips.
+
+**Run 7, changed and reworded cards without chips, N = 3** (`05c3057`). This is the headline:
+
+| Grounding score | Result |
+|---|---|
+| Changed facts followed | **28/36 (78%)** |
+| Of the runs where the same decision's card (no chips) chose 2013, changed facts moved it | **22/30 (73%)** |
+| Control kept its choice | **17/18 (94%)** |
+| Where memory was wrong, the card got the real choice | **3/3** (all at the second ad) |
+
+| Decision | nochips | reworded | changed (stuck) | recall |
+|---|---|---|---|---|
+| positioning | 3/3 | 3/3 | 0/6 | 3/3 |
+| weiner | 3/3 | 3/3 | 3/6 | 3/3 |
+| hospital | 3/3 | 3/3 | 5/6 | 3/3 |
+| budget | 0/3 | 0/3 | 0/6 | 3/3 |
+| firstad | 3/3 | 3/3 | 0/6 | 3/3 |
+| base | 3/3 | 3/3 | 0/6 | 0/3 |
+
+- **Without the chips, it follows changed facts every time at four of six decisions**, positioning included.
+- **Weiner's first changed card and the hospital still hold.** At the hospital it calls it "a hospital closing in my own borough": the changed card names no borough, so that part is memory.
+- **At budget the card never takes the real choice** (0/3 without chips), while memory always knows it (3/3). That's the plainest case of the agent not reading its answer from memory.
+
+**Held out, run once, frozen** (`89b03fe`, N = 3): card 23/33 (70%), recall 22/33 (67%), memory wrong and card right 2/11. Full table in `docs/evals.md` and `web/eval/runs/heldout-2026-11-15T12-10-54.md`.
+
+**Free run 1, the whole system** (`b28d704`, before the memo-leak fix and tuning 1):
+- The campaigner held 32 weekly meetings and gave 64 orders. The staff carried out 294 jobs and the rivals made 46 moves.
+- It made **6 of 6 real choices** (break, hold, arrest, all on TV, family, frisk).
+- De Blasio finished at 42.4 with no runoff (certified: 40.81). That's context, not the score.
+- **Its orders read like this campaign's:** small-donor fundraising for matching funds, earned media on the pre-K tax and paid sick leave "framing the race as a tale of two cities", and organising with union locals and Black churches.
+- **The staff work pushed de Blasio 1.6 points past the certified result.** The engine was fitted with a fixed weekly routine, and 64 live orders do more. That's a finding for the engine fit (#35).
+
+### Decisions log (all 14–15 Nov)
+- Score agreement with real choices, not vote share.
+- No student: every role is an agent, with profiles from verified research, gated by date.
+- Eleven held-out decisions, written before any run.
+- Memory is measured three ways: masked, recall and changed.
+- The campaigner sees what a student sees, plus a no-chips condition.
+- After run 1, the target became grounding, not agreement.
+- Memos skip dropped card lines.
+- After run 3, the headline became changed-vs-reworded, agreement where memory is wrong, and unrecognised twins. Twins and controls were written before any of them ran.
+- Tuning 2 (the reason names its facts) is kept, though it made no measurable difference.
+- After run 6, changed and reworded cards drop the chips: the chips, written for the real situation, contradicted the changed facts.
+- Tuning frozen at `bdd01be`; the held-out set runs once. No final N = 5 replay and no second free run: out of time for the hackathon.
+
+### Limits
+- The model knows this race.
+- The held-out set was written by an agent that knows the outcome.
+- The chips were fitted to the record.
+- Voter groups the case doesn't simulate drift toward their real September figures, which hints at the future a little.
+- Adviser fidelity has only three cases from two people.
+- In the free run, after a different choice, the cards' text still describes 2013.
+
+### How to run (in `web/`, with `ANTHROPIC_API_KEY`, and `LANGSMITH_API_KEY` for tracing)
+```bash
+npm run eval -- replay --n 3
+```
+```bash
+npm run eval -- free --runs 1
+```
+```bash
+npm run eval -- heldout --frozen --n 3
+```
+```bash
+npm run eval -- score eval/runs/<file>.jsonl
+```
+Options: `--cond card,nochips,masked,changed,recall`, `--kinds case,adviser`, `--only weiner,base`, `--concurrency 4`, `--dry` (rules only, no key needed).
 
 ---
 
@@ -547,7 +796,7 @@ npm run dev
 | `ANTHROPIC_API_KEY` | Staff, rivals, planks, memos; the paper's fallback |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | The paper (default `gemini-3.8-flash`) |
 | `SPECTRUM_PROJECT_ID`, `SPECTRUM_PROJECT_SECRET`, `SPECTRUM_IMESSAGE_LINE` | iMessage texts (local only for now) |
-| `LANGSMITH_API_KEY` | Tracing the evals |
+| `LANGSMITH_API_KEY` | Tracing the evals (on `feat/evals`; not in `.env.example` on `main`) |
 
 **For a demo, use a production build:** `npm run build && npm run start`. It serves on port 3000, faster and with no dev overlay.
 
@@ -569,7 +818,7 @@ In development, the browser console has `window.caseStore` and `window.game`.
 | [`docs/plans/demo-polish.md`](docs/plans/demo-polish.md) | The demo-polish plan: poll chart, "What changed", War room rings, election-night bars, save and resume, demo start, reset. Built |
 | [`docs/ui-text-pass.md`](docs/ui-text-pass.md) | The UI text pass: short versions with "Read more", type sizes |
 | [`docs/AGENT_COORDINATION.md`](docs/AGENT_COORDINATION.md) | How the agents coordinate through GitHub issues and the board (#32) |
-| `docs/evals.md` | The full evals report, summarised in §9 |
+| [`docs/evals.md`](docs/evals.md) | The full evals report, summarised in §9 |
 
 ---
 
