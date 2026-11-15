@@ -27,11 +27,11 @@ const staffer = (id: string) => useGame.getState().staff.find((p) => p.id === id
 /** How a post signs a text: a post held by a real person in the record signs as the post, never as that person. */
 const signature = (p: Staff | undefined) => (!p ? "Your campaign" : p.onRecord || !p.name || p.name === p.role ? `The ${p.role}` : `${p.name}, ${p.role}`);
 
-async function post(text: string) {
+async function post(text: string, thread = false) {
   const { phone, enabled } = usePhone.getState();
   if (!phone || !enabled) return false;
   try {
-    const res = await fetch("/api/photon/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: phone, text }) });
+    const res = await fetch("/api/photon/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: phone, text, thread }) });
     const out = (await res.json()) as { ok: boolean; error?: string };
     usePhone.setState({ error: out.ok ? null : out.error ?? "The text did not go out" });
     return out.ok;
@@ -68,14 +68,14 @@ function handle(text: string) {
   const { pending } = usePhone.getState();
   const who = pending?.who ?? "cm";
   const p = staffer(who);
-  if (!p?.name) { void post("That post is empty right now. Hire someone in the War room first."); return; }
+  if (!p?.name) { void post("That post is empty right now. Hire someone in the War room first.", true); return; }
   if (pending?.ask !== undefined && YES.test(text)) {
     answerAsk(who, pending.ask, true);
     usePhone.setState({ pending: null, awaiting: { ...usePhone.getState().awaiting, [who]: (useStaff.getState().chat[who] ?? []).length } });
     return;
   }
   const order = YES.test(text) && pending?.order ? pending.order : text;
-  if (useStaff.getState().active[who]) { void post(`${signature(p)}: I'm still on the last job. I'll text you the report.`); return; }
+  if (useStaff.getState().active[who]) { void post(`${signature(p)}: I'm still on the last job. I'll text you the report.`, true); return; }
   usePhone.setState({ pending: null, awaiting: { ...usePhone.getState().awaiting, [who]: (useStaff.getState().chat[who] ?? []).length } });
   void instruct(who, order);
 }
@@ -116,7 +116,8 @@ export function watchPhone() {
       const money = r.spent || r.raised ? `\n\nSpent $${r.spent.toLocaleString("en-US")}${r.raised ? `, raised $${r.raised.toLocaleString("en-US")}` : ""}.` : "";
       const ask = r.ask && r.state === "open" ? `\n\nI could use another $${r.ask.amount.toLocaleString("en-US")} ${r.ask.reason}. Reply YES to approve.` : "\n\nReply with the next order.";
       usePhone.setState({ awaiting: rest, pending: r.ask && r.state === "open" ? { who, ask: i } : { who } });
-      void post(`${signature(staffer(who))}: ${r.text}${money}${ask}`);
+      // A threaded reply to the order they texted, which also ends the typing bubble.
+      void post(`${signature(staffer(who))}: ${r.text}${money}${ask}`, true);
     }
   });
   return () => { clearInterval(poll); off(); started = false; };

@@ -4,8 +4,8 @@
 // ponytail: the inbox lives in this process. On serverless hosting (Vercel) replies need Photon webhooks and shared
 // storage; texts out still work.
 
-type Space = { send: (text: string) => Promise<unknown> };
-type Inbound = { direction: string; id: string; sender?: { id: string }; content: { type: string; text?: string } };
+type Space = { send: (text: string) => Promise<unknown>; startTyping?: () => Promise<void>; stopTyping?: () => Promise<void> };
+type Inbound = { direction: string; id: string; sender?: { id: string }; content: { type: string; text?: string }; react?: (emoji: string) => Promise<unknown>; reply?: (text: string) => Promise<unknown> };
 type App = { messages: AsyncIterable<[Space, Inbound]>; stop: () => Promise<void> };
 type IMessage = { user: (id: string) => Promise<unknown>; space: { create: (user: unknown) => Promise<Space> } };
 export type Reply = { id: string; from: string; text: string; at: number };
@@ -16,7 +16,8 @@ export const photonReady = () => !!(process.env.SPECTRUM_PROJECT_ID && process.e
 /** A phone number as the last ten digits, so "+1 (555) 111-2222" and "any;-;+15551112222" match. */
 export const sameNumber = (a: string, b: string) => a.replace(/\D/g, "").slice(-10) === b.replace(/\D/g, "").slice(-10);
 
-type State = { app: Promise<App>; inbox: Reply[]; spaces: Map<string, Space> };
+/** `last`: each number's latest message, so the answer can come back as a threaded reply to it. */
+type State = { app: Promise<App>; inbox: Reply[]; spaces: Map<string, Space>; last: Map<string, Inbound> };
 const g = globalThis as unknown as { __photon?: State; __photonFailed?: number };
 
 function state(): State {
@@ -25,10 +26,11 @@ function state(): State {
   if (g.__photonFailed && Date.now() - g.__photonFailed < 30_000) {
     const failed = Promise.reject(new Error("Photon is not connected; trying again shortly"));
     failed.catch(() => {});
-    return { app: failed, inbox: [], spaces: new Map() };
+    return { app: failed, inbox: [], spaces: new Map(), last: new Map() };
   }
   const inbox: Reply[] = [];
   const spaces = new Map<string, Space>();
+  const last = new Map<string, Inbound>();
   const app = (async () => {
     const { Spectrum } = await import("@spectrum-ts/core");
     const { imessage } = await import("@spectrum-ts/imessage");
@@ -38,9 +40,14 @@ function state(): State {
       for await (const [space, m] of a.messages) {
         if (m.direction !== "inbound" || m.content.type !== "text" || !m.content.text?.trim()) continue;
         const from = m.sender?.id ?? "";
-        spaces.set(from.replace(/\D/g, "").slice(-10), space);
+        const key = from.replace(/\D/g, "").slice(-10);
+        spaces.set(key, space);
+        last.set(key, m);
         inbox.push({ id: m.id, from, text: m.content.text.trim(), at: Date.now() });
         if (inbox.length > 300) inbox.shift();
+        // Like a person would: a tapback that the order landed, then typing while the staff work on it.
+        void m.react?.("👍").catch(() => {});
+        void space.startTyping?.().catch(() => {});
       }
     })().catch((err) => {
       console.error("[photon] the message stream ended:", err);
@@ -55,14 +62,24 @@ function state(): State {
     g.__photon = undefined;
     g.__photonFailed = Date.now();
   });
-  return (g.__photon = { app, inbox, spaces });
+  return (g.__photon = { app, inbox, spaces, last });
 }
 
-/** Text `to` (E.164) from the staff's line. Reuses the conversation once it exists. */
-export async function sendText(to: string, text: string) {
+/**
+ * Text `to` (E.164) from the staff's line. Reuses the conversation once it exists. `thread`: answer the student's
+ * latest message as a threaded reply (the report on an order they gave by text), which also ends the typing.
+ */
+export async function sendText(to: string, text: string, thread = false) {
   const s = state();
   const app = await s.app;
   const key = to.replace(/\D/g, "").slice(-10);
+  const prior = s.last.get(key);
+  if (thread && prior?.reply) {
+    await s.spaces.get(key)?.stopTyping?.().catch(() => {});
+    await prior.reply(text);
+    s.last.delete(key);
+    return;
+  }
   let space = s.spaces.get(key);
   if (!space) {
     const { imessage } = await import("@spectrum-ts/imessage");
