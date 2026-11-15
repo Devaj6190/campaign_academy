@@ -12,7 +12,7 @@ import { isDropped } from "./conditions";
 import { instruct, snapshot } from "../staff/run";
 import { useStaff } from "../staff/store";
 import { PLACES } from "../staff/world";
-import { decideLive, decideRules, EVAL_MODEL, optionLines, system, type Trace } from "./decider";
+import { decideLive, decideRules, EVAL_MODEL, GROUNDED, optionLines, system, type Trace } from "./decider";
 import { factsBefore, PEOPLE } from "./people";
 import { caseCard, type Rec } from "./replay";
 
@@ -85,6 +85,7 @@ What you know about yourself:
 ${factsBefore(me, today).map((f) => `- ${f.text}`).join("\n")}
 
 Today is ${today}. You know only what you are told here and what you knew as of today. Nothing after today has happened.
+${GROUNDED}
 It is your weekly meeting with your directors. Read what you need, then give up to ${max} orders with the order tool, or none if nothing is worth the money. Run the campaign as you would.`,
   });
   await agent.invoke({ messages: [{ role: "user", content: t.body }] }, { recursionLimit: 30, runName: `eval:week:${today}`, tags: trace.tags, metadata: { ...trace.metadata, date: today } });

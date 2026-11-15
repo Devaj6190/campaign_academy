@@ -26,6 +26,16 @@ export function summarise(all: (Rec | FinalRec)[]): string {
     const conds = [...new Set(rs.map((r) => r.cond))];
     const decisions = [...new Set(rs.map((r) => r.decision))];
     out.push(`\n### ${TITLE[kind]}\n`);
+    // The grounding scores come first: they are the ones that matter (docs/evals.md, section 3).
+    const unrec = line(rs.filter((r) => r.cond === "masked" && r.recognised === false));
+    const rec = line(rs.filter((r) => r.cond === "masked" && r.recognised === true));
+    const ch = line(rs.filter((r) => r.cond === "changed"));
+    if (unrec.scored + rec.scored || ch.scored) {
+      out.push("Grounding:");
+      if (unrec.scored + rec.scored) out.push(`- Masked cards not recognised: ${unrec.scored} of ${unrec.scored + rec.scored}; on those, ${unrec.real}/${unrec.scored} on the real choice (${pct(unrec.real, unrec.scored)}). On recognised ones: ${rec.real}/${rec.scored}.`);
+      if (ch.scored) out.push(`- Changed facts followed (moved off the 2013 choice): ${ch.scored - ch.real}/${ch.scored} (${pct(ch.scored - ch.real, ch.scored)}).`);
+      out.push("");
+    }
     out.push(`| Condition | On the real choice | Chance | No answer |`, `|---|---|---|---|`);
     for (const cond of conds) {
       const l = line(rs.filter((r) => r.cond === cond));

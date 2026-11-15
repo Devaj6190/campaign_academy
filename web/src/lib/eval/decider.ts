@@ -34,11 +34,18 @@ const json = <T>(raw: string): T | null => { try { return JSON.parse(raw.slice(r
 export const optionLines = (c: Card, chips = true) =>
   c.options.map((o) => `${o.key}. ${o.label}. ${o.detail}${o.cost ? ` Costs $${o.cost.toLocaleString("en-US")}.` : ""}${chips && (o.up || o.down) ? ` Likely up: ${o.up?.join(", ") || "nothing"}. Likely down: ${o.down?.join(", ") || "nothing"}.` : ""}`).join("\n");
 
+/**
+ * Tuning 1 (after run 1): the agent kept the 2013 choice at three of six changed-facts cards and argued from what it
+ * remembered, not from the card. This tells it the card's facts are the facts. It names no option and no outcome.
+ */
+export const GROUNDED = "The facts you are given are the facts of this campaign, even where they differ from anything you think you remember about a real election. This campaign has not happened yet and need not go the way any real one went. Argue only from what is in front of you.";
+
 export function system(c: Card) {
   const verb = c.ask === "decide" ? "The decision is yours. Decide as you would" : "The candidate has asked where you stand. Say which option you would argue for, as you would";
   return `You are ${c.person.name}, ${c.person.role}.
 ${c.person.facts.length ? `What you know about yourself:\n${c.person.facts.map((f) => `- ${f}`).join("\n")}\n` : ""}
 Today is ${c.today}. You know only what you are told here and what you knew as of today. Nothing after today has happened.
+${GROUNDED}
 ${verb}: from who you are, what you know, and the situation below, not from what a textbook says is right.
 Read what you need first: read_map (support by district), read_voter_groups (support and size by group) and read_paper (what the press has reported). Then call decide exactly once.`;
 }
