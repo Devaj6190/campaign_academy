@@ -116,7 +116,7 @@ The honest summary: the agents are grounded in the evidence they are given, but 
 
 Devank wrote to about 60 political science professors and students while we built it. *(TODO: how many replied, and how many tried it.)*
 
-**Prof. Samuel S.-H. Wang, Princeton University,** replied with two points to be careful about:
+**A Princeton professor** replied with two points to be careful about:
 
 - **Paid media is the big unknown.** How effective advertising is remains uncertain, and issue positions may matter less than people expect.
 - **Budgeting matters,** because different kinds of campaign material cost different amounts.
@@ -151,13 +151,19 @@ Every live staff member is a LangChain **deep agent** (`deepagents` 1.16.5):
 
 The War room's **Thinking** panel streams the agents' reasoning and hand-offs as they happen. We say plainly what isn't built: the staff director doesn't have `write_todos` yet, there is no checkpointer, and staff traces aren't flushed on Vercel. The full account, with every limit we found, is in [README §5b](README.md#5b-how-the-agents-work-langchain-deep-agents-in-depth).
 
-### Amazon
+### Amazon: Best Practical AI Innovation
 
-> **TODO (Devaj):** how it's practical. Not drafted yet.
+An AI-powered tool a political science student would use every week of a course, built around the track's focus areas:
 
-### Perry
+- **Agentic behavior.** Staff directors are deep agents that plan an order, split it into jobs, hand them to subagents and act through tools, over many steps (Figure 3). Rival campaigns plan and act on their own.
+- **Real-world impact.** Students learn campaigns from readings written after the result. Here they make the calls on a real race, with every fact cited, and compare themselves with what really happened.
+- **Adaptive intelligence.** Each director keeps a memory of what worked in this campaign and comes back with follow-ups. Staff speak up when money runs low, a voter group slips or a rival moves. Every order is graded on how well it was delegated.
+- **User-friendly design.** Orders are plain language; the agents' reasoning is shown live; every number says whether it is real or simulated.
+- **Reliable.** Every live part has a rules fallback, so the tool runs even with no API key, and an automated check keeps the simulation on the real result.
 
-> **TODO (Devaj):** to come.
+### Peri: Forward Deployed Challenge
+
+> **Draft, needs a decision.** This track asks for a real business or student organization we consulted during the hackathon, with the name and role of the person consulted and one piece of evidence. The professor's feedback is our strongest evidence, but this track needs names, so it can't stay anonymous here. Options: name the professor and department with their permission, or name a student organization or class that tried the tool.
 
 ### Gemini (MLH Best Use of Gemini API)
 
