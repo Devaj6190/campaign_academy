@@ -28,6 +28,8 @@ export type Snapshot = {
   /** The candidate's calendar: appearances booked and not yet done, and the most he can do in a day. */
   booked: { date: string; label: string }[];
   daily: number;
+  /** The weekly spending plan the student set: what runs every week without an order (lib/cases/allocation). */
+  plan: string[];
   manifesto: string[];
   /** Profiles for people hired during the game (seed staff use roster.ts). */
   hires: Record<string, Profile>;
@@ -111,8 +113,9 @@ export function describeWorld(w: Snapshot) {
   const factions = w.factions.map((f) => `${f.id} (${f.name}): ${Math.round(f.feel)}% support ${w.candidate}; ${f.size}% of likely voters`).join("\n");
   const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 0) - (w.sent[b.cd] ?? 0));
   const line = (p: (typeof PLACES)[number]) => `${p.cd} ${p.name} (${p.boro}): support ${Math.round(w.sent[p.cd] ?? 0)}%`;
-  return `Today is ${w.date}; ${w.daysLeft} days to the primary. Left to spend under the cap: ${usd(w.cash)}. Poll: ${poll}.
-The candidate's calendar (he can do ${w.daily} things a day): ${w.booked.length ? w.booked.map((b) => `${b.date} ${b.label}`).join("; ") : "nothing booked"}.
+  return `Today is ${w.date}; ${w.daysLeft} days to the primary. The whole campaign has ${usd(w.cash)} left to spend under the cap (every order draws on it). Poll: ${poll}.
+The student's weekly spending plan, which runs by itself every week on top of any order: ${w.plan.length ? w.plan.join("; ") : "nothing"}.
+The candidate's calendar (he can do ${w.daily} things a day, and each call-time session uses one): ${w.booked.length ? w.booked.map((b) => `${b.date} ${b.label}`).join("; ") : "nothing booked"}.
 Platform: ${w.manifesto.map((m, i) => `${i + 1}. ${m}`).join(" ")}
 Voter groups (use the id). They overlap: one voter is in several.
 ${factions}

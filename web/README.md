@@ -9,6 +9,8 @@ npm run dev
 
 The staff, the rivals and plank shaping are live agents (`deepagents`, `@langchain/anthropic`). They need `ANTHROPIC_API_KEY` in `web/.env.local` (copy `web/.env.example`). Without a key every agent route falls back to a rules version, and the War room says so.
 
+The morning paper is written by Gemini (`@google/genai`, model `gemini-3.8-flash`, or `GEMINI_MODEL`) when `GEMINI_API_KEY` is set. That covers the newsroom's simulated stories and letters (`lib/paper/newsroom.ts`) and the three ways to answer the lead story (`lib/paper/stancesLive.ts`), both through `lib/paper/model.ts`. If Gemini is missing or fails, Claude writes the paper; with neither key, the template and the rules stand. The same number check (`honest()`) applies whoever writes it, and the paper says under its masthead which model wrote that morning's stories. Everything else stays on Claude.
+
 ## How it fits together
 
 ```
@@ -31,13 +33,14 @@ work layer ────────────────┘    (worldNow, use
 |---|---|
 | Case data and rules | `lib/cases/types.ts`, `mayor2013.ts`, `index.ts`, `platform.ts` |
 | Live state | `lib/cases/store.ts` (world, work layer), `lib/cases/clock.ts` |
+| Weekly spending plan | `lib/cases/allocation.ts` (the lines and what each buys), `lib/sim/spend.ts` (spends it), `components/Plan.tsx` (the sliders in the top bar's Spending and Income panels) |
 | Voter groups | `lib/cases/mayor2013-factions.ts` (22 groups, real poll numbers), `mayor2013-leanings.ts` and `mayor2013-links.ts` (inferred, see below) |
 | Staff agents | `lib/staff/agents.ts` (the agents), `run.ts` (snapshot of the case, landing a job, candidate appearances), `offline.ts` (rules fallback), `speak.ts` (unprompted remarks), `roster.ts`, `protocol.ts`, `world.ts` |
 | What an action does | `lib/engine/catalog.ts` (the actions), `lib/engine/resolve.ts` (cost and effect of one action) |
 | Rivals | `lib/cases/rivals.ts` (when they plan, how a move lands), `lib/engine/rivalAgent.ts` (the agent and its rules fallback) |
 | Platform planks | `lib/manifesto/` (shape, rules, run), `components/PlankDesk.tsx` |
 | Election night | `lib/cases/night.ts`, `lib/cases/mayor2013-ad.json` (certified result by Assembly District) |
-| API routes | `app/api/staff/instruct`, `staff/candidates`, `staff/speak`, `rivals/plan`, `manifesto/shape` |
+| API routes | `app/api/staff/instruct`, `staff/memo`, `staff/candidates`, `staff/speak`, `rivals/plan`, `manifesto/shape`, `paper/write`, `paper/stances`, `photon/send`, `photon/inbox`, `photon/join`, `photon/status`, `status` |
 | Screens | `views/CaseView.tsx`, `Profile.tsx`, `WarRoom.tsx`, `MapView.tsx`, `VoterGroups.tsx` (the Factions tab) |
 | Shell | `app/page.tsx`, `components/TopBar.tsx`, `Sidebar.tsx`, `Paper.tsx`, `Toasts.tsx` |
 | Map data | `lib/nyc.json` (real NYC Open Data; refresh with `node scripts/build-data.mjs`), `lib/geo.ts` |
@@ -67,17 +70,22 @@ Each is a first guess, in one place.
 | Length of a day; speeds | `DAY_MS`, `SPEEDS` in `lib/cases/clock.ts` | 2 seconds; 1, 2, 5 |
 | Poll points a rival's move must cost you before the top bar's poll strip glows | `RIVAL_HIT` in `components/TopBar.tsx` | 0.1 |
 | Days between polls in the morning paper | `POLL_EVERY` in `lib/paper/edition.ts` | 7 |
-| Days between unprompted staff remarks | `GAP`, `REPEAT` in `lib/staff/speak.ts` | 8, 30 |
+| How much of a group's gain from plan work spills into linked groups (lost with opposed ones) | `SPILL` in `lib/cases/allocation.ts` | 0.25 |
+| How much less a donor pool gives for each time the plan asked it in the last four weeks | `FATIGUE` in `lib/cases/allocation.ts` | 0.2, compounding |
+| Most of each plan line a week; call time is capped by the candidate's day | `max` on each of `LINES` in `lib/cases/allocation.ts` | 2 to 8 |
+| Days between unprompted staff remarks; before the same worry repeats | `GAP`, `REPEAT` in `lib/staff/speak.ts` | 3, 14 |
 
-Money the staff raise pays for staff work but never lifts the campaign above the spending cap (`staffMoney` in `lib/cases/store.ts`).
+Money the staff raise pays for staff work but never lifts the campaign above the spending cap (`staffMoney` in `lib/cases/store.ts`). The top bar lists what was raised beyond that as "Raised over the cap, not spendable".
 
-The case's own shifts are fitted together with the rivals (rules mode) and a typical staff plan (`TYPICAL_STAFF` in `lib/sim/headless.ts`), so the record does not count twice what the rival campaigns and staff do. `npm run check:engine` plays the whole campaign without the browser and fails unless the real campaign's six choices, with that staff plan and the rivals acting, land within two points of the certified result for every candidate with no runoff, and the same inputs give the same world. Today every candidate lands within 0.2 points. After changing anything that sets what rival moves or staff work are worth, or the case's own shifts, run `npm run refit:case` (it rewrites the `since` and `close` shifts in the case file) and then the check. The record alone now finishes de Blasio on 39.5 and a runoff, with the rivals and no staff work on 37.1, and with staff and no rivals on 43.1: the student has to work, and the rivals push back.
+**The weekly plan (#33).** The sliders in the top bar's Spending and Income panels set how many of eight actions the campaign buys each week (doors, rallies, press, mail, digital ads; call time, small donors, donor dinners) and where each is aimed. Every seventh day the clock spends the plan through `resolve()` and `apply()`, the same path a staff job takes, so it moves districts, voter groups and the poll, shows in the ledger line by line, and is read by the rivals, the paper and the staff agents. Plan work also spills into the voter groups linked in `mayor2013-links.ts`, donor pools asked every week give less, and each call-time session uses one of the candidate's appearances that day. A new campaign starts on `DEFAULT_ALLOCATION`, which is the typical staff plan, so a student who never touches the sliders plays the fitted race.
+
+The case's own shifts are fitted together with the rivals (rules mode) and a typical staff plan (`TYPICAL_STAFF` in `lib/sim/headless.ts`, which is the default weekly plan), so the record does not count twice what the rival campaigns and staff do. `npm run check:engine` plays the whole campaign without the browser and fails unless the real campaign's six choices, with that staff plan and the rivals acting, land within two points of the certified result for every candidate with no runoff, and the same inputs give the same world. Today every candidate lands within 0.2 points. The check also fails if four Bronx canvasses a week do not move the Bronx, or donor dinners do not cool liberal voters. After changing anything that sets what rival moves or staff work are worth, or the case's own shifts, run `npm run refit:case` (it rewrites the `since` and `close` shifts in the case file) and then the check. The record alone now finishes de Blasio on 39.5 and a runoff, with the rivals and no staff work on 37.1, and with staff and no rivals on 43.1: the student has to work, and the rivals push back.
 
 ## The first version
 
 The first version simulated a fictional race. Its code is no longer in the tree. It can be read at the tag `first-version-code` (`git show first-version-code:web/src/lib/relations.ts`, for example).
 
-One of its features is still to be rebuilt on the case: standing budgets the student can allocate (#33). The links between voter groups are rebuilt as lines on the Factions screen (#34), without the first version's knock-on effects. Its map filter by voter group is already rebuilt (`views/MapView.tsx`, for the groups the census can place). Its calendar, tactics and debates were dropped.
+Its standing budgets are rebuilt on the case as the weekly plan (#33, above). The links between voter groups are rebuilt as lines on the Factions screen (#34); work bought by the weekly plan spills along them, and staff orders do not yet. Its map filter by voter group is already rebuilt (`views/MapView.tsx`, for the groups the census can place). Its calendar, tactics and debates were dropped.
 
 Three of Devank's branches that were built on the first version's engine are kept the same way, as the tags `archive/feat-combined`, `archive/feat-money` and `archive/feat-newspaper`.
 

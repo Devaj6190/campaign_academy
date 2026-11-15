@@ -7,6 +7,8 @@
 // - `share`: the group's share of the September poll's likely voters, in percent. It sets the bubble size.
 // `tracks` names the case's own voter group where the case already simulates this group decision by decision.
 
+import { DISTRICTS, type Demo } from "../geo";
+
 export type Faction = { id: string; name: string; kind: "Race" | "Borough" | "Ideology" | "Religion" | "Age" | "Gender" | "Income" | "Education" | "Labor"; feb: number; sep: number; share: number; tracks?: string };
 
 export const FACTION_POLLS = {
@@ -55,3 +57,26 @@ export function factionSupport(f: Faction, citywideNow: number, citywideStart: n
  */
 export const factionNow = (f: Faction, groups: Record<string, number>, citywideNow: number, citywideStart: number, work: Record<string, number> = {}): number =>
   f.tracks ? (groups[f.tracks] ?? 0) : Math.max(0, Math.min(100, factionSupport(f, citywideNow, citywideStart) + (work[f.id] ?? 0)));
+
+const RACE: Record<string, "white" | "black" | "hispanic"> = { white: "white", black: "black", latino: "hispanic" };
+const BORO: Record<string, string[]> = { brooklyn: ["Brooklyn"], manhattan: ["Manhattan"], "queens-si": ["Queens", "Staten Island"], bronx: ["Bronx"] };
+// ponytail: income and age place a faction by each district's median, a rough stand-in for where its members live.
+const ROUGH: Record<string, (d: Demo) => number> = { "income-low": (d) => -d.income, "income-high": (d) => d.income, older: (d) => d.age, younger: (d) => -d.age };
+
+/**
+ * Where a faction lives: each community district from 0 (fewest of them) to 1 (most), or null where nothing in the
+ * district data places it (ideology, religion, gender, education, union). Real: census shares and borough lines;
+ * `rough` when it is read off the district's median income or age.
+ */
+export function whereFaction(id: string): { at: Record<number, number>; rough: boolean } | null {
+  const boro = BORO[id], race = RACE[id], rough = ROUGH[id];
+  if (!boro && !race && !rough) return null;
+  const ds = DISTRICTS.filter((d) => !d.park && d.demo);
+  const raw = ds.map((d) => (boro ? +boro.includes(d.boro) : race ? d.demo!.race[race] : rough(d.demo!)));
+  const lo = Math.min(...raw), hi = Math.max(...raw);
+  return { at: Object.fromEntries(ds.map((d, i) => [d.cd, (raw[i] - lo) / (hi - lo || 1)])), rough: !!rough };
+}
+
+/** The map filter that brightens where one faction lives, and the faction a filter names. */
+export const factionFilter = (id: string) => `faction:${id}`;
+export const factionOf = (filter: string) => (filter.startsWith("faction:") ? (FACTIONS_2013.find((f) => `faction:${f.id}` === filter) ?? null) : null);

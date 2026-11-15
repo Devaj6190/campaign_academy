@@ -1,12 +1,13 @@
 "use client";
 
-import { Check, ChevronRight, Clapperboard, MoreHorizontal, Newspaper, Plus, RotateCcw } from "lucide-react";
+import { Check, ChevronRight, Clapperboard, MoreHorizontal, Newspaper, Plus, RotateCcw, Smartphone } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { currentCase, useCase } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
 import { useTasks } from "@/lib/tasks";
 import { cn } from "@/lib/util";
 import { usePaper } from "./Paper";
+import { cancelLink, linkPhone, unlinkPhone, usePhone } from "@/lib/photon/client";
 import { loadDemo, resetAll } from "@/lib/save";
 import { Dialog, Label } from "./ui";
 
@@ -121,6 +122,7 @@ const ASK = {
 function DeskMenu() {
   const [open, setOpen] = useState(false);
   const [ask, setAsk] = useState<keyof typeof ASK | null>(null);
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const started = useCase((s) => s.at > 0 || s.work.length > 0);
   const choose = (k: keyof typeof ASK) => {
     setOpen(false);
@@ -145,9 +147,11 @@ function DeskMenu() {
           <div role="menu" className="panel absolute top-7 right-0 z-50 w-[200px] rounded-lg border border-line-strong p-1 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.9)]">
             <button role="menuitem" className={item} onClick={() => choose("demo")}><Clapperboard />Load demo start</button>
             <button role="menuitem" className={item} onClick={() => choose("reset")}><RotateCcw />Reset campaign</button>
+            <button role="menuitem" className={item} onClick={() => { setOpen(false); setPhoneOpen(true); }}><Smartphone />Texts on my phone</button>
           </div>
         </>
       )}
+      <PhoneDialog open={phoneOpen} close={() => setPhoneOpen(false)} />
       <Dialog open={!!ask} onClose={() => setAsk(null)} className="max-w-[420px]">
         {ask && (
           <div className="p-6">
@@ -161,5 +165,53 @@ function DeskMenu() {
         )}
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * Link the student's phone (#53, Photon). Photon's free lines are inbound-first: the student texts the line a short
+ * code from their phone, and that phone is linked. Then the staff text their remarks and reports there, and a reply
+ * by text is an order. The handle stays in this browser.
+ */
+function PhoneDialog({ open, close }: { open: boolean; close: () => void }) {
+  const { phone, enabled, line, code, error } = usePhone();
+  const [note, setNote] = useState<string | null>(null);
+  const shown = line?.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "+1 ($1) $2-$3") ?? line;
+  const link = async () => {
+    setNote(null);
+    const err = await linkPhone();
+    setNote(err ?? "Linked. Check your phone.");
+  };
+  return (
+    <Dialog open={open} onClose={() => { cancelLink(); close(); }} className="max-w-[460px]">
+      {open && (
+        <div className="p-6">
+          <h2 className="font-display text-[20px] text-gold-bright">Texts on my phone</h2>
+          <p className="mt-2 text-[13px] leading-relaxed text-soft">
+            Your staff text you by iMessage, through Photon, when something needs your call. Reply YES to take their suggestion, or reply with your own order. The report comes back by text.
+          </p>
+          {enabled === false ? (
+            <p className="mt-4 text-[13px] text-warm">Texting is not set up on this server (no Photon keys).</p>
+          ) : code ? (
+            <div className="mt-5 rounded-xl border border-gold/40 bg-gold/[0.06] p-4 text-center">
+              <div className="text-[12px] text-muted">From your phone, text</div>
+              <div className="mt-1 font-mono text-[26px] tracking-wider text-gold-bright">{code}</div>
+              <div className="mt-1 text-[12px] text-muted">to</div>
+              <a href={`sms:${line ?? ""}&body=${encodeURIComponent(code)}`} className="mt-1 block font-mono text-[18px] text-fg hover:text-gold-bright">{shown ?? "your project's iMessage line"}</a>
+              <div className="mt-3 text-[12px] text-faint">Waiting for your text…</div>
+            </div>
+          ) : (
+            <>
+              <p className="mt-4 text-[13px] text-muted">{phone ? `Linked to ${phone}.` : "Not linked yet."}</p>
+              {(note || error) && <p className={cn("mt-2 text-[12.5px]", note?.startsWith("Linked") ? "text-pos" : "text-neg")}>{note ?? error}</p>}
+              <div className="mt-5 flex justify-end gap-2">
+                {phone && <button onClick={() => { unlinkPhone(); setNote(null); }} className="btn-pill h-8 px-4 text-[12px]">Stop texts</button>}
+                <button onClick={link} className="btn-gold h-8 px-4 text-[12px]">{phone ? "Link a different phone" : "Link my phone"}</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </Dialog>
   );
 }

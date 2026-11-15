@@ -7,7 +7,7 @@ import { LEANINGS_2013 } from "../cases/mayor2013-leanings";
 
 export type Stance = { label: string; says: string; helps: string[]; annoys: string[] };
 export type StanceRequest = { story: string; candidate: string; record: string[] };
-export type StanceResult = { stances: Stance[]; mode: "live" | "rules" };
+export type StanceResult = { stances: Stance[]; mode: "live" | "rules"; by?: "gemini" | "claude" };
 
 /** Points the aimed-at group moves come from the engine's rapid response; the others are a share of that. */
 export const STANCE = { helps: 0.5, annoys: 0.6, citywide: 0.5 };

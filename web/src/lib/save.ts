@@ -1,6 +1,8 @@
 import type { StoreApi } from "zustand";
+import { quietly } from "./loading";
 import { useNight } from "./cases/night";
 import { useRivals } from "./cases/rivals";
+import { DEFAULT_ALLOCATION } from "./cases/allocation";
 import { CASES } from "./cases/index";
 import { useCase } from "./cases/store";
 import { usePlanks } from "./manifesto/run";
@@ -24,8 +26,8 @@ export const SAVE_KEY = "campaign-academy:save";
 type Store = StoreApi<any>;
 /** A store and the fields of it that make up the campaign. The case store comes first: see restore(). */
 const SLOTS: { name: string; store: Store; keys: string[] }[] = [
-  { name: "case", store: useCase, keys: ["caseId", "step", "at", "date", "speed", "card", "picks", "work", "bookings"] },
-  { name: "staff", store: useStaff, keys: ["chat", "runs", "job", "feed", "morale", "hires", "mode", "spoken", "followups", "memory", "draft"] },
+  { name: "case", store: useCase, keys: ["caseId", "step", "at", "date", "speed", "card", "picks", "work", "bookings", "allocation"] },
+  { name: "staff", store: useStaff, keys: ["chat", "runs", "job", "feed", "morale", "hires", "spoken", "followups", "memory", "draft"] },
   { name: "game", store: useGame, keys: ["staff", "unread"] },
   { name: "paper", store: usePaper, keys: ["editions", "unread"] },
   { name: "rivals", store: useRivals, keys: ["planned", "memory", "mode"] },
@@ -51,13 +53,16 @@ export function snapshot(): Save {
   return JSON.parse(JSON.stringify({ v: SAVE_VERSION, caseId: useCase.getState().caseId, savedAt: new Date().toISOString(), stores }));
 }
 
+/** Fields added after saves were first written: an older save without them still loads (restore fills them in). */
+const LATER = new Set(["allocation"]);
+
 /** Whether a save can be loaded: this version, a case that exists, and every field the shape the game expects. */
 export function valid(x: unknown): x is Save {
   const s = x as Save;
   if (!s || typeof s !== "object" || s.v !== SAVE_VERSION || !CASES.some((c) => c.id === s.caseId) || !s.stores) return false;
   return SLOTS.every(({ name, store, keys }) => {
     const got = s.stores[name], init = initial(store);
-    return !!got && typeof got === "object" && keys.every((k) => k in got && (init[k] === null || got[k] === null ? true : kind(got[k]) === kind(init[k])));
+    return !!got && typeof got === "object" && keys.every((k) => (k in got ? init[k] === null || got[k] === null || kind(got[k]) === kind(init[k]) : LATER.has(k)));
   });
 }
 
@@ -72,9 +77,14 @@ export function valid(x: unknown): x is Save {
  * - new ids start past the loaded ones.
  */
 export function restore(save: unknown): boolean {
+  return quietly(() => put(save));
+}
+
+function put(save: unknown): boolean {
   if (!valid(save)) return false;
   const st = JSON.parse(JSON.stringify(save.stores)) as Save["stores"];
-  useCase.setState({ ...st.case, running: false });
+  // A save from before the weekly plan existed starts on the default plan, not on whatever was set before loading.
+  useCase.setState({ allocation: structuredClone(DEFAULT_ALLOCATION), ...st.case, running: false });
 
   const staff = st.staff as { chat: Record<string, ChatItem[]>; runs: Record<string, { id: number; status: string }[]>; job: Record<string, string>; feed: { id: number }[] };
   for (const [who, runs] of Object.entries(staff.runs)) {
@@ -87,6 +97,9 @@ export function restore(save: unknown): boolean {
       chat.push({ k: "note", text: "This order was cut off when the page reloaded. Anything reported above was done; nothing else was.", run: r.id });
     }
   }
+  // Whether the agents are live belongs to this server, not to the save (a demo built with no key said "no API key"
+  // on a live server). Older saves carry it; it is dropped, and the app asks the server (lib/save startSaving).
+  delete (st.staff as { mode?: unknown }).mode;
   const memos = st.memos as { byDecision: Record<string, { status: string }> };
   memos.byDecision = Object.fromEntries(Object.entries(memos.byDecision).filter(([, e]) => e.status === "ready"));
 
@@ -105,7 +118,13 @@ export function restore(save: unknown): boolean {
 
 /** Every store back to how a new visitor finds it, and the save cleared. */
 export function resetAll() {
+  quietly(wipe);
+}
+
+function wipe() {
+  const mode = useStaff.getState().mode; // the server's, not the campaign's: it survives a reset
   for (const { store } of SLOTS) store.setState(initial(store));
+  useStaff.setState({ mode });
   useGame.setState({ ...initial(useGame), view: "case" });
   bumpFeed(0);
   bumpEditions(0);
@@ -159,6 +178,8 @@ export function startSaving() {
     started = true;
     const s = readSave();
     if (s && !restore(s)) clearSave();
+    // Live agents or the rules: the War room's label is right from the start, not only after the first order.
+    void fetch("/api/status").then((r) => r.json()).then((x: { live: boolean }) => useStaff.setState({ mode: x.live ? "live" : "offline" })).catch(() => {});
   }
   return watchSave();
 }

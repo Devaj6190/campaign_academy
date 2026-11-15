@@ -1,10 +1,12 @@
 "use client";
 
+import { isLoading } from "../loading";
 import { finished, waiting } from "../cases/clock";
 import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
 import { factionWork, shortMoney, supportIn, useCase, worldNow } from "../cases/store";
 import { useGame } from "../store";
 import { profileFor } from "./roster";
+import { runway } from "../sim/spend";
 import { comeBack, dueFollowUps, feed } from "./run";
 import { pushChat, useStaff } from "./store";
 import { BOROS, PLACES, short, shortPlace } from "./world";
@@ -57,6 +59,13 @@ function triggers(day: number): Trigger[] {
   // Money: the closing weeks need a reserve.
   const close = -(c.close.shift.budget ?? 0);
   if (close > 0 && w.budget < close && has("fin")) out.push({ key: "money", who: "fin", situation: `The campaign has ${shortMoney(w.budget)} left to spend under the cap. A full push in the closing weeks costs about ${shortMoney(close)}.`, text: `We have ${shortMoney(w.budget)} left under the cap, and the closing weeks need about ${shortMoney(close)}. Everything we fund now comes out of the finish.`, suggest: "Raise money this week with call time and a donor dinner" });
+
+  // The weekly plan (the top bar's sliders) will not last, or eats the closing push.
+  const plan = runway(k.allocation);
+  if (w.budget >= close && (plan.runsOut || plan.eatsClose) && has("fin")) {
+    const when = plan.runsOut ? `runs out around ${plan.runsOut}` : `leaves less than ${shortMoney(close)} for the closing weeks`;
+    out.push({ key: `plan-${plan.runsOut ? "out" : "close"}`, who: "fin", situation: `The weekly spending plan costs ${shortMoney(plan.cost)} a week and raises about ${shortMoney(plan.raised)}. At that rate the money ${when}.`, text: `At this week's spending the money ${when}. Something on the plan has to come down.`, suggest: "Tell me which line of the weekly plan to cut and I will keep the rest running" });
+  }
 
   // The large voter group where the campaign trails its own citywide figure by the most.
   const boost = factionWork();
@@ -148,6 +157,8 @@ async function say(t: Trigger, day: number) {
   } catch {}
   useGame.setState((s) => ({ toasts: [...s.toasts.slice(-2), { id: Date.now(), staff: p.id, text: said.text }], unread: { ...s.unread, [p.id]: true } }));
   pushChat(p.id, { k: "them", text: said.text, suggest: said.suggest || undefined });
+  // And on the student's phone, when they linked one (lib/photon/client, #53).
+  void import("../photon/client").then((m) => m.textFromStaff(p.id, said.text, said.suggest || undefined));
   const who = short(p);
   feed(p.id, `${who[0].toUpperCase()}${who.slice(1)}: "${said.text}"`, "warm");
 }
@@ -172,7 +183,7 @@ export function watch() {
     // A restarted case starts the staff's read of the numbers over.
     if (s.at < p.at || s.date < p.date) seen = null;
     const made = Object.keys(s.picks).find((id) => !(id in p.picks));
-    if (!made) return;
+    if (!made || isLoading()) return; // a loaded campaign's decisions were made before
     const { c } = worldNow();
     const d = c.decisions.find((x) => x.id === made);
     const o = d?.options.find((x) => x.id === s.picks[made].option);
@@ -191,7 +202,7 @@ export function watch() {
     if (stopped) return;
     editions = usePaper.getState().editions.length;
     offPaper = usePaper.subscribe((s) => {
-      if (s.editions.length <= editions) { editions = s.editions.length; return; }
+      if (s.editions.length <= editions || isLoading()) { editions = s.editions.length; return; }
       editions = s.editions.length;
       const lead = s.editions.at(-1)?.lead;
       if (!lead || useStaff.getState().spoken[`news-${lead.key}`] !== undefined) return;

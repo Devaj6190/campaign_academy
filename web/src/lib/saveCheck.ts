@@ -19,6 +19,8 @@ import { useTasks } from "./tasks";
 // 7. Changes are written to storage within a second.
 // 8. The demo start point is a valid save of May 22, 2013 with the Weiner decision waiting.
 // 9. An order still running when the campaign is reset lands nothing in the new one.
+// 11. Loading a campaign raises no notification and no staff remark.
+// 10. Whether the agents are live is not saved: a loaded save or a reset keeps the server's answer.
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -141,6 +143,37 @@ export async function checkSave() {
     if (globalThis.localStorage?.getItem(SAVE_KEY)) problems.push("reset: the save is still in storage");
     report.push("reset: nothing of the campaign is left, and no save");
   }
+  // 11. Loading the demo start is not news: no result notification, no staff remark about a decision made before.
+  {
+    const { watchResults } = await import("./results");
+    const { watch } = await import("./staff/speak");
+    resetAll();
+    const offR = watchResults(), offS = watch();
+    useGame.setState({ toasts: [] });
+    restore(base);
+    const chats = Object.values(useStaff.getState().chat).flat().length;
+    await wait(1500);
+    offR(); offS();
+    const toasts = useGame.getState().toasts.length, after = Object.values(useStaff.getState().chat).flat().length;
+    if (toasts) problems.push(`quiet load: loading the demo raised ${toasts} notification(s)`);
+    if (after !== chats) problems.push(`quiet load: loading the demo made the staff say ${after - chats} new thing(s)`);
+    report.push("quiet load: the demo start loads with no notification and no remark");
+  }
+
+  // 10. Whether the agents are live is the server's, not the save's (full test, 15 Nov: the demo, built with no key,
+  //     said "no API key" on a live server). It is not saved, a loaded save does not change it, and a reset keeps it.
+  {
+    if ("mode" in saved.stores.staff) problems.push("live label: the save carries the staff's mode");
+    useStaff.setState({ mode: "live" });
+    const old = structuredClone(saved);
+    (old.stores.staff as { mode?: string }).mode = "offline";
+    restore(old);
+    if (useStaff.getState().mode !== "live") problems.push(`live label: loading a save set the mode to ${useStaff.getState().mode}`);
+    resetAll();
+    if (useStaff.getState().mode !== "live") problems.push(`live label: a reset set the mode to ${useStaff.getState().mode}`);
+    report.push("live label: not saved, kept through a load and a reset");
+  }
+
   // 9. An order running through a reset. With no server here it runs by the rules, in this process.
   {
     restore(saved);
