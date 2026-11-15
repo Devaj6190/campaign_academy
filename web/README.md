@@ -71,14 +71,13 @@ Money the staff raise pays for staff work but never lifts the campaign above the
 
 With the rivals acting and no staff work, the real campaign's six choices finish on about 38.5 percent and a runoff. Without rivals the same choices finish on 41.0 against the certified 40.81.
 
-## Left over from the first version
+## The first version
 
-The first version simulated a fictional race (Adrian Cole, Hale, Brandt). Its code is still in the tree and nothing on screen uses it. It is waiting on a decision about what, if anything, to bring back before it is removed:
+The first version simulated a fictional race. Its code is no longer in the tree. It can be read at the tag `first-version-code` (`git show first-version-code:web/src/lib/relations.ts`, for example).
 
-- Not imported by anything: `components/Overlays.tsx` (the old paper, manifesto, calendar, tactic and result dialogs), `views/Factions.tsx`, `views/Advisers.tsx`, `lib/candidate.ts`, `lib/factionHistory.ts`.
-- Only kept alive by `lib/store.ts`: the old game state in that file (cash, the three-candidate poll, the 30-day clock, the old rivals) and `lib/engine/poll.ts`, `rivals.ts`, `schedule.ts`, `tactic.ts`, `election.ts`, `debate.ts`, `lib/relations.ts`, and the fictional lists in `lib/data.ts` and `lib/demographics.ts`.
+Two of its features are to be rebuilt on the case and have issues: standing budgets the student can allocate (#33) and the links between voter groups that move together (#34). Its map filter by voter group is already rebuilt (`views/MapView.tsx`, for the groups the census can place). Its calendar, tactics and debates were dropped.
 
-Do not build on any of these. If a name in the code says Cole, Hale or Brandt, it is first-version code.
+Three of Devank's branches that were built on the first version's engine are kept the same way, as the tags `archive/feat-combined`, `archive/feat-money` and `archive/feat-newspaper`.
 
 ## Checks
 
