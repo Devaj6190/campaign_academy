@@ -2,15 +2,12 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
-  "engines": {
-    "node": "24.x"
-  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "node scripts/copy-map-worker.mjs",
+    "postinstall": "node scripts/copy-map-worker.mjs && node scripts/esm-scopes.mjs",
     "check:engine": "node scripts/check-engine.mjs",
     "refit:case": "node scripts/refit-case.mjs",
     "check:staff": "node scripts/check-staff.mjs",
