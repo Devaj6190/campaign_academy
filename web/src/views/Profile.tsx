@@ -3,7 +3,7 @@
 import { ArrowRight, BookOpen, Map as MapIcon } from "lucide-react";
 import { Dock, DockButton, Inspector, Label, Meter, Section } from "@/components/ui";
 import { ShaderBackground } from "@/components/ui21/dithering";
-import { useCase, worldNow } from "@/lib/cases/store";
+import { useCaseNow } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 import { Cite, Claims } from "./CaseView";
@@ -11,19 +11,14 @@ import { Cite, Claims } from "./CaseView";
 // The real candidate and race of the current case. Everything here is read from the case file; the only
 // simulated numbers are the student's own standing and money, which follow their decisions so far.
 
-const DAY = 86_400_000;
 const money = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n / 1000)}k`);
 
 export function Profile() {
-  const step = useCase((s) => s.step);
-  useCase((s) => s.picks); // re-render when a decision is made
   const go = useGame((s) => s.go);
-  const { c, w } = worldNow();
+  const { c, w, today, daysLeft } = useCaseNow();
   const me = c.candidates.find((x) => x.id === c.follow)!;
   const rivals = c.candidates.filter((x) => x.id !== c.follow);
 
-  const today = step === 0 ? c.briefingDate : (c.decisions[step - 1]?.date ?? c.electionDate);
-  const daysLeft = Math.max(0, Math.round((Date.parse(c.electionDate) - Date.parse(today)) / DAY));
   const race = c.candidates.map((x) => ({ ...x, poll: w.poll[x.id] ?? 0 })).filter((x) => x.poll > 0 || x.id === c.follow).sort((a, b) => b.poll - a.poll);
   const rank = race.findIndex((x) => x.id === c.follow) + 1;
   const undecided = Math.max(0, 100 - race.reduce((n, x) => n + x.poll, 0));

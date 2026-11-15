@@ -3,6 +3,7 @@
 import { ArrowDown, ArrowRight, ArrowUp, Check, ExternalLink, Map as MapIcon, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Button, Label, Meter, Section } from "@/components/ui";
+import { run } from "@/lib/cases/clock";
 import { changeAt, currentCase, useCase, worldAt } from "@/lib/cases/store";
 import type { Advice, Case, Claim, Decision, Judgment, Shift, Skill, World } from "@/lib/cases/types";
 import { useGame } from "@/lib/store";
@@ -10,7 +11,8 @@ import { cn } from "@/lib/util";
 
 // A case, played: briefing, then each decision point, then the debrief.
 // At a decision the student sees the record of that date, hears their advisers, and chooses. The choice changes
-// their simulated campaign and the race plays on from there. What the real campaign chose stays hidden until the debrief.
+// their simulated campaign and the race plays on from there. The clock (lib/cases/clock) carries the campaign from
+// one decision to the next; a step opens here only once the campaign has reached it.
 
 const SKILLS: Record<Skill, string> = { delegating: "Delegating", budgeting: "Budgeting", "voter-groups": "Reading voter groups", policy: "Policy trade-offs" };
 const day = (iso: string) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -18,11 +20,10 @@ const usd = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(Math.round(n)).toLo
 const pts = (n: number) => `${n > 0 ? "+" : "−"}${Math.abs(Math.round(n * 10) / 10)}`;
 
 export function CaseView() {
-  const { caseId, step, go, picks } = useCase();
+  const { caseId, step, go, picks, at } = useCase();
   const c = currentCase(caseId);
   const n = c.decisions.length;
   const steps = ["Briefing", ...c.decisions.map((_, i) => `Decision ${i + 1}`), "Debrief"];
-  const reached = c.decisions.filter((d) => picks[d.id]).length + 1; // furthest step open
 
   return (
     <div className="h-full overflow-y-auto">
@@ -33,7 +34,7 @@ export function CaseView() {
           {steps.map((label, i) => (
             <button
               key={label}
-              disabled={i > reached}
+              disabled={i > at}
               onClick={() => go(i)}
               className={cn("rounded-full border px-3 py-1 text-[12px] transition-colors disabled:opacity-35", i === step ? "border-gold bg-hover text-gold-bright" : "border-line text-muted hover:text-fg")}
             >
@@ -135,7 +136,7 @@ function Briefing({ c }: { c: Case }) {
         <p className="text-[14px] text-soft">{c.lesson}</p>
         <p className="mt-2 text-[13px] text-muted">The people, dates, polls and money in this case are real and sourced. Your decisions are yours: each one changes your campaign, and the race plays on from where you leave it. After each decision you see what the real campaign did; how it turned out for them comes at the end.</p>
         <div className="mt-3"><Claims c={c} items={c.start.basis} /></div>
-        <Button variant="primary" className="mt-4" onClick={() => go(1)}>First decision <ArrowRight className="size-3.5" /></Button>
+        <Button variant="primary" className="mt-4" onClick={() => (useCase.getState().at ? go(1) : run())}>First decision <ArrowRight className="size-3.5" /></Button>
       </Section>
     </>
   );
@@ -176,8 +177,10 @@ function Changes({ c, s }: { c: Case; s: Shift }) {
   );
 }
 
-function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: number }) {
-  const { step, go, decide, picks } = useCase();
+/** One decision: the record, the advisers, the choice. Shown in the Case tab and as the card that opens when the clock reaches it. */
+export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: number }) {
+  const { decide, picks, at, running } = useCase();
+  const live = index === at - 1;
   const pick = picks[d.id];
   const decided = !!pick;
   const w = worldAt(c, picks, index);
@@ -207,7 +210,7 @@ function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: number }) 
       <Section title={decided ? "Your decision" : "What do you do?"}>
         <div className="space-y-2" role="radiogroup">
           {d.options.map((o) => {
-            const on = option === o.id;
+            const on = (pick?.option ?? option) === o.id; // the pick wins: this step can be on screen twice (tab and card)
             const short = !decided && w.budget + (o.effect.budget ?? 0) < 0;
             return (
               <button
@@ -249,12 +252,19 @@ function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: number }) 
         <>
           <Section title="What changed">
             <Changes c={c} s={changeAt(c, picks, d)} />
-            <Button className="mt-4" onClick={() => useGame.getState().go("map")}><MapIcon className="size-3.5" /> See it on the map</Button>
+            <Button className="mt-4" onClick={() => { useCase.setState({ card: false }); useGame.getState().go("map"); }}><MapIcon className="size-3.5" /> See it on the map</Button>
           </Section>
           <Section title="What the real campaign did">
             <p className="mb-3 text-[13px] text-muted">{d.taken === null ? "Something that was not on your list." : d.taken === pick.option ? "The same call you made." : `A different call: ${label(d.taken)}.`}</p>
             <Claims c={c} items={d.did} />
-            <Button variant="primary" className="mt-4" onClick={() => go(step + 1)}>{last ? "Election day" : "Next decision"} <ArrowRight className="size-3.5" /></Button>
+            {live && (running ? (
+              <p className="mt-4 text-[13px] text-muted">The campaign is running. The next decision arrives on its own date; until then your staff are in the War room.</p>
+            ) : (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button variant="primary" onClick={() => run()}>{last ? "Run to election day" : "Carry on with the campaign"} <ArrowRight className="size-3.5" /></Button>
+                <Button onClick={() => { useCase.setState({ card: false }); useGame.getState().go("war"); }}>Give your staff work first</Button>
+              </div>
+            ))}
           </Section>
         </>
       )}

@@ -30,9 +30,9 @@ export function Sidebar() {
 export function SidebarBody() {
   const view = useGame((s) => s.view);
   const go = useGame((s) => s.go);
-  const { caseId, step, picks, go: goStep } = useCase();
+  const { caseId, step, picks, at, go: goStep } = useCase();
   const c = currentCase(caseId);
-  const reached = c.decisions.filter((d) => picks[d.id]).length + 1; // furthest step open
+  const reached = at; // furthest step the campaign has reached
   const openPaper = usePaper((s) => s.set);
   // A decision's title is only shown once the student has reached it, so the list can't give away what is coming.
   const steps = ["Briefing", ...c.decisions.map((d, i) => (i + 1 <= reached ? d.title : `Decision ${i + 1}`)), "Election night"];
@@ -54,7 +54,7 @@ export function SidebarBody() {
         <summary className="plate flex h-8 cursor-pointer list-none items-center gap-2.5 px-5 [&::-webkit-details-marker]:hidden">
           <ChevronRight className="-mx-1 size-3.5 text-gold transition-transform group-open:rotate-90" />
           <Label className="flex-1 text-gold-bright">Case outline</Label>
-          <span className="tnum font-mono text-[11px] text-gold/80">{Math.min(reached - 1, c.decisions.length)} of {c.decisions.length}</span>
+          <span className="tnum font-mono text-[11px] text-gold/80">{c.decisions.filter((d) => picks[d.id]).length} of {c.decisions.length}</span>
         </summary>
         {/* Steps hang off a rail: each one is a node on the line. */}
         <ol className="mt-3 mr-4 ml-[27px] border-l border-line-strong">

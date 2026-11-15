@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Fit } from "@/components/Fit";
 import { Dock, DockButton, Inspector, Label, Meter, Section, Tag, ViewHeader } from "@/components/ui";
 import { FACTION_POLLS, FACTIONS_2013, factionNow, type Faction } from "@/lib/cases/mayor2013-factions";
-import { useCase, useCaseNow, worldAt } from "@/lib/cases/store";
+import { factionWork, useCase, useCaseNow, worldAt } from "@/lib/cases/store";
 import { DISTRICTS } from "@/lib/geo";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
@@ -45,7 +45,8 @@ export function VoterGroups() {
   const select = useGame((s) => s.select);
   const [picked, setPicked] = useState<string | null>(null);
   const mine = w.poll[c.follow] ?? 0, mineStart = c.start.poll[c.follow] ?? 0;
-  const now = (f: Faction) => factionNow(f, w.groups, mine, mineStart);
+  const boost = factionWork();
+  const now = (f: Faction) => factionNow(f, w.groups, mine, mineStart, boost);
   const sel = FACTIONS_2013.find((f) => f.id === picked) ?? null;
 
   return (

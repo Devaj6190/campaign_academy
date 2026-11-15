@@ -3,36 +3,92 @@ import { DISTRICTS, districtBy } from "../geo";
 import { CASES } from "./index";
 import { effectOf, simulate, type Case, type Decision, type Shift, type World } from "./types";
 
-// Where the student is in a case and what they chose. The case file is never written; the student's world is
-// always derived from their picks by `simulate`.
+// Where the student is in a case, what they chose, and the work done between decisions. The case file is never
+// written; the student's world is always derived from their picks by `simulate`, with the work layer on top.
 
 export type Pick = { option: string; why: string };
 
+/**
+ * One piece of work done between decisions: a staff job, or a rival's move. Simulated. `poll` is citywide points
+ * by candidate id, `groups` is points in the case's own voter groups, `factions` is points in poll groups the case
+ * does not simulate, and `districts` is points in one community district.
+ */
+export type Work = {
+  id: number;
+  date: string;
+  by: string;
+  label: string;
+  cost: number;
+  raised: number;
+  poll: Record<string, number>;
+  groups: Record<string, number>;
+  factions: Record<string, number>;
+  districts: Record<number, number>;
+};
+
 type CaseState = {
   caseId: string;
-  /** 0 is the briefing, 1..n are the decision points, n+1 is the debrief. */
+  /** The step on screen in the Case tab: 0 is the briefing, 1..n are the decision points, n+1 is the debrief. */
   step: number;
+  /** The furthest step the campaign has reached. The live world, the clock and the staff all work from here. */
+  at: number;
+  /** The live date, ISO. It moves with the clock (lib/cases/clock). */
+  date: string;
+  running: boolean;
+  speed: number;
+  /** The decision card is open. */
+  card: boolean;
   picks: Record<string, Pick>;
+  work: Work[];
   go: (step: number) => void;
   decide: (decision: string, pick: Pick) => void;
+  addWork: (w: Omit<Work, "id" | "date">) => void;
   restart: () => void;
 };
 
+const fresh = () => ({ step: 0, at: 0, date: CASES[0].briefingDate, running: false, card: false, picks: {}, work: [] });
+
 export const useCase = create<CaseState>((set) => ({
   caseId: CASES[0].id,
-  step: 0,
-  picks: {},
+  speed: 1,
+  ...fresh(),
   go: (step) => set({ step }),
   decide: (decision, pick) => set((s) => ({ picks: { ...s.picks, [decision]: pick } })),
-  restart: () => set({ step: 0, picks: {} }),
+  addWork: (w) => set((s) => ({ work: [...s.work, { ...w, id: s.work.length + 1, date: s.date }] })),
+  restart: () => set(fresh()),
 }));
 
 export const currentCase = (id: string) => CASES.find((c) => c.id === id) ?? CASES[0];
 
 const options = (picks: Record<string, Pick>) => Object.fromEntries(Object.entries(picks).map(([k, v]) => [k, v.option]));
 
+/**
+ * What staff work has cost and brought in. The spending cap stays: money the staff raise pays for staff work, but
+ * never lifts the campaign above what the case gives it, so `raised` stops at `spent`.
+ */
+export function staffMoney(work: Work[]) {
+  const spent = work.reduce((a, x) => a + x.cost, 0);
+  return { spent, raised: Math.min(spent, work.reduce((a, x) => a + x.raised, 0)) };
+}
+
+/**
+ * The work layer, folded into where the case starts, so `simulate` carries it through every later step (including
+ * how much of the closing stretch the money still covers). `until` leaves out work done after that date.
+ */
+function withWork(c: Case, until?: string): Case {
+  const work = useCase.getState().work.filter((x) => !until || x.date <= until);
+  if (!work.length) return c;
+  const sum = (key: "poll" | "groups") => {
+    const out = { ...c.start[key] };
+    for (const x of work) for (const [k, v] of Object.entries(x[key])) if (k in out) out[k] = Math.max(0, Math.min(100, out[k] + v));
+    return out;
+  };
+  const m = staffMoney(work);
+  return { ...c, start: { ...c.start, budget: c.start.budget - m.spent + m.raised, poll: sum("poll"), groups: sum("groups") } };
+}
+
 /** The student's world on arriving at decision `index` (0-based), or at the end when `index` is the decision count. */
-export const worldAt = (c: Case, picks: Record<string, Pick>, index: number): World => simulate(c, options(picks), index);
+export const worldAt = (c: Case, picks: Record<string, Pick>, index: number): World => simulate(withWork(c, c.decisions[index]?.date), options(picks), index);
 
 /** What the student's choice at a decision changed, summed into one shift. Simulated. */
 export function changeAt(c: Case, picks: Record<string, Pick>, d: Decision): Shift {
@@ -45,12 +101,12 @@ export function changeAt(c: Case, picks: Record<string, Pick>, d: Decision): Shi
   return out;
 }
 
-/** The student's world right now: on arrival at the current step, plus the current decision if it has been made. */
+/** The live world: on arrival at the step the campaign has reached, plus that decision if made, plus all work so far. */
 export function worldNow(): { c: Case; w: World } {
-  const { caseId, picks, step } = useCase.getState();
+  const { caseId, picks, at } = useCase.getState();
   const c = currentCase(caseId);
-  const i = Math.min(Math.max(step - 1, 0), c.decisions.length);
-  const w = worldAt(c, picks, i);
+  const i = Math.min(Math.max(at - 1, 0), c.decisions.length);
+  const w = simulate(withWork(c), options(picks), i);
   const d = c.decisions[i];
   if (!d || !picks[d.id]) return { c, w };
   const ch = changeAt(c, picks, d);
@@ -58,15 +114,23 @@ export function worldNow(): { c: Case; w: World } {
   return { c, w: { budget: w.budget + (ch.budget ?? 0), poll: plus(w.poll, ch.poll), groups: plus(w.groups, ch.groups) } };
 }
 
-/** The case as the student sees it now: their world, the date they have reached and the days left. Re-renders the caller. */
+/** The live campaign: its world, the step and date it has reached and the days left. Re-renders the caller. */
 export function useCaseNow() {
-  const step = useCase((s) => s.step);
+  const step = useCase((s) => s.at);
+  const today = useCase((s) => s.date);
   useCase((s) => s.picks);
   useCase((s) => s.caseId);
+  useCase((s) => s.work);
   const { c, w } = worldNow();
-  const today = step === 0 ? c.briefingDate : (c.decisions[step - 1]?.date ?? c.electionDate);
   const daysLeft = Math.max(0, Math.round((Date.parse(c.electionDate) - Date.parse(today)) / 86_400_000));
   return { c, w, step, today, daysLeft };
+}
+
+/** Points of work so far in each poll group the case does not simulate, by faction id. */
+export function factionWork(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const x of useCase.getState().work) for (const [k, v] of Object.entries(x.factions)) out[k] = (out[k] ?? 0) + v;
+  return out;
 }
 
 /**
@@ -80,12 +144,22 @@ export function mapValue(support: number): number {
 
 /** "27 January 2013" from an ISO date. */
 export const longDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+/** "27 Jan" from an ISO date. */
+export const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 /** "$4.3M" or "$850k". */
 export const shortMoney = (n: number) => (Math.abs(n) >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n ? `$${Math.round(n / 1000)}k` : "$0");
 
+/** A district's share of the city's residents, 0 to 1: how far a change there moves the citywide figure. */
+export function popShare(cd: number): number {
+  let people = 0;
+  for (const d of DISTRICTS) if (d.demo && !d.park) people += d.demo.pop;
+  return people ? (districtBy(cd)?.demo?.pop ?? 0) / people : 0;
+}
+
 /**
  * The student's support in one community district, in percent: each group's support weighted by the share of
- * residents the census puts in that group there. Residents outside the tracked groups count at the citywide figure.
+ * residents the census puts in that group there, plus any work done in that district. Residents outside the
+ * tracked groups count at the citywide figure.
  */
 export function supportIn(cd: number): number | null {
   if (!districtBy(cd)?.demo) return null;
@@ -104,5 +178,6 @@ export function supportIn(cd: number): number | null {
   let total = 0, people = 0;
   for (const d of DISTRICTS) if (d.demo && !d.park) { total += raw(d.cd) * d.demo.pop; people += d.demo.pop; }
   const mean = people ? total / people : 0;
-  return Math.max(0, Math.min(100, raw(cd) * (mean ? (w.poll[c.follow] ?? mean) / mean : 1)));
+  const local = useCase.getState().work.reduce((a, x) => a + (x.districts[cd] ?? 0), 0);
+  return Math.max(0, Math.min(100, raw(cd) * (mean ? (w.poll[c.follow] ?? mean) / mean : 1) + local));
 }

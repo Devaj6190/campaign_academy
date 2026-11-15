@@ -2,18 +2,19 @@
 
 import { ArrowDownRight, ArrowUpRight, ListChecks } from "lucide-react";
 import { motion } from "motion/react";
-import { longDate, shortMoney, useCase, useCaseNow } from "@/lib/cases/store";
+import { longDate, shortMoney, staffMoney, useCase, useCaseNow } from "@/lib/cases/store";
 import { effectOf } from "@/lib/cases/types";
 import type { View } from "@/lib/data";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
+import { ClockControls } from "./Clock";
 import { SidebarBody } from "./Sidebar";
 import { Label, Meter, Popover } from "./ui";
 
 // The sections of the tool, in the order a student meets them: the case first, then the material behind it. Add new views here.
 const VIEWS: [View, string][] = [["case", "Case"], ["profile", "Profile"], ["war", "War room"], ["map", "Map"], ["factions", "Factions"]];
 
-// Sections on the left, money in the centre, the poll and the date on the right.
+// Sections on the left, money in the centre, the poll, the clock and the date on the right.
 // The money plate hangs below the bar. Everything it shows is read from the case and the student's decisions so far.
 export function TopBar() {
   return (
@@ -21,8 +22,9 @@ export function TopBar() {
       <span className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-gold/10 via-gold/70 to-gold/10" />
       <Nav />
       <Money />
-      <div className="flex items-center justify-end gap-5">
+      <div className="flex items-center justify-end gap-4">
         <Standing />
+        <ClockControls />
         <Day />
       </div>
     </header>
@@ -88,6 +90,10 @@ function useLedger() {
     if (v) rows.push({ label: d.title, v });
   }
   const sum = (xs: Entry[]) => xs.reduce((a, r) => a + r.v, 0);
+  // Staff work between decisions. What the staff raise pays for staff work and stops there (see staffMoney).
+  const staff = staffMoney(useCase((s) => s.work));
+  if (staff.spent) rows.push({ label: "Staff work", v: -staff.spent });
+  if (staff.raised) rows.push({ label: "Raised by your staff", v: staff.raised });
   if (upTo >= n && c.close.shift.budget) {
     // The closing stretch is paid only as far as the money lasts.
     const cost = -c.close.shift.budget;
@@ -176,7 +182,7 @@ function Standing() {
   const all = c.candidates.map((x) => ({ id: x.id, name: x.id === c.follow ? "You" : x.name.split(" ").pop()!, v: Math.round(w.poll[x.id] ?? 0), mine: x.id === c.follow })).sort((a, b) => b.v - a.v);
   const top = all.slice(0, 3).some((x) => x.mine) ? all.slice(0, 3) : [...all.slice(0, 2), all.find((x) => x.mine)!];
   return (
-    <div className="hidden w-44 xl:block" title="Poll standing on your path through the case (simulated)">
+    <div className="hidden w-40 min-[1440px]:block" title="Poll standing on your path through the case (simulated)">
       <div className="tnum mb-1.5 flex justify-between font-mono text-[11px] leading-none">
         {top.map((x) => <span key={x.id} className={x.mine ? "text-warm" : "text-muted"}>{x.name} {x.v}</span>)}
       </div>

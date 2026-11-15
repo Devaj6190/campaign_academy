@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { create } from "zustand";
 import { FACTIONS_2013, factionNow } from "@/lib/cases/mayor2013-factions";
-import { longDate, useCaseNow } from "@/lib/cases/store";
+import { factionWork, longDate, useCaseNow } from "@/lib/cases/store";
 import { Cite, Claims } from "@/views/CaseView";
 import { Button, Dialog, Label, Meter, Tag } from "./ui";
 
@@ -31,7 +31,7 @@ function Edition({ close }: { close: () => void }) {
   const [lead, ...older] = past;
   const since = step >= 1 && step <= c.decisions.length ? (c.decisions[step - 1].since?.notes ?? []) : [];
   const mine = w.poll[c.follow] ?? 0, mineStart = c.start.poll[c.follow] ?? 0;
-  const standing = FACTIONS_2013.map((f) => ({ f, v: factionNow(f, w.groups, mine, mineStart) })).sort((a, b) => b.v - a.v);
+  const standing = FACTIONS_2013.map((f) => ({ f, v: factionNow(f, w.groups, mine, mineStart, factionWork()) })).sort((a, b) => b.v - a.v);
   const poll = c.candidates.map((x) => ({ id: x.id, name: x.id === c.follow ? "You" : x.name, v: Math.round(w.poll[x.id] ?? 0) })).filter((x) => x.v > 0).sort((a, b) => b.v - a.v).slice(0, 5);
   const [head, body] = lead ? split(lead.summary) : ["", ""];
 
