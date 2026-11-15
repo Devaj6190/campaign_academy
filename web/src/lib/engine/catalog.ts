@@ -57,7 +57,17 @@ export const ACTIONS: Record<ActionId, Action> = {
   coalition_meeting: { id: "coalition_meeting", label: "Coalition meeting", doing: "Meeting leaders of", cost: 500, group: 4, needs: { faction: true }, skills: ["planning", "policy", "field"], about: "Sit down with a faction's leaders (union locals, tenant groups, merchants)." },
   policy_brief: { id: "policy_brief", label: "Policy brief", doing: "Drafting a brief for", cost: 800, group: 3, momentum: 0.1, needs: { faction: true }, skills: ["policy"], about: "A detailed plan aimed at one faction's concerns." },
   voter_targeting: { id: "voter_targeting", label: "Voter targeting", doing: "Modelling turnout in", cost: 1500, local: 1, needs: { district: true }, skills: ["data"], about: "Build a target list for a district. Makes later field work there stronger." },
-  schedule_event: { id: "schedule_event", label: "Schedule it", doing: "Scheduling", cost: 0, needs: {}, skills: ["scheduling", "planning"], about: "Put something on the candidate's calendar. No direct effect, but it happens." },
+  schedule_event: { id: "schedule_event", label: "Schedule it", doing: "Scheduling", cost: 0, needs: { district: true }, skills: ["scheduling", "planning"], about: "Book the candidate in person on a date: doors, a rally, a house party or a meeting in one district. It happens on that day, uses one of his daily appearances, and is paid for then." },
 };
 
 export const ACTION_IDS = Object.keys(ACTIONS) as [ActionId, ...ActionId[]];
+
+/** What the candidate can be booked to do in person, and the catalog action each one is when the day comes. */
+export const BOOKING_KINDS = ["doors", "rally", "house_party", "meeting"] as const;
+export type BookingKind = (typeof BOOKING_KINDS)[number];
+export const BOOKING: Record<BookingKind, { action: ActionId; label: string }> = {
+  doors: { action: "canvass", label: "door knocking" },
+  rally: { action: "rally", label: "a rally" },
+  house_party: { action: "house_party", label: "a house party" },
+  meeting: { action: "coalition_meeting", label: "a meeting with community leaders" },
+};

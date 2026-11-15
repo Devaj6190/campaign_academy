@@ -2,7 +2,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { tool } from "@langchain/core/tools";
 import { createDeepAgent, registerHarnessProfile, type SubAgent } from "deepagents";
 import { z } from "zod";
-import { ACTION_IDS, ACTIONS } from "../engine/catalog";
+import { ACTION_IDS, ACTIONS, BOOKING_KINDS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
 import { THOUGHT_MAX, type RunCtx } from "./protocol";
 import { humanize, PLACES, short, type Snapshot } from "./world";
@@ -39,6 +39,7 @@ export function world(w: Snapshot) {
   const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 0) - (w.sent[b.cd] ?? 0));
   const line = (p: (typeof PLACES)[number]) => `${p.cd} ${p.name} (${p.boro}): support ${Math.round(w.sent[p.cd] ?? 0)}%`;
   return `Today is ${w.date}; ${w.daysLeft} days to the primary. Left to spend under the cap: ${usd(w.cash)}. Poll: ${poll}.
+The candidate's calendar (he can do ${w.daily} things a day): ${w.booked.length ? w.booked.map((b) => `${b.date} ${b.label}`).join("; ") : "nothing booked"}.
 Platform: ${w.manifesto.map((m, i) => `${i + 1}. ${m}`).join(" ")}
 Voter groups (use the id). They overlap: one voter is in several.
 ${factions}
@@ -51,9 +52,9 @@ export const catalog = (w: Snapshot) => ACTION_IDS.map((id) => `- ${id}: ${ACTIO
 
 function actionTool(ctx: RunCtx, by: string) {
   return tool(
-    async ({ why, action, district, faction }) => {
+    async ({ why, action, district, faction, on, kind }) => {
       ctx.think(by, humanize(why, ctx.req.snapshot.factions));
-      return ctx.act(by, action, { district: district ? Number(district) : undefined, faction: faction ?? undefined }).text;
+      return ctx.act(by, action, { district: district ? Number(district) : undefined, faction: faction ?? undefined, on: on ?? undefined, kind: kind ?? undefined }).text;
     },
     {
       name: "take_action",
@@ -64,6 +65,8 @@ function actionTool(ctx: RunCtx, by: string) {
         action: z.enum(ACTION_IDS),
         district: z.enum(DISTRICT_IDS).nullable().describe("Community district number, when the action needs a place"),
         faction: z.enum(ctx.req.snapshot.factions.map((f) => f.id) as [string, ...string[]]).nullable().describe("Voter group id, when the action targets a group"),
+        on: z.string().nullable().describe("Only for schedule_event: the date the candidate appears, YYYY-MM-DD, after today. Otherwise null"),
+        kind: z.enum(BOOKING_KINDS).nullable().describe("Only for schedule_event: what the candidate does there. Otherwise null"),
       }),
     },
   );

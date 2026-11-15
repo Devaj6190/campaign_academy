@@ -1,7 +1,7 @@
-import type { ActionId } from "../engine/catalog";
+import { BOOKING, type ActionId, type BookingKind } from "../engine/catalog";
 import { clarity, fitScore, resolve, type Effect } from "../engine/resolve";
 import { hash } from "../util";
-import type { Snapshot } from "./world";
+import { shortPlace, type Snapshot } from "./world";
 
 // The wire format between /api/staff/instruct and the browser: one JSON event per line.
 
@@ -48,8 +48,11 @@ export class RunCtx {
     this.quality = clarity(req.followOf ?? req.text);
   }
 
+  /** Money promised to booked appearances: paid on their day, but it counts against this order's budget now. */
+  committed = 0;
+
   get left() {
-    return Math.max(0, this.req.budget - this.spent);
+    return Math.max(0, this.req.budget - this.spent - this.committed);
   }
 
   /** Say why, in a sentence or two. A long one is cut at a word; an empty one is dropped. */
@@ -62,9 +65,10 @@ export class RunCtx {
   }
 
   /** Carry out one catalog action. Returns the line the agent reads back. */
-  act(by: string, action: ActionId, p: { district?: number; faction?: string }) {
+  act(by: string, action: ActionId, p: { district?: number; faction?: string; on?: string; kind?: BookingKind }) {
     const w = this.req.snapshot;
     if (!w.staff.some((s) => s.id === by && s.name)) return { ok: false, text: "That post is vacant now; nothing happened." };
+    if (action === "schedule_event") return this.book(by, p);
     this.load[by] = (this.load[by] ?? 0) + 1;
     const effect = resolve(w, by, action, p, { quality: this.quality.mult, seed: this.req.runId * 31 + this.n++, load: this.load[by] });
     if (effect.cost > this.left) return { ok: false, text: `Not done: it costs $${effect.cost.toLocaleString("en-US")} and only $${this.left.toLocaleString("en-US")} of this budget is left. Ask the campaigner for more.` };
@@ -74,6 +78,35 @@ export class RunCtx {
     this.effects.push(effect);
     this.emit({ t: "action", effect });
     return { ok: true, text: `${effect.summary} Cost $${effect.cost.toLocaleString("en-US")}. Budget left $${this.left.toLocaleString("en-US")}.` };
+  }
+
+  /**
+   * Put the candidate on the calendar. Nothing happens and nothing is paid now: on the day he does it in person. The
+   * date must be after today and before the election; a day that is already full moves to the next free one.
+   */
+  private book(by: string, p: { district?: number; faction?: string; on?: string; kind?: BookingKind }) {
+    const w = this.req.snapshot;
+    const kind: BookingKind = p.kind && p.kind in BOOKING ? p.kind : "rally";
+    const day = (iso: string, n: number) => new Date(Date.parse(iso) + n * 86_400_000).toISOString().slice(0, 10);
+    const last = day(w.date, w.daysLeft - 1);
+    let date = p.on && /^\d{4}-\d{2}-\d{2}$/.test(p.on) && p.on > w.date && p.on <= last ? p.on : day(w.date, 1);
+    const taken = (d: string) => w.booked.filter((b) => b.date === d).length + this.effects.filter((e) => e.booking?.date === d).length;
+    while (taken(date) >= w.daily && date < last) date = day(date, 1);
+    if (taken(date) >= w.daily) return { ok: false, text: "Not booked: the candidate's calendar is full until the election." };
+    // What the appearance will cost when the candidate does it, as near as can be said now.
+    const est = resolve(w, "candidate", BOOKING[kind].action, { district: p.district, faction: p.faction }, { quality: 1, seed: this.req.runId, load: 1 }).cost;
+    const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
+    if (est > this.left) return { ok: false, text: `Not booked: ${BOOKING[kind].label} costs about ${usd(est)} on the day and only ${usd(this.left)} of this budget is left. Book something cheaper (door knocking and meetings cost least) or ask the campaigner for more.` };
+    this.committed += est;
+    this.load[by] = (this.load[by] ?? 0) + 1;
+    const base = resolve(w, by, "schedule_event", { district: p.district, faction: p.faction }, { quality: this.quality.mult, seed: this.req.runId * 31 + this.n++, load: this.load[by] });
+    const when = new Date(date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+    const where = base.district ? shortPlace(base.district) : "the city";
+    const moved = p.on && p.on !== date ? ` (${p.on} was full or out of range)` : "";
+    const effect: Effect = { ...base, booking: { date, kind }, calendar: `${BOOKING[kind].label} · ${where}`, summary: `Booked the candidate for ${BOOKING[kind].label} in ${where} on ${when}, about ${usd(est)} on the day.` };
+    this.effects.push(effect);
+    this.emit({ t: "action", effect });
+    return { ok: true, text: `${effect.summary}${moved} It happens that day and is paid for then. Budget left ${usd(this.left)}. He can do ${w.daily} things a day.` };
   }
 
   /** Answer a question with options instead of acting. It counts as the reply, so no report follows. */

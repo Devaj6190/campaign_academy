@@ -1,11 +1,13 @@
 import { useCase } from "../cases/store";
 import { isQuestion, runOffline } from "./offline";
 import { RunCtx, type RunEvent } from "./protocol";
-import { BASE_BUDGET, snapshot } from "./run";
+import { BASE_BUDGET, DAILY, runBookings, snapshot } from "./run";
 
 // Checks on the staff agents that need no API key (issue #41). Run with `npm run check:staff`.
 // 1. An order and a question are told apart from their wording (the rules fallback; live agents decide themselves).
 // 2. With no key, a question to any director gets two or three options and spends nothing; an order does work.
+// 3. A scheduled event is a real appearance: it is booked on a date, paid for on the day and reserved from the order's
+//    budget until then, happens as the candidate's own work, and never puts more on one day than he can do.
 
 const ORDERS = [
   "Canvass Crown Heights this week with a $20,000 budget",
@@ -52,5 +54,32 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
     if (o.events.some((e) => e.t === "proposals")) problems.push(`${d}: an order was answered with options`);
     report.push(`${d}: question → ${n} options, $0 spent; order → ${o.events.filter((e) => e.t === "action").length} jobs, $${o.spent.toLocaleString("en-US")}`);
   }
+
+  // Scheduling: book through the run, then let the day come.
+  useCase.getState().restart();
+  useCase.setState({ at: 1, step: 1 });
+  const today = useCase.getState().date;
+  const events: RunEvent[] = [];
+  const ctx = new RunCtx({ director: "cm", text: "Book the candidate", snapshot: snapshot(), history: [], budget: 250_000, runId: 7 }, (e) => events.push(e));
+  const wanted = new Date(Date.parse(today) + 3 * 86_400_000).toISOString().slice(0, 10);
+  const texts = [0, 1, 2].map(() => ctx.act("sch", "schedule_event", { district: 308, on: wanted, kind: "rally" }).text);
+  const booked = events.flatMap((e) => (e.t === "action" && e.effect.booking ? [e.effect] : []));
+  if (booked.length !== 3) problems.push(`scheduling: 3 events asked for, ${booked.length} booked`);
+  if (ctx.spent) problems.push("scheduling: booking cost money before the day came");
+  if (ctx.committed <= 0 || ctx.left !== 250_000 - ctx.committed) problems.push("scheduling: the expected cost was not reserved from the order's budget");
+  const over = new RunCtx({ director: "cm", text: "Book the candidate", snapshot: snapshot(), history: [], budget: 20_000, runId: 8 }, () => {});
+  if (over.act("sch", "schedule_event", { district: 308, on: wanted, kind: "rally" }).ok) problems.push("scheduling: a rally was booked on a budget too small to pay for it");
+  if (!over.act("sch", "schedule_event", { district: 308, on: wanted, kind: "doors" }).ok) problems.push("scheduling: door knocking was refused on a budget that covers it");
+  const sameDay = booked.filter((e) => e.booking!.date === wanted).length;
+  if (sameDay > DAILY) problems.push(`scheduling: ${sameDay} events on one day, the candidate can do ${DAILY}`);
+  if (booked.some((e) => e.booking!.date <= today)) problems.push("scheduling: an event was booked for today or the past");
+  for (const e of booked) useCase.getState().book({ date: e.booking!.date, kind: e.booking!.kind, cd: e.district!, by: e.by });
+  const dates = [...new Set(booked.map((e) => e.booking!.date))].sort();
+  for (const d of dates) { useCase.setState({ date: d }); runBookings(); }
+  const done = useCase.getState().bookings.filter((b) => b.done && !/^(Cancelled|Dropped)/.test(b.done)).length;
+  const mine = useCase.getState().work.filter((x) => x.by === "candidate");
+  if (done !== 3 || mine.length !== 3) problems.push(`scheduling: ${done} of 3 bookings happened, ${mine.length} appearances on the case`);
+  if (!mine.some((x) => x.cost > 0)) problems.push("scheduling: the appearances cost nothing on the day");
+  report.push(`scheduling: 3 rallies asked for ${wanted} → booked on ${dates.join(", ")}; all happened, $${mine.reduce((a, x) => a + x.cost, 0).toLocaleString("en-US")} paid on the day (${texts[2].includes("full") ? "third moved: day was full" : "no day was full"})`);
   return { problems, report };
 }

@@ -43,8 +43,11 @@ export function tick(): "arrived" | "event" | undefined {
   // The stretch is under way, however it started (run or skip): the rivals plan for it, once per step.
   void import("./rivals").then((m) => m.planRivals());
   const date = nextDay(s.date);
-  if (date >= dateOf(c, s.at + 1)) return arrive();
+  // Whatever is on the candidate's calendar for the new day happens as it starts.
+  const bookings = () => void import("../staff/run").then((m) => m.runBookings());
+  if (date >= dateOf(c, s.at + 1)) { const r = arrive(); bookings(); return r; }
   useCase.setState({ date });
+  bookings();
   return isEventDay(c, date) ? "event" : undefined;
 }
 

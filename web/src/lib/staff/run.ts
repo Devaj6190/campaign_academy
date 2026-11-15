@@ -4,7 +4,7 @@ import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
 import { platformAt } from "../cases/platform";
 import { factionWork, popShare, supportIn, useCase, worldNow } from "../cases/store";
 import { useGame } from "../store";
-import { ACTIONS, type ActionId } from "../engine/catalog";
+import { ACTIONS, BOOKING, type ActionId } from "../engine/catalog";
 import { resolve, type Effect } from "../engine/resolve";
 import { runOffline } from "./offline";
 import { RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
@@ -50,6 +50,8 @@ export function snapshot(): Snapshot {
     sent: Object.fromEntries(PLACES.map((p) => [p.cd, supportIn(p.cd) ?? mine])),
     factions: FACTIONS_2013.map((f) => ({ id: f.id, name: f.name, feel: factionNow(f, w.groups, mine, c.start.poll[c.follow] ?? 0, boost), size: f.share, values: [], dislikes: [] })),
     staff: g.staff,
+    booked: k.bookings.filter((b) => !b.done).map((b) => ({ date: b.date, label: `${BOOKING[b.kind].label} in ${shortPlace(b.cd)}` })),
+    daily: DAILY,
     // The platform on record so far, then the planks the student has added.
     manifesto: [...platformAt(c, k.at, k.picks).map((p) => p.text), ...k.work.filter((x) => x.by === "platform").map((x) => x.note ?? x.label)],
     hires: s.hires,
@@ -116,16 +118,37 @@ export const DAILY = 2;
 export const appearancesToday = () => { const { work, date } = useCase.getState(); return work.filter((x) => x.by === "candidate" && x.date === date).length; };
 
 /** What an appearance would cost and do, without doing it. */
-export const preview = (cd: number, id: ActionId) => resolve(snapshot(), "candidate", id, { district: cd }, { quality: 1, seed: cd * 7 + appearancesToday(), load: 1 });
+export const preview = (cd: number, id: ActionId, faction?: string) => resolve(snapshot(), "candidate", id, { district: cd, faction }, { quality: 1, seed: cd * 7 + appearancesToday(), load: 1 });
 
 /** The candidate does it. Refused when he is out of appearances for the day or the money is not there. */
-export function appear(cd: number, id: ActionId): { ok: boolean; text: string } {
+export function appear(cd: number, id: ActionId, faction?: string): { ok: boolean; text: string } {
   if (appearancesToday() >= DAILY) return { ok: false, text: "No appearances left today. Send staff, or let the clock run to tomorrow." };
-  const e = preview(cd, id);
+  const e = preview(cd, id, faction);
   if (e.cost > worldNow().w.budget) return { ok: false, text: "The campaign does not have the money for that." };
   apply(e);
   feed("candidate", `The candidate: ${e.summary}`, e.raised > e.cost ? "pos" : undefined);
   return { ok: true, text: e.summary };
+}
+
+/**
+ * The day's booked appearances happen: the candidate does each in person, inside his daily limit. One that does not
+ * fit today moves to tomorrow; one the campaign cannot pay for is cancelled. The clock calls this as each day starts.
+ */
+export function runBookings() {
+  const s = useCase.getState(), c = worldNow().c;
+  const set = (id: number, patch: Partial<{ date: string; done: string }>) => useCase.setState((k) => ({ bookings: k.bookings.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
+  for (const b of s.bookings.filter((x) => !x.done && x.date <= s.date)) {
+    const what = `${BOOKING[b.kind].label} in ${shortPlace(b.cd)}`;
+    if (appearancesToday() >= DAILY) {
+      const next = new Date(Date.parse(s.date) + 86_400_000).toISOString().slice(0, 10);
+      if (next >= c.electionDate) set(b.id, { done: "Dropped: no day left before the election." });
+      else { set(b.id, { date: next }); feed("candidate", `The candidate's day is full, so ${what} moves to tomorrow.`); }
+      continue;
+    }
+    const r = appear(b.cd, BOOKING[b.kind].action, b.faction);
+    set(b.id, { done: r.ok ? r.text : `Cancelled: ${r.text}` });
+    if (!r.ok) feed("candidate", `Cancelled, ${what}: ${r.text}`, "neg");
+  }
 }
 
 /** Hand a district to the Field Director: a draft order waits in their box in the War room. */
@@ -171,6 +194,7 @@ function handle(director: string, runId: number, e: RunEvent) {
     }
     case "action": {
       apply(e.effect);
+      if (e.effect.booking && e.effect.district) useCase.getState().book({ date: e.effect.booking.date, kind: e.effect.booking.kind, cd: e.effect.district, faction: e.effect.faction, by: e.effect.by });
       if (!e.effect.fit) {
         const by = e.effect.by;
         useStaff.setState((s) => ({ misfit: { ...s.misfit, [by]: true } }));

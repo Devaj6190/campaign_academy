@@ -8,6 +8,7 @@ import { Avatar, Button, Dock, DockButton, Label, Meter, Section, ViewHeader } f
 import { AgentPlan, type PlanTask } from "@/components/ui21/agent-plan";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import type { Staff } from "@/lib/data";
+import { BOOKING } from "@/lib/engine/catalog";
 import type { Effect } from "@/lib/engine/resolve";
 import { profileFor } from "@/lib/staff/roster";
 import { answerAsk, hire, letGo, loadCandidates, pick, reassign } from "@/lib/staff/run";
@@ -200,6 +201,28 @@ function Node({ at, name, role, job, misfit, morale, thinking, you, selected, bu
   );
 }
 
+/** The candidate's calendar: what staff have booked him for, and what came of each once its day has passed. */
+function Calendar() {
+  const bookings = useCase((s) => s.bookings);
+  if (!bookings.length) return null;
+  const ahead = bookings.filter((b) => !b.done).sort((a, b) => a.date.localeCompare(b.date));
+  const past = bookings.filter((b) => b.done).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+  const row = (b: (typeof bookings)[number]) => (
+    <li key={b.id} className="flex gap-2.5 text-[12px] leading-snug">
+      <span className="tnum w-[44px] shrink-0 pt-px font-mono text-[10.5px] text-faint">{shortDate(b.date)}</span>
+      <span className="min-w-0 flex-1">
+        <span className={b.done ? "text-muted" : "text-soft"}>{BOOKING[b.kind].label[0].toUpperCase()}{BOOKING[b.kind].label.slice(1)} in {shortPlace(b.cd)}</span>
+        {b.done && <span className={cn("block text-[11.5px]", /^(Cancelled|Dropped)/.test(b.done) ? "text-neg" : "text-muted")}>{b.done}</span>}
+      </span>
+    </li>
+  );
+  return (
+    <Section title="Candidate's calendar" right={<span className="text-[10.5px] text-faint">{ahead.length ? `${ahead.length} booked` : "Nothing ahead"}</span>}>
+      <ol className="space-y-2">{ahead.map(row)}{past.map(row)}</ol>
+    </Section>
+  );
+}
+
 function Overview({ pick }: { pick: (id: string) => void }) {
   const staff = useGame((s) => s.staff);
   const spent = staffMoney(useCase((s) => s.work)).spent;
@@ -219,6 +242,7 @@ function Overview({ pick }: { pick: (id: string) => void }) {
           ))}
         </div>
       </Section>
+      <Calendar />
       <Section title="Direct reports">
         <div className="-mx-2">
           {staff.filter((p) => !p.boss).map((p) => (
