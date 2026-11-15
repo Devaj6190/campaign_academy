@@ -4,12 +4,13 @@ import { Map as MLMap, NavigationControl, setWorkerUrl, type StyleSpecification 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import adResult from "@/lib/cases/mayor2013-ad.json";
+import { mapValue } from "@/lib/cases/store";
 import { groupsHere } from "@/lib/demographics";
 import { DISTRICTS } from "@/lib/geo";
 import { sentimentOf, useGame } from "@/lib/store";
 
 // A real street map of New York (OpenFreeMap, no key) with the 59 community districts on top, coloured by
-// how each one feels about Cole. Buildings rise in 3D when you zoom in on a district.
+// how strong the campaign is in each one. Buildings rise in 3D when you zoom in on a district.
 
 const STYLE = "https://tiles.openfreemap.org/styles/dark";
 // The bundler can't serve MapLibre's worker, so it is copied to public/ on install (scripts/copy-map-worker.mjs).
@@ -101,7 +102,7 @@ export function MapCanvas({ onHover, onSelect, real = false }: { onHover: (t: Ti
       if (d.park) continue;
       const g = world.filter === "all" ? null : groupsHere(d.cd).find((x) => x.id === world.filter);
       const op = g ? 0.25 + 0.5 * Math.min(1, g.rel / 1.6) : 0.6;
-      m.setFeatureState({ source: "districts", id: d.cd }, { v: sentimentOf(world, d.cd) * (world.filter === "all" ? 2 : 1), op });
+      m.setFeatureState({ source: "districts", id: d.cd }, { v: world.filter === "all" ? mapValue(sentimentOf(world, d.cd)) : sentimentOf(world, d.cd), op });
     }
   };
 

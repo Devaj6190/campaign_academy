@@ -1,29 +1,22 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect } from "react";
-import { Overlays } from "@/components/Overlays";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { useGame } from "@/lib/store";
+import { Advisers } from "@/views/Advisers";
 import { CaseView } from "@/views/CaseView";
-import { Factions } from "@/views/Factions";
 import { MapView } from "@/views/MapView";
 import { Profile } from "@/views/Profile";
-import { WarRoom } from "@/views/WarRoom";
+import { VoterGroups } from "@/views/VoterGroups";
 
-const VIEWS = { case: CaseView, profile: Profile, war: WarRoom, map: MapView, factions: Factions };
+// Every screen reads the current case. The first version's fictional race (its clock, staff chatter, pop-ups,
+// War room and Factions screens) is no longer mounted; time moves only when the student makes a decision.
+const VIEWS = { case: CaseView, profile: Profile, war: Advisers, map: MapView, factions: VoterGroups };
 
 export default function Home() {
   const view = useGame((s) => s.view);
   const View = VIEWS[view];
-
-  useEffect(() => {
-    // The campaign clock never stops; speed only changes how far each tick moves it.
-    const clock = setInterval(() => useGame.getState().tick(), 250);
-    const chatter = setInterval(() => useGame.getState().speak(), 50000);
-    return () => { clearInterval(clock); clearInterval(chatter); };
-  }, []);
 
   return (
     <div className="grid h-full grid-rows-[56px_minmax(0,1fr)]">
@@ -38,7 +31,6 @@ export default function Home() {
           </AnimatePresence>
         </main>
       </div>
-      <Overlays />
     </div>
   );
 }

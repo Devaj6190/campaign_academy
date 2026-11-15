@@ -1,159 +1,99 @@
 "use client";
 
-import { ArrowDownRight, ArrowUpRight, Menu, Minus, Plus } from "lucide-react";
-import type { Flow } from "@/lib/data";
-import { DAY_END, DAY_START, SPEEDS, netPerDay, useGame } from "@/lib/store";
-import { clock, cn, money, moneyK } from "@/lib/util";
+import { ListChecks } from "lucide-react";
+import { motion } from "motion/react";
+import { longDate, shortMoney, useCaseNow } from "@/lib/cases/store";
+import type { View } from "@/lib/data";
+import { useGame } from "@/lib/store";
+import { cn } from "@/lib/util";
 import { SidebarBody } from "./Sidebar";
-import { Label, Meter, Popover } from "./ui";
+import { Popover } from "./ui";
 
-// The masthead: the name of the tool on the left, the state of the campaign on the right. Navigation lives in the rail.
+// The sections of the tool, in the order a student meets them: the case first, then the material behind it. Add new views here.
+const VIEWS: [View, string][] = [["case", "Case"], ["profile", "Profile"], ["war", "War room"], ["map", "Map"], ["factions", "Voter groups"]];
+
+// Sections on the left, money in the centre, the poll and the date on the right.
+// The money, poll and date are read from the case and the student's decisions so far.
 export function TopBar() {
   return (
-    <header className="relative z-40 flex h-14 items-center gap-5 border-b border-line bg-bg px-4">
-      {/* The one picture in the frame: a strip of skyline behind the name, fading out to the right. */}
-      <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-[380px] bg-[url(/art/masthead-skyline.webp)] bg-[length:480px_auto] bg-[position:left_47%] [mask-image:linear-gradient(to_right,black_40%,transparent)]" />
-      <Brand />
-      <div className="flex-1" />
-      <Poll />
+    <header className="relative z-40 grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-line bg-bg px-4">
+      <Nav />
       <Money />
-      <Clock />
+      <div className="flex items-center justify-end gap-5">
+        <Standing />
+        <Day />
+      </div>
     </header>
   );
 }
 
-function Brand() {
+function Nav() {
+  const view = useGame((s) => s.view);
+  const go = useGame((s) => s.go);
   return (
-    <div className="relative flex items-center gap-3 min-[1200px]:w-[216px]">
+    <div className="flex items-center gap-4 self-stretch">
+      <span className="font-serif text-[21px] leading-none tracking-tight whitespace-nowrap max-[1199px]:hidden">Ballot to Bill</span>
+      <nav aria-label="Sections" className="flex items-stretch self-stretch">
+        {VIEWS.map(([k, name]) => (
+          <button key={k} onClick={() => go(k)} aria-current={view === k ? "page" : undefined} className={cn("relative px-3 text-[13.5px] whitespace-nowrap transition-colors", view === k ? "text-fg" : "text-muted hover:text-fg")}>
+            {name}
+            {/* Gold marks where you are: the line sits on the bar's bottom border and slides between tabs. */}
+            {view === k && <motion.span layoutId="tab" className="absolute inset-x-3 -bottom-px h-0.5 bg-gold" transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }} />}
+          </button>
+        ))}
+      </nav>
+      {/* Below 1200px the sidebar is hidden and its content opens from here. */}
       <div className="h-8 min-[1200px]:hidden">
-        <Popover align="start" className="flex max-h-[76vh] w-[264px] flex-col" trigger={(o) => (
-          <button aria-label="Menu" className={cn("grid size-8 place-items-center rounded-md text-soft transition-colors hover:bg-hover", o && "bg-hover")}>
-            <Menu className="size-4" />
+        <Popover align="start" className="flex max-h-[76vh] w-[272px] flex-col" trigger={(o) => (
+          <button className={cn("flex h-8 items-center gap-2 rounded-md border border-line px-2.5 text-[12.5px] whitespace-nowrap text-soft transition-colors hover:bg-hover", o && "bg-hover")}>
+            <ListChecks className="size-3.5 text-muted" />Outline
           </button>
         )}>
           <SidebarBody />
         </Popover>
       </div>
-      <span className="font-serif text-[21px] leading-none tracking-tight whitespace-nowrap">Ballot to Bill</span>
     </div>
   );
 }
 
-function Poll() {
-  const poll = useGame((s) => s.poll);
+// Money left under the spending cap.
+function Money() {
+  const { w } = useCaseNow();
   return (
-    <div className="hidden w-44 xl:block" title="Latest poll">
+    <div className="flex h-9 items-center rounded-lg border border-line px-4" title="What you have left to spend under the cap (simulated)">
+      <div className="flex items-baseline gap-2">
+        <span className="tnum text-[15px] font-medium">{shortMoney(Math.max(0, w.budget))}</span>
+        <span className="text-[12.5px] whitespace-nowrap text-muted">left to spend</span>
+      </div>
+    </div>
+  );
+}
+
+// Your campaign and the two candidates nearest the top, as the polls stand on your path through the case.
+function Standing() {
+  const { c, w } = useCaseNow();
+  const all = c.candidates.map((x) => ({ id: x.id, name: x.id === c.follow ? "You" : x.name.split(" ").pop()!, v: Math.round(w.poll[x.id] ?? 0), mine: x.id === c.follow })).sort((a, b) => b.v - a.v);
+  const top = all.slice(0, 3).some((x) => x.mine) ? all.slice(0, 3) : [...all.slice(0, 2), all.find((x) => x.mine)!];
+  return (
+    <div className="hidden w-52 xl:block" title="Poll standing on your path through the case (simulated)">
       <div className="tnum mb-1.5 flex justify-between text-[12px] leading-none">
-        <span className="text-warm">Cole {poll.cole}</span>
-        <span className="text-muted">Hale {poll.hale}</span>
-        <span className="text-faint">Brandt {poll.brandt}</span>
+        {top.map((x) => <span key={x.id} className={x.mine ? "text-warm" : "text-muted"}>{x.name} {x.v}</span>)}
       </div>
       <div className="flex h-1 gap-px overflow-hidden rounded-full">
-        <div className="bg-warm transition-[width] duration-500" style={{ width: `${poll.cole}%` }} />
-        <div className="bg-white/40 transition-[width] duration-500" style={{ width: `${poll.hale}%` }} />
-        <div className="bg-white/20 transition-[width] duration-500" style={{ width: `${poll.brandt}%` }} />
+        {top.map((x) => <div key={x.id} className={cn("transition-[width] duration-500", x.mine ? "bg-warm" : "bg-white/30")} style={{ width: `${x.v}%` }} />)}
         <div className="flex-1 bg-white/[0.06]" />
       </div>
     </div>
   );
 }
 
-// Money is the only resource: spending on the left, the total in the middle, income on the right.
-function Money() {
-  const cash = useGame((s) => s.cash);
-  const losses = useGame((s) => s.losses);
-  const gains = useGame((s) => s.gains);
-  const net = netPerDay({ gains, losses });
-  const out = losses.reduce((a, c) => a + c.v, 0), inc = gains.reduce((a, c) => a + c.v, 0);
+// Where you are on the real calendar.
+function Day() {
+  const { c, today, daysLeft } = useCaseNow();
   return (
-    <div className="flex h-9 items-stretch rounded-lg border border-line">
-      <Popover trigger={(o) => <FlowTrigger open={o} side="left" label="Spending" value={out} />} className="w-[340px]">
-        <FlowPanel kind="losses" title="Spending" flows={losses} total={out} />
-      </Popover>
-      <div className="flex items-baseline gap-2 self-center border-x border-line px-4">
-        <span className="tnum text-[15px] font-medium">{money(cash)}</span>
-        <span className={cn("tnum text-[12px] whitespace-nowrap", net < 0 ? "text-neg" : "text-pos")}>{net < 0 ? "−" : "+"}{moneyK(net)} a day</span>
-      </div>
-      <Popover align="end" trigger={(o) => <FlowTrigger open={o} side="right" label="Income" value={inc} />} className="w-[340px]">
-        <FlowPanel kind="gains" title="Income" flows={gains} total={inc} />
-      </Popover>
-    </div>
-  );
-}
-
-function FlowTrigger({ open, side, label, value }: { open: boolean; side: "left" | "right"; label: string; value: number }) {
-  const Icon = side === "left" ? ArrowDownRight : ArrowUpRight;
-  return (
-    <button className={cn("flex h-full items-center gap-2 px-3 transition-colors hover:bg-hover", side === "left" ? "rounded-l-[7px]" : "rounded-r-[7px]", open && "bg-hover")}>
-      <Icon className={cn("size-3.5", side === "left" ? "text-neg" : "text-pos")} />
-      <span className="hidden text-[12.5px] text-muted xl:inline">{label}</span>
-      <span className="tnum text-[12.5px]">{moneyK(value)}</span>
-    </button>
-  );
-}
-
-function FlowPanel({ kind, title, flows, total }: { kind: "losses" | "gains"; title: string; flows: Flow[]; total: number }) {
-  const allocate = useGame((s) => s.allocate);
-  const color = kind === "losses" ? "var(--color-neg)" : "var(--color-pos)";
-  return (
-    <div className="p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <Label>{title} per day</Label>
-        <span className="tnum text-[13px] text-soft">{money(total)}</span>
-      </div>
-      <div className="space-y-3.5">
-        {flows.map((c, i) => (
-          <div key={c.k}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px]">{c.k}</span>
-              <div className="flex items-center gap-1.5">
-                <span className="tnum mr-1 text-[12.5px] text-soft">{money(c.v)}</span>
-                <Step onClick={() => allocate(kind, i, -500)} label={`Less on ${c.k}`}><Minus /></Step>
-                <Step onClick={() => allocate(kind, i, 500)} label={`More on ${c.k}`}><Plus /></Step>
-              </div>
-            </div>
-            <Meter value={(c.v / total) * 100} color={color} className="my-1.5" />
-            <div className="flex flex-wrap gap-x-3 text-[12px] text-muted">
-              {c.items.map(([n, v]) => (
-                <span key={n}>{n} <span className="tnum">{moneyK(v)}</span></span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="mt-4 border-t border-line pt-3 text-[12px] text-muted">Use − and + to move money. Changes apply from tomorrow.</p>
-    </div>
-  );
-}
-
-const Step = ({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label: string }) => (
-  <button onClick={(e) => { e.stopPropagation(); onClick(); }} aria-label={label} className="grid size-6 place-items-center rounded border border-line-strong text-muted transition-colors hover:bg-hover hover:text-fg [&_svg]:size-3">
-    {children}
-  </button>
-);
-
-function Clock() {
-  const day = useGame((s) => s.day);
-  const min = useGame((s) => s.min);
-  const speed = useGame((s) => s.speed);
-  const setSpeed = useGame((s) => s.setSpeed);
-  const late = min > DAY_END - 120; // last two hours of the day
-  return (
-    <div className="flex items-center gap-3">
-      <div className="w-[116px]">
-        <div className="flex items-baseline justify-between leading-none">
-          <span className="text-[12.5px] text-muted">Day {day} of 30</span>
-          <span className={cn("tnum text-[13px] transition-colors", late && "breathe text-warm")}>{clock(min)}</span>
-        </div>
-        <Meter value={((min - DAY_START) / (DAY_END - DAY_START)) * 100} color={late ? "var(--color-warm)" : "var(--color-soft)"} className="mt-1.5 h-[3px]" />
-      </div>
-      <div className="flex h-7 items-center rounded-md border border-line p-0.5" title="Slow the day down or speed it up. There is no pause.">
-        {SPEEDS.map((s) => (
-          <button key={s} onClick={() => setSpeed(s)} aria-pressed={speed === s} className={cn("tnum h-full rounded px-2 text-[12px] transition-colors", speed === s ? "bg-white/10 text-fg" : "text-muted hover:text-fg")}>
-            {s === 0.5 ? "½" : s}×
-          </button>
-        ))}
-      </div>
+    <div className="text-right leading-tight whitespace-nowrap" title={`Primary on ${longDate(c.electionDate)}`}>
+      <div className="text-[13px]">{longDate(today)}</div>
+      <div className="tnum text-[12px] text-muted">{daysLeft ? `${daysLeft} days to the primary` : "Primary day"}</div>
     </div>
   );
 }

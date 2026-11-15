@@ -83,7 +83,7 @@ function WorldStrip({ c, w, final }: { c: Case; w: World; final?: boolean }) {
 }
 
 /** Statements with their sources. Every line shows where it comes from. */
-function Claims({ c, items }: { c: Case; items: (Claim | Judgment)[] }) {
+export function Claims({ c, items }: { c: Case; items: (Claim | Judgment)[] }) {
   return (
     <ul className="space-y-2.5">
       {items.map((x, i) => (
@@ -98,7 +98,7 @@ function Claims({ c, items }: { c: Case; items: (Claim | Judgment)[] }) {
   );
 }
 
-function Cite({ c, id }: { c: Case; id: string }) {
+export function Cite({ c, id }: { c: Case; id: string }) {
   const i = c.sources.findIndex((s) => s.id === id);
   const s = c.sources[i];
   if (!s) return null;
@@ -147,7 +147,7 @@ const Chip = ({ up, children }: { up: boolean; children: string }) => (
   </span>
 );
 
-function AdviceCard({ c, a, option }: { c: Case; a: Advice; option?: string }) {
+export function AdviceCard({ c, a, option }: { c: Case; a: Advice; option?: string }) {
   return (
     <div className="rounded-lg border border-line bg-raised p-3">
       <div className="flex items-baseline justify-between gap-2">
