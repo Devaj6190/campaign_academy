@@ -1,9 +1,11 @@
 "use client";
 
+import { PollChart } from "./PollChart";
 import { ArrowDownRight, ArrowUpRight, ListChecks, Swords } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { longDate, shortDate, shortMoney, staffMoney, useCase, useCaseNow } from "@/lib/cases/store";
+import { Changed, pointsDelta, usdDelta } from "./Changed";
 import { effectOf, type Case } from "@/lib/cases/types";
 import { Cite, More } from "@/views/CaseView";
 import type { View } from "@/lib/data";
@@ -106,6 +108,10 @@ function useLedger() {
   return { left: w.budget, out, inc, spent: -sum(out), raised: sum(inc) };
 }
 
+/** Money fine enough that a single job shows: "$4.24M", "$612.5k", "$18,000". */
+const fineMoney = (x: number) => { const n = Math.abs(x) < 0.5 ? 0 : x; return fineMoneyOf(n); };
+const fineMoneyOf = (n: number) => (Math.abs(n) >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : Math.abs(n) >= 1e5 ? `$${(n / 1e3).toFixed(1)}k` : `$${Math.round(n).toLocaleString("en-US")}`);
+
 // Money is the only resource: spending on the left, what is left in the middle, income on the right.
 function Money() {
   const { left, out, inc, spent, raised } = useLedger();
@@ -128,7 +134,9 @@ function Money() {
         </svg>
         <div className="relative flex h-[70px] flex-col items-center justify-center">
           <span className="font-display text-[10px] leading-none font-medium tracking-[0.14em] text-gold/70 uppercase">Left to spend</span>
-          <span className="tnum mt-1.5 font-mono text-[20px] leading-none font-medium tracking-tight text-gold-bright">{shortMoney(Math.max(0, left))}</span>
+          <Changed value={Math.max(0, left)} format={usdDelta} className="mt-1.5" place="below">
+            <span className="tnum font-mono text-[20px] leading-none font-medium tracking-tight text-gold-bright">{fineMoney(Math.max(0, left))}</span>
+          </Changed>
         </div>
       </div>
       <Popover align="end" trigger={(o) => <FlowTrigger open={o} side="right" label="Income" value={raised} />} className="w-[340px]">
@@ -147,7 +155,9 @@ function FlowTrigger({ open, side, label, value }: { open: boolean; side: "left"
       </span>
       <span className="leading-none">
         <span className="hidden font-display text-[10px] font-medium tracking-[0.1em] text-muted uppercase xl:block">{label}</span>
-        <span className="tnum mt-1 block font-mono text-[13px] text-fg">{shortMoney(value)}</span>
+        <Changed value={value} format={usdDelta} good={side === "left" ? "down" : "up"} className="mt-1" place="below">
+          <span className="tnum block font-mono text-[13px] text-fg">{fineMoney(value)}</span>
+        </Changed>
       </span>
     </button>
   );
@@ -211,7 +221,7 @@ function Standing() {
   const { rivals, newest } = useRivals();
   const [seen, setSeen] = useState<string | null>(null);
   const glow = !!newest && newest !== seen;
-  const all = c.candidates.map((x) => ({ id: x.id, name: x.id === c.follow ? "You" : x.name.split(" ").pop()!, v: Math.round(w.poll[x.id] ?? 0), mine: x.id === c.follow })).sort((a, b) => b.v - a.v);
+  const all = c.candidates.map((x) => ({ id: x.id, name: x.id === c.follow ? "You" : x.name.split(" ").pop()!, v: w.poll[x.id] ?? 0, mine: x.id === c.follow })).sort((a, b) => b.v - a.v);
   const top = all.slice(0, 3).some((x) => x.mine) ? all.slice(0, 3) : [...all.slice(0, 2), all.find((x) => x.mine)!];
   return (
     <div className="h-9">
@@ -221,7 +231,14 @@ function Standing() {
           <Swords className="size-4 text-gold min-[1440px]:hidden" />
           <span className="hidden w-40 min-[1440px]:block">
             <span className="tnum mb-1.5 flex justify-between font-mono text-[11px] leading-none">
-              {top.map((x) => <span key={x.id} className={x.mine ? "text-warm" : "text-muted"}>{x.name} {x.v}</span>)}
+              {top.map((x) => (
+                <span key={x.id} className={x.mine ? "text-warm" : "text-muted"}>
+                  {x.name}{" "}
+                  <Changed value={Math.round(x.v * 10) / 10} format={pointsDelta} epsilon={0.04} place="below">
+                    <span>{x.mine ? x.v.toFixed(1) : Math.round(x.v)}</span>
+                  </Changed>
+                </span>
+              ))}
             </span>
             <span className="flex h-[5px] gap-px overflow-hidden">
               {top.map((x) => <span key={x.id} className={cn("transition-[width] duration-500", x.mine ? "bg-warm" : "bg-white/35")} style={{ width: `${x.v}%` }} />)}
@@ -245,7 +262,8 @@ function RivalsPanel({ c, rivals, onOpen }: { c: Case; rivals: ReturnType<typeof
   const stamp = (i: RivalItem) => <span className="flex shrink-0 items-center gap-2"><span className="tnum font-mono text-[13px] text-muted">{shortDate(i.date)}</span><Tag kind={i.source ? "real" : "sim"} /></span>;
   return (
     <div className="max-h-[72vh] overflow-y-auto p-4">
-      <Label className="text-[20px] leading-tight font-semibold text-gold-bright">What your rivals are doing</Label>
+      <PollChart />
+      <Label className="mt-5 block text-[20px] leading-tight font-semibold text-gold-bright">What your rivals are doing</Label>
       <div className="mt-3 space-y-2">
         {rivals.map((o) => {
           const items = o.items.slice(0, full ? RIVAL_ITEMS : 1);

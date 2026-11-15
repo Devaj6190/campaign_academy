@@ -4,6 +4,7 @@ import { ArrowDownRight, ArrowUp, Brain, Check, ChevronDown, CircleDollarSign, L
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Fit } from "@/components/Fit";
+import { TypeOut } from "@/components/TypeOut";
 import { Avatar, Button, Dock, DockButton, Label, Meter, Section, ViewHeader } from "@/components/ui";
 import { AgentPlan, type PlanTask } from "@/components/ui21/agent-plan";
 import { ShaderBackground } from "@/components/ui21/dithering";
@@ -109,7 +110,7 @@ export function WarRoom() {
             </svg>
             <Node at={YOU} name="You" role="The campaigner" you />
             {staff.map((p) => (
-              <Node key={p.id} at={pos[p.id]} name={p.name} role={p.role} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} thinking={!!active[p.id]} selected={p.id === person} busy={!!busy[p.id]} unread={unread[p.id]} onClick={() => pick(p.id)} />
+              <Node key={p.id} id={p.id} at={pos[p.id]} name={p.name} role={p.role} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} thinking={!!active[p.id]} selected={p.id === person} busy={!!busy[p.id]} unread={unread[p.id]} onClick={() => pick(p.id)} />
             ))}
           </Fit>
         </div>
@@ -161,7 +162,29 @@ function ModeBadge() {
   );
 }
 
-function Node({ at, name, role, job, misfit, morale, thinking, you, selected, busy, unread, onClick }: { at: Pt; name?: string; role: string; job?: string; misfit?: boolean; morale?: number; thinking?: boolean; you?: boolean; selected?: boolean; busy?: boolean; unread?: boolean; onClick?: () => void }) {
+/** The money a person's latest piece of work cost or raised, popping above their node for a moment as it lands. */
+function Landed({ id }: { id: string }) {
+  const latest = useCase((s) => { for (let i = s.work.length - 1; i >= 0; i--) if (s.work[i].by === id) return s.work[i]; return undefined; });
+  // Work already there when the War room opens is old news; only what lands while it is open pops.
+  const [opened] = useState(() => latest?.id ?? 0);
+  if (!latest || latest.id <= opened) return null;
+  const net = latest.raised - latest.cost;
+  const text = latest.raised ? `+$${Math.round(latest.raised / 1000)}k raised` : latest.cost ? `−$${latest.cost.toLocaleString("en-US")}` : null;
+  if (!text) return null;
+  return (
+    <motion.span
+      key={latest.id}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: [0, 1, 1, 0], y: [4, -6, -6, -10] }}
+      transition={{ duration: 2.8, times: [0, 0.12, 0.8, 1], ease: "easeOut" }}
+      className={cn("tnum pointer-events-none absolute -top-5 left-1/2 z-10 -translate-x-1/2 rounded px-1.5 font-mono text-[10.5px] leading-[16px] whitespace-nowrap shadow-[0_6px_18px_-6px_rgba(0,0,0,0.9)]", net >= 0 ? "bg-pos/15 text-pos" : "bg-neg/15 text-neg")}
+    >
+      {text}
+    </motion.span>
+  );
+}
+
+function Node({ id, at, name, role, job, misfit, morale, thinking, you, selected, busy, unread, onClick }: { id?: string; at: Pt; name?: string; role: string; job?: string; misfit?: boolean; morale?: number; thinking?: boolean; you?: boolean; selected?: boolean; busy?: boolean; unread?: boolean; onClick?: () => void }) {
   const size = at.r * 2;
   return (
     <button
@@ -178,7 +201,8 @@ function Node({ at, name, role, job, misfit, morale, thinking, you, selected, bu
             <Plus className="m-auto size-4" />
           </span>
         )}
-        {thinking && <span className="absolute -inset-0.5 animate-spin rounded-full border border-transparent border-t-warm [animation-duration:1.4s]" />}
+        {(thinking || busy) && <span className="absolute -inset-0.5 animate-spin rounded-full border border-transparent border-t-warm [animation-duration:1.4s]" />}
+        {id && <Landed id={id} />}
         {unread && <i className="absolute top-0.5 right-0.5 size-2.5 rounded-full border-2 border-bg bg-warm" />}
         {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute bottom-0.5 left-0.5 size-2.5 rounded-full border-2 border-bg bg-neg" />}
       </span>
@@ -531,7 +555,7 @@ function Reply({ c, index, id, effects }: { c: Extract<ChatItem, { k: "report" }
   const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
   return (
     <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start">
-      <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft">{c.text}</div>
+      <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft"><TypeOut id={`report-${id}-${c.run ?? index}`} text={c.text} /></div>
       <div className="tnum mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-1 font-mono text-[10.5px] text-muted">
         <span>Spent <span className="text-neg">{usd(c.spent)}</span></span>
         {!!c.raised && <span>Raised <span className="text-pos">{usd(c.raised)}</span></span>}
