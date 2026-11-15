@@ -348,7 +348,8 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
   if (!about) feed("you", `You → ${first(id)}: ${text}`);
 
   const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget, runId, followOf, steps, followUp: !!about || undefined, memory: memoriesFor([id, ...useGame.getState().staff.filter((p) => p.boss === id).map((p) => p.id)]) };
-  const on = (e: RunEvent) => handle(id, runId, e);
+  // A reset or a loaded campaign while this runs: the run belongs to a campaign that is gone, and nothing of it lands.
+  const on = (e: RunEvent) => { if (useStaff.getState().runs[id]?.some((r) => r.id === runId)) handle(id, runId, e); };
   try {
     const res = await fetch("/api/staff/instruct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
     // A refused order (vacant post, empty text) is not a network failure: say so instead of simulating.
@@ -376,17 +377,20 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
     console.warn("[staff] falling back to local simulation:", err);
     if (!useStaff.getState().runs[id]?.find((r) => r.id === runId)?.jobs.length) await runOffline(new RunCtx(req, on));
   } finally {
-    // Whatever happened, nobody on this run stays stuck looking busy.
-    for (const j of useStaff.getState().runs[id]?.find((r) => r.id === runId)?.jobs ?? []) {
-      if (!j.done) {
-        setBusy(j.to);
-        useStaff.setState((s) => ({ job: Object.fromEntries(Object.entries(s.job).filter(([k]) => k !== j.to)) }));
+    // Whatever happened, nobody on this run stays stuck looking busy. A run reset away has nothing left to tidy, and
+    // must not touch the new campaign (its director may already be on a new job).
+    if (useStaff.getState().runs[id]?.some((r) => r.id === runId)) {
+      for (const j of useStaff.getState().runs[id]?.find((r) => r.id === runId)?.jobs ?? []) {
+        if (!j.done) {
+          setBusy(j.to);
+          useStaff.setState((s) => ({ job: Object.fromEntries(Object.entries(s.job).filter(([k]) => k !== j.to)) }));
+        }
       }
+      useStaff.setState((s) => ({ runs: { ...s.runs, [id]: (s.runs[id] ?? []).map((r) => (r.id === runId ? { ...r, status: "done" as const, jobs: r.jobs.map((j) => ({ ...j, done: true })) } : r)) } }));
+      patchThoughts(id, runId, (t) => ({ ...t, live: false }));
+      setBusy(id);
+      useStaff.setState((st) => { const active = { ...st.active }; delete active[id]; return { active }; });
     }
-    useStaff.setState((s) => ({ runs: { ...s.runs, [id]: (s.runs[id] ?? []).map((r) => (r.id === runId ? { ...r, status: "done" as const, jobs: r.jobs.map((j) => ({ ...j, done: true })) } : r)) } }));
-    patchThoughts(id, runId, (t) => ({ ...t, live: false }));
-    setBusy(id);
-    useStaff.setState((st) => { const active = { ...st.active }; delete active[id]; return { active }; });
   }
 }
 

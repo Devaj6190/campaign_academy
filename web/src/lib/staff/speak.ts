@@ -30,6 +30,8 @@ useCase.subscribe((s, p) => {
 
 /** Where the numbers stood the last time the staff spoke up about them. */
 let seen: { poll: number; groups: Record<string, number> } | null = null;
+/** A loaded or reset campaign: the staff's last read of the numbers starts over (lib/save.ts). */
+export const resetSeen = () => { seen = null; };
 
 const dayNow = () => { const s = useCase.getState(), c = worldNow().c; return Math.round((Date.parse(s.date) - Date.parse(c.briefingDate)) / 86_400_000) + 1; };
 

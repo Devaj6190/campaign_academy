@@ -1,22 +1,15 @@
 "use client";
 
-import { Check, ChevronRight, Newspaper, Plus } from "lucide-react";
+import { Check, ChevronRight, Clapperboard, MoreHorizontal, Newspaper, Plus, RotateCcw } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { create } from "zustand";
 import { currentCase, useCase } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
+import { useTasks } from "@/lib/tasks";
 import { cn } from "@/lib/util";
 import { usePaper } from "./Paper";
-import { Label } from "./ui";
+import { loadDemo, resetAll } from "@/lib/save";
+import { Dialog, Label } from "./ui";
 
-// The student's own to-do list. It starts empty: the game store's tasks belong to the fictional race, which is no longer mounted.
-// ponytail: kept in memory only, like the rest of the case state; persist it with the picks if they ever get saved.
-type Task = { id: number; text: string; done: boolean };
-const useTasks = create<{ tasks: Task[]; add: (text: string) => void; toggle: (id: number) => void }>((set) => ({
-  tasks: [],
-  add: (text) => set((s) => ({ tasks: [...s.tasks, { id: Date.now(), text, done: false }] })),
-  toggle: (id) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) })),
-}));
 
 /** Your tasks, and where you are in the case. The sections of the tool are the tabs in the top bar. On narrow windows this opens from the top bar's "Tasks" menu. */
 export function Sidebar() {
@@ -41,7 +34,7 @@ export function SidebarBody() {
     <div className="min-h-0 flex-1 overflow-y-auto pt-5 pb-4">
       <Tasks />
       <section className="mt-7">
-        <div className="plate mb-2 flex h-8 items-center gap-2.5 px-5"><Label className="flex-1 text-gold-bright">Desk</Label></div>
+        <div className="plate mb-2 flex h-8 items-center gap-2.5 px-5"><Label className="flex-1 text-gold-bright">Desk</Label><DeskMenu /></div>
         <div className="px-4">
           <button onClick={() => openPaper(true)} className="group flex h-10 w-full items-center gap-3 rounded-lg px-1 text-[13px] text-soft transition-colors hover:text-gold-bright">
             <span className="grid size-7 shrink-0 place-items-center rounded-full border border-line-strong transition-colors group-hover:border-gold [&_svg]:size-3.5 [&_svg]:text-gold"><Newspaper /></span>
@@ -118,3 +111,55 @@ const Node = ({ on, here, children }: { on: boolean; here?: boolean; children?: 
     {children}
   </span>
 );
+
+const ASK = {
+  demo: { title: "Load the demo start?", body: "Opens the campaign on May 22, 2013, the day Weiner enters, with the first decision made and the staff at work. The campaign you are playing is replaced.", act: "Load demo start" },
+  reset: { title: "Reset the campaign?", body: "Clears this campaign and its save: decisions, staff chats, the calendar, the paper and your tasks. This cannot be undone.", act: "Reset campaign" },
+};
+
+/** The Desk's menu: load the prepared demo moment, or wipe the campaign and its save (lib/save.ts). */
+function DeskMenu() {
+  const [open, setOpen] = useState(false);
+  const [ask, setAsk] = useState<keyof typeof ASK | null>(null);
+  const started = useCase((s) => s.at > 0 || s.work.length > 0);
+  const choose = (k: keyof typeof ASK) => {
+    setOpen(false);
+    // Nothing to lose on a fresh campaign: the demo loads at once.
+    if (k === "demo" && !started) void loadDemo();
+    else setAsk(k);
+  };
+  const go = () => {
+    if (ask === "demo") void loadDemo();
+    if (ask === "reset") resetAll();
+    setAsk(null);
+  };
+  const item = "flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] text-soft transition-colors hover:bg-white/[0.04] hover:text-gold-bright [&_svg]:size-3.5 [&_svg]:text-gold";
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((o) => !o)} aria-label="Campaign menu" aria-expanded={open} className="grid size-6 place-items-center rounded-full text-gold/80 transition-colors hover:text-gold-bright [&_svg]:size-4">
+        <MoreHorizontal />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div role="menu" className="panel absolute top-7 right-0 z-50 w-[200px] rounded-lg border border-line-strong p-1 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.9)]">
+            <button role="menuitem" className={item} onClick={() => choose("demo")}><Clapperboard />Load demo start</button>
+            <button role="menuitem" className={item} onClick={() => choose("reset")}><RotateCcw />Reset campaign</button>
+          </div>
+        </>
+      )}
+      <Dialog open={!!ask} onClose={() => setAsk(null)} className="max-w-[420px]">
+        {ask && (
+          <div className="p-6">
+            <h2 className="font-display text-[20px] text-gold-bright">{ASK[ask].title}</h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-soft">{ASK[ask].body}</p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button onClick={() => setAsk(null)} className="btn-pill h-8 px-4 text-[12px]">Cancel</button>
+              <button onClick={go} className="btn-gold h-8 px-4 text-[12px]">{ASK[ask].act}</button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+    </div>
+  );
+}
