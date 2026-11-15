@@ -63,7 +63,7 @@ The simulation is grounded in the record and is not a replay of it. The six deci
 - **Decisions are never on a timer.** The clock stops at a decision and stays stopped until you choose.
 - **The real choice is not always the right one.** Luck and rivals' mistakes are part of the record and are shown as such.
 - **A real name is always sourced.** A real person appears in a post only where the record names them in it, and the War room cites that source. The rest of the staff are invented people, so the student has a full team to direct.
-- **Poll numbers and inferences are kept apart.** How large a voter group is and how it polled are real figures. What a group is likely to value is inferred, and is stored and labelled separately.
+- **Poll numbers and inferences are kept apart.** How large a voter group is and how it polled are real figures. What a group is likely to value, and so which groups pull together or apart, is inferred and stored separately. The Factions screen is the one place that shows real, simulated and inferred figures side by side without tags.
 - **Cases are chosen for the lesson.** Not for who won or what they believed. Party primaries are preferred because the contest is inside one party.
 
 ---
@@ -108,7 +108,7 @@ A case is a data file. Adding a case means researching and writing one more file
 | **Profile** | The real candidate and race as of your date: record, platform (each plank dated and cited), and the planks you add |
 | **War room** | The campaign's staff. You give orders in plain language and watch the work travel down and back |
 | **Map** | The city: where your campaign is stronger or weaker, which districts your last decision moved, the candidate's own appearances, and on primary day the count as it comes in |
-| **Factions** | The voter groups the polls reported: how large each is and where you stand with it |
+| **Factions** | The voter groups the polls reported: how large each is, where you stand with it, what it is likely to want, and which groups pull together or against each other |
 
 The top bar holds the money (spent, left under the cap, raised), the poll, the date and the clock. Hovering the poll lists what each rival is doing, and it glows when one of them has done something you have not read. The morning paper opens from the sidebar and on mornings with news.
 

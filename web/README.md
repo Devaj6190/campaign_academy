@@ -31,7 +31,7 @@ work layer ────────────────┘    (worldNow, use
 |---|---|
 | Case data and rules | `lib/cases/types.ts`, `mayor2013.ts`, `index.ts`, `platform.ts` |
 | Live state | `lib/cases/store.ts` (world, work layer), `lib/cases/clock.ts` |
-| Voter groups | `lib/cases/mayor2013-factions.ts` (22 groups, real poll numbers), `mayor2013-leanings.ts` (inferred, see below) |
+| Voter groups | `lib/cases/mayor2013-factions.ts` (22 groups, real poll numbers), `mayor2013-leanings.ts` and `mayor2013-links.ts` (inferred, see below) |
 | Staff agents | `lib/staff/agents.ts` (the agents), `run.ts` (snapshot of the case, landing a job, candidate appearances), `offline.ts` (rules fallback), `speak.ts` (unprompted remarks), `roster.ts`, `protocol.ts`, `world.ts` |
 | What an action does | `lib/engine/catalog.ts` (the actions), `lib/engine/resolve.ts` (cost and effect of one action) |
 | Rivals | `lib/cases/rivals.ts` (when they plan, how a move lands), `lib/engine/rivalAgent.ts` (the agent and its rules fallback) |
@@ -50,7 +50,7 @@ work layer ────────────────┘    (worldNow, use
 
 **Simulated, and labelled so on screen:** what each decision option moves, what staff jobs, appearances, planks and rival moves achieve, and the election-night swing.
 
-**Inferred, kept apart:** `mayor2013-leanings.ts` says what each voter group is likely to value. That is not poll data. Groups defined only by race, religion or gender are left empty unless a 2013 poll line supports a view. The poll lines in that file came from one research pass and should be rechecked against the PDFs before publishing.
+**Inferred, kept apart:** `mayor2013-leanings.ts` says what each voter group is likely to value. That is not poll data. Groups defined only by race, religion or gender are left empty unless a 2013 poll line supports a view. The poll lines in that file came from one research pass and should be rechecked against the PDFs before publishing. `mayor2013-links.ts` is read off the leanings: two groups are linked when they are likely to want the same thing, or when one is likely to want what the other does not. The links only draw lines on the Factions screen; they move no number. That screen shows no real, simulated or estimate tags.
 
 ## Numbers you can tune
 
@@ -77,7 +77,7 @@ With the rivals acting and no staff work, the real campaign's six choices finish
 
 The first version simulated a fictional race. Its code is no longer in the tree. It can be read at the tag `first-version-code` (`git show first-version-code:web/src/lib/relations.ts`, for example).
 
-Two of its features are to be rebuilt on the case and have issues: standing budgets the student can allocate (#33) and the links between voter groups that move together (#34). Its map filter by voter group is already rebuilt (`views/MapView.tsx`, for the groups the census can place). Its calendar, tactics and debates were dropped.
+One of its features is still to be rebuilt on the case: standing budgets the student can allocate (#33). The links between voter groups are rebuilt as lines on the Factions screen (#34), without the first version's knock-on effects. Its map filter by voter group is already rebuilt (`views/MapView.tsx`, for the groups the census can place). Its calendar, tactics and debates were dropped.
 
 Three of Devank's branches that were built on the first version's engine are kept the same way, as the tags `archive/feat-combined`, `archive/feat-money` and `archive/feat-newspaper`.
 
