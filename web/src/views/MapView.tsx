@@ -167,7 +167,7 @@ export function MapView() {
               <>
                 {APPEARANCES.map((a, i) => {
                   const e = preview(sel.cd, a.id);
-                  return <DockButton key={a.id} primary={i === 0} icon={ICONS[a.id]} label={a.label} sub={`$${e.cost.toLocaleString("en-US")} · ${a.note}`} disabled={left <= 0} onClick={() => act(a.id)} />;
+                  return <DockButton key={a.id} primary={i === 0} icon={ICONS[a.id]} label={a.label} sub={`$${e.cost.toLocaleString("en-US")} · ${a.note}`} aria-disabled={left <= 0} onClick={() => act(a.id)} />;
                 })}
                 <DockButton icon={<UserRound />} label="Send staff" sub="order to the Field Director" onClick={() => sendStaff(sel.cd)} />
               </>
