@@ -1,4 +1,5 @@
 import type { StoreApi } from "zustand";
+import { quietly } from "./loading";
 import { useNight } from "./cases/night";
 import { useRivals } from "./cases/rivals";
 import { CASES } from "./cases/index";
@@ -72,6 +73,10 @@ export function valid(x: unknown): x is Save {
  * - new ids start past the loaded ones.
  */
 export function restore(save: unknown): boolean {
+  return quietly(() => put(save));
+}
+
+function put(save: unknown): boolean {
   if (!valid(save)) return false;
   const st = JSON.parse(JSON.stringify(save.stores)) as Save["stores"];
   useCase.setState({ ...st.case, running: false });
@@ -108,6 +113,10 @@ export function restore(save: unknown): boolean {
 
 /** Every store back to how a new visitor finds it, and the save cleared. */
 export function resetAll() {
+  quietly(wipe);
+}
+
+function wipe() {
   const mode = useStaff.getState().mode; // the server's, not the campaign's: it survives a reset
   for (const { store } of SLOTS) store.setState(initial(store));
   useStaff.setState({ mode });
