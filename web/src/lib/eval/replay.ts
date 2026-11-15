@@ -176,7 +176,7 @@ export async function replay(o: ReplayOptions): Promise<Rec[]> {
               const d2 = { ...d, since: undefined, situation: ch.situation.map((text) => ({ text, sources: [] })) };
               arriveAt(c, i);
               const mm = await memosFor(d2, i);
-              const { card } = caseCard(c, d2, i, n, mm, me, "decide", true);
+              const { card } = caseCard(c, d2, i, n, mm, me, "decide", false);
               jobs.push({ rec: { ...base, away: ch.away, variant: v, memos: mm.map((m) => ({ director: m.director, option: m.option })) }, card, who: me });
             }
           } else if (cond === "twin") {
@@ -185,7 +185,7 @@ export async function replay(o: ReplayOptions): Promise<Rec[]> {
           } else {
             // reworded: the same facts in other words; the memos were written from the same facts, so they stay.
             const d2 = cond === "reworded" ? { ...d, situation: REWORDED[d.id].map((text) => ({ text, sources: [] })) } : d;
-            const { card, dropped } = caseCard(c, d2, i, n, cond === "recall" ? [] : memos, me, "decide", cond !== "nochips");
+            const { card, dropped } = caseCard(c, d2, i, n, cond === "recall" ? [] : memos, me, "decide", cond === "card" || cond === "masked" || cond === "recall");
             jobs.push({ rec: { ...base, memos: cond === "recall" ? undefined : memoRecs, dropped }, card: cond === "masked" ? masked(card, me) : card, who: me, recallAs: cond === "recall" ? { who: `${me.name}'s campaign`, date: d.date } : undefined });
           }
         }
@@ -228,7 +228,7 @@ export async function replay(o: ReplayOptions): Promise<Rec[]> {
       let answer: string | undefined;
       try {
         ch = j.recallAs ? (o.live ? await recall(j.card, j.recallAs.who, j.recallAs.date, trace) : { key: null, why: "No key: recall needs the model.", read: [], mode: "rules", ms: 0 })
-          : o.live ? await decideLive(j.card, trace) : decideRules(j.card, j.rec.cond !== "nochips");
+          : o.live ? await decideLive(j.card, trace) : decideRules(j.card, j.card.options.some((x) => x.up));
         if (j.rec.cond === "masked" || j.rec.cond === "twin") answer = o.live ? await probe(j.card, trace) : undefined;
       } catch (err) {
         ch = { key: null, why: `Error: ${(err as Error).message}`, read: [], mode: o.live ? "live" : "rules", ms: 0 };
@@ -238,7 +238,7 @@ export async function replay(o: ReplayOptions): Promise<Rec[]> {
         ...j.rec, chosen, onReal: chosen === null ? null : chosen === j.rec.taken, order: j.card.options.map((x) => x.id),
         why: ch.why, read: ch.read, mode: ch.mode, ms: ch.ms,
         ...(answer !== undefined ? { probe: answer, recognised: recognised(answer) } : {}),
-        prompt: { system: j.recallAs ? "" : system(j.card), user: `${j.card.title}\n\n${j.card.body}\n\nOptions:\n${optionLines(j.card, j.rec.cond !== "nochips")}` },
+        prompt: { system: j.recallAs ? "" : system(j.card), user: `${j.card.title}\n\n${j.card.body}\n\nOptions:\n${optionLines(j.card)}` },
       };
       out.push(r);
       o.onRecord(r);
