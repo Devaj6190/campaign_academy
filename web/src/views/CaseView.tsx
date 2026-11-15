@@ -138,12 +138,12 @@ const Figure = ({ value, label, sub, mine }: { value: string; label: string; sub
 
 const ordinal = (n: number) => `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10 < 4 ? n % 10 : 0]}`;
 
-export function Cite({ c, id }: { c: Case; id: string }) {
+export function Cite({ c, id, className }: { c: Case; id: string; className?: string }) {
   const i = c.sources.findIndex((s) => s.id === id);
   const s = c.sources[i];
   if (!s) return null;
   return (
-    <a href={s.url} target="_blank" rel="noreferrer" title={`${s.title} · ${s.publisher}`} className="ml-1 align-super text-[10.5px] text-gold hover:underline">
+    <a href={s.url} target="_blank" rel="noreferrer" title={`${s.title} · ${s.publisher}`} className={cn("ml-1 align-super text-gold hover:underline", className ?? "text-[10.5px]")}>
       [{i + 1}]
     </a>
   );

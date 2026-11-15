@@ -39,6 +39,10 @@
   /* Headings. `font-serif` is the class the views already use for titles; it and `font-display` both mean Funnel Display. */
   --font-serif: var(--font-funnel);
   --font-display: var(--font-funnel);
+  /* The morning paper's faces (Paper.tsx), used nowhere else. */
+  --font-headline: var(--font-anton);
+  --font-masthead: var(--font-playfair);
+  --font-print: var(--font-oldstandard);
 }
 
 html,
@@ -269,6 +273,203 @@ a {
 }
 @media (prefers-reduced-motion: reduce) {
   .wire-run {
+    animation: none;
+  }
+}
+
+/* ---- The morning paper (Paper.tsx) ----
+   A sheet of newsprint on the dark desk. Inside it the theme's colours are redefined as inks, so every shared piece
+   (citations, popovers, the close button) prints in ink without its own variant. Unlayered, so it beats the panel. */
+.ledger {
+  --color-fg: #1c160e;
+  --color-soft: #2b2318;
+  --color-muted: #574b39;
+  --color-faint: #6c5f4a;
+  --color-gold: #6e4510;
+  --color-gold-bright: #3d2606;
+  --color-line: rgb(28 22 14 / 0.22);
+  --color-line-strong: rgb(28 22 14 / 0.55);
+  --color-raised: #e6d9b9;
+  --color-hover: #dccca5;
+  --color-pos: #2d5a28;
+  --color-neg: #8a2a18;
+  --color-warm: #84460f;
+  --color-cool: #2b4962;
+  color: var(--color-fg);
+  font-family: var(--font-oldstandard), Georgia, serif;
+}
+.ledger-sheet {
+  border: 0;
+  border-radius: 3px;
+  background-color: #e9ddc0;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 18% 12%, rgb(255 250 232 / 0.55), transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 70%, rgb(160 120 60 / 0.12), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .26 0 0 0 0 .12 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Edges darken and fade like old newsprint; a contact shadow sets it on the desk. */
+  box-shadow:
+    inset 0 0 90px rgb(120 84 36 / 0.42),
+    inset 0 0 14px rgb(84 58 24 / 0.5),
+    0 2px 0 rgb(0 0 0 / 0.5),
+    0 50px 110px -24px #000;
+}
+.ledger ::selection {
+  background: rgb(110 69 16 / 0.25);
+}
+.ledger-rule {
+  border-top: 3px double var(--color-fg);
+}
+.ledger-kicker {
+  font-family: var(--font-playfair), serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.ledger-text {
+  font-size: 14.5px;
+  line-height: 1.55;
+  text-align: justify;
+  hyphens: auto;
+}
+.ledger-cols {
+  column-gap: 28px;
+  column-rule: 1px solid var(--color-line);
+}
+.ledger-drop::first-letter {
+  float: left;
+  margin: 6px 8px 0 0;
+  padding: 2px 8px 0;
+  border: 2px solid var(--color-fg);
+  font-family: var(--font-playfair), serif;
+  font-size: 58px;
+  font-weight: 900;
+  line-height: 0.95;
+}
+.ledger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1.5px solid var(--color-fg);
+  font-family: var(--font-playfair), serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background-color 0.15s, color 0.15s;
+}
+.ledger-btn:hover {
+  background: var(--color-fg);
+  color: #e9ddc0;
+}
+.ledger-btn.solid {
+  background: var(--color-fg);
+  color: #e9ddc0;
+}
+.ledger-btn.solid:hover {
+  background: #3d2606;
+}
+.ledger-btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* The moving picture: a printed photograph that never quite holds still. Slow push-in, haze drifting across, a light
+   sweeping over and the grain and exposure flickering, like a photo that is still being taken. */
+.living {
+  position: relative;
+  overflow: hidden;
+  background: #1b150d;
+  box-shadow: inset 0 0 0 1px rgb(28 22 14 / 0.7);
+}
+.living img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 25%;
+  transform-origin: 50% 30%;
+  filter: grayscale(1) sepia(0.4) contrast(1.15) brightness(var(--lift, 1));
+  animation: living-push 26s ease-in-out infinite alternate;
+  transition: opacity 1.6s ease;
+}
+.living::before,
+.living::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+}
+.living::before {
+  background:
+    radial-gradient(ellipse 40% 25% at 30% 60%, rgb(240 225 190 / 0.22), transparent 70%),
+    radial-gradient(ellipse 35% 20% at 70% 40%, rgb(240 225 190 / 0.16), transparent 70%);
+  animation: living-haze 19s ease-in-out infinite alternate;
+}
+.living::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .95 0 0 0 0 .85 0 0 0 .3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  animation: living-grain 0.9s steps(6) infinite, living-flicker 5.5s linear infinite;
+}
+.living .sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 244 215 / 0.2) 50%, transparent 65%);
+  animation: living-sweep 9s ease-in-out infinite;
+  pointer-events: none;
+}
+/* Inner edge: the photo fades into the paper rather than ending on a hard line. */
+.living .vignette {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 60px 10px rgb(20 14 6 / 0.75);
+  pointer-events: none;
+}
+@keyframes living-push {
+  from { transform: scale(1.04) translate(0, 0); }
+  to { transform: scale(1.14) translate(-2%, 1%); }
+}
+@keyframes living-haze {
+  from { transform: translate(-6%, 2%); }
+  to { transform: translate(8%, -3%); }
+}
+@keyframes living-grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-3%, 2%); }
+  40% { transform: translate(2%, -3%); }
+  60% { transform: translate(-1%, 3%); }
+  80% { transform: translate(3%, 1%); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes living-flicker {
+  0%, 100% { opacity: 0.7; }
+  8% { opacity: 0.95; }
+  9% { opacity: 0.55; }
+  10% { opacity: 0.85; }
+  48% { opacity: 0.7; }
+  50% { opacity: 1; }
+  52% { opacity: 0.65; }
+}
+@keyframes living-sweep {
+  0%, 30% { transform: translateX(-100%); }
+  70%, 100% { transform: translateX(100%); }
+}
+/* The sunburst behind the days-to-go figure turns very slowly. */
+@keyframes ledger-turn {
+  to { transform: rotate(360deg); }
+}
+.ledger-sun {
+  animation: ledger-turn 90s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .living img,
+  .living::before,
+  .living::after,
+  .living .sweep,
+  .ledger-sun {
     animation: none;
   }
 }
