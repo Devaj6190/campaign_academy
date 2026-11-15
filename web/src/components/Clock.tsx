@@ -12,10 +12,10 @@ import { Dialog, Label } from "./ui";
 
 // The clock's controls for the top bar, the timer behind them, and the card that opens when a decision arrives.
 
-/** What follows a step of the clock: the paper on a morning with news, the debrief when the campaign is over. */
+/** What follows a step of the clock: the paper on a morning with news, election night on the map when the campaign is over. */
 function land(r: ReturnType<typeof tick>) {
   if (r === "event") usePaper.getState().set(true);
-  if (r === "arrived" && finished()) useGame.getState().go("case");
+  if (r === "arrived" && finished()) useGame.setState({ view: "map", district: null });
 }
 
 /** Keeps the days passing while the clock is running. Time waits while the paper is open. Mount once. */
