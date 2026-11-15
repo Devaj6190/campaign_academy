@@ -224,6 +224,43 @@ What it showed:
 - **So the twins cannot give the clean score they were built for.** The grounding evidence for this case has to come from the changed facts against their control, and from the decisions where memory is wrong.
 - **Recognising the race does not make the agent replay it.** At Weiner, where the twin's late entrant has an expenses scandal instead of the real one, the agent left the 2013 choice in five of the six twin runs across runs 4 and 5, although the probe recognised every twin. Which twin detail moved it is not known.
 
+### Run 6: tuning 2, N = 3 (commit 96fcf73, 15 November)
+
+Tuning 2: the agent's reason must name the facts it rests on and the one fact that would most change its mind.
+
+| Grounding score | Run 4 | Run 6 |
+|---|---|---|
+| Changed facts followed | 26/36 (72%) | 25/36 (69%) |
+| Control kept its choice | 17/18 (94%) | 16/18 (89%) |
+| Where memory was wrong, the card got the real choice | 2/2 | 3/3 |
+
+What it showed:
+- **Tuning 2 made no difference**, like tuning 1. Two prompt changes aimed at grounding have not moved the score beyond run-to-run noise.
+- **The hospital kept the 2013 choice on all six changed cards, and the reasons showed why: the chips.** "C is the only option expected to raise my poll standing." The changed cards rewrote the facts but kept the chips, which were set for the real situation, so the card said the union had turned on the candidate while the chips still said arrest wins union votes. Part of what looked like memory was the agent following leftover chips. From run 7, changed and reworded cards have no chips and are compared with the card without chips.
+
+### Run 7: changed and reworded cards without chips, N = 3 (commit 05c3057, 15 November)
+
+| Grounding score | Result |
+|---|---|
+| Changed facts followed | **28/36 (78%)** |
+| Of the runs where the same decision's card (no chips) chose 2013, changed facts moved it | **22/30 (73%)** |
+| Control kept its choice | **17/18 (94%)** |
+| Where memory was wrong, the card got the real choice | **3/3** (all at the second ad) |
+
+| Decision | nochips | reworded | changed (stuck) | recall |
+|---|---|---|---|---|
+| positioning | 3/3 | 3/3 | 0/6 | 3/3 |
+| weiner | 3/3 | 3/3 | 3/6 | 3/3 |
+| hospital | 3/3 | 3/3 | 5/6 | 3/3 |
+| budget | 0/3 | 0/3 | 0/6 | 3/3 |
+| firstad | 3/3 | 3/3 | 0/6 | 3/3 |
+| base | 3/3 | 3/3 | 0/6 | 0/3 |
+
+What it showed:
+- **Without the chips, the agent follows changed facts at four of six decisions every time**, positioning included (it had kept 2013 there in runs 1 to 3).
+- **Weiner's first changed card and the hospital still hold.** At the hospital the agent argues that a fourth-place candidate needs the attention, and calls it "a hospital closing in my own borough": the changed card names no borough, so that part is memory. Whether a reasoning agent should move away from arrest on that card is itself a judgement made in writing it.
+- **At budget the card never takes the real choice** (0/3 without chips), while memory always knows it (3/3). That is the plainest case of the agent not reading its answer from memory.
+
 ### Free run 1: the whole system, one run (commit b28d704, 15 November)
 
 Run before the memo-leak fix and before tuning 1. The campaigner held 32 weekly meetings and gave 64 orders; the staff carried out 294 jobs; the rivals made 46 moves.
@@ -256,6 +293,8 @@ What it showed:
 | 15 Nov | After run 1: the target is grounding, not agreement. Report agreement on unrecognised masked cards and how often changed facts are followed | Memory alone gives 100% agreement |
 | 15 Nov | Memos skip the lines the card leaves out; masking also hides identifying figures and details; recall replies that are cut short still count | Found in run 1's transcripts |
 | 15 Nov | After run 3, the headline changes to: changed facts followed (with a reworded control), agreement where memory is wrong, and agreement on unrecognised twins. Twins, controls and a second changed version per decision are written before any of them runs | Masking cannot hide this race (27 of 27 recognised in run 2); tuning 1 did not move the changed-facts score. Devaj |
+| 15 Nov | Tuning 2: the reason must name the facts it rests on. Kept, though it made no measurable difference | Run 5 |
+| 15 Nov | Changed and reworded cards drop the chips and are compared with the card without chips | Run 6: the chips, written for the real situation, contradicted the changed facts |
 | 15 Nov | Tuning 1: the campaigner is told the facts it is given are this campaign's facts, even where they differ from what it remembers (`GROUNDED` in `decider.ts`). It names no option and no outcome | Run 1: at three changed-facts cards it argued from memory, not the card |
 
 ## 9. Limits

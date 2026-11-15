@@ -38,7 +38,7 @@ export function summarise(all: (Rec | FinalRec)[]): string {
     const baseOf = (r: Rec) => (rs.some((x) => x.cond === "nochips") ? plainOf(r) : cardOf(r));
     const ctrl = rs.filter((r) => r.cond === "reworded" && r.chosen && baseOf(r)?.chosen);
     const moved = rs.filter((r) => r.cond === "changed" && r.chosen && baseOf(r)?.onReal);
-    const wrong = rs.filter((r) => r.cond === "recall" && r.onReal === false).map(cardOf).filter((r): r is Rec => !!r && r.onReal !== null);
+    const wrong = rs.filter((r) => r.cond === "recall" && r.onReal === false).map((r) => cardOf(r) ?? plainOf(r)).filter((r): r is Rec => !!r && r.onReal !== null);
     const twinU = line(rs.filter((r) => r.cond === "twin" && r.recognised === false));
     const twinR = rs.filter((r) => r.cond === "twin" && r.recognised === true).length;
     const unrec = line(rs.filter((r) => r.cond === "masked" && r.recognised === false));
