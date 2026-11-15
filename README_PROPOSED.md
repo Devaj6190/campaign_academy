@@ -114,7 +114,14 @@ The honest summary: the agents are grounded in the evidence they are given, but 
 
 ## Validation
 
-> **TODO (Devaj):** Devang reached out to about 60 professors and students. Add who tried it, what they said, and the Princeton professor's feedback (what we should be careful about), with the screenshot saved as `docs/readme/screens/validation-princeton.png`.
+Devank wrote to about 60 political science professors and students while we built it. *(TODO: how many replied, and how many tried it.)*
+
+**Prof. Samuel S.-H. Wang, Princeton University,** replied with two points to be careful about:
+
+- **Paid media is the big unknown.** How effective advertising is remains uncertain, and issue positions may matter less than people expect.
+- **Budgeting matters,** because different kinds of campaign material cost different amounts.
+
+What we do with that: every action in the simulation has its own price, from door knocking to television, and the student sets a weekly spending plan across doors, rallies, press, mail and digital ads. How much each kind of spending moves voters is fitted to the record of the race, not measured, and the tool says so.
 
 ---
 
