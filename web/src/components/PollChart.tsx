@@ -8,6 +8,7 @@ import { Label } from "./ui";
 // The race over time, on the student's path: every candidate's line by day from the briefing to today, the student's
 // in the warm gold, rivals in the neutral greys, each named at its end. Markers along the bottom are the student's
 // decisions (gold) and the case's biggest moments (grey); hovering one says what happened. Grows as the clock runs.
+// A moment dated today is held back, as the paper does: same-day coverage can give away what the real campaign chose.
 
 const W = 408, H = 150, PAD = { l: 4, r: 64, t: 8, b: 18 };
 
@@ -33,7 +34,7 @@ export function PollChart() {
 
   const marks = [
     ...c.decisions.filter((d) => picks[d.id] && d.date <= today).map((d) => ({ key: `d${d.id}`, date: d.date, text: `${shortDate(d.date)} · Your decision: ${d.title}`, mine: true })),
-    ...c.press.filter((p) => (p.impact ?? 0) >= 4 && p.date <= today).map((p) => ({ key: `p${p.date}${p.source}`, date: p.date, text: `${shortDate(p.date)} · ${p.short ?? p.summary.split(". ")[0]}`, mine: false })),
+    ...c.press.filter((p) => (p.impact ?? 0) >= 4 && p.date < today).map((p) => ({ key: `p${p.date}${p.source}`, date: p.date, text: `${shortDate(p.date)} · ${p.short ?? p.summary.split(". ")[0]}`, mine: false })),
   ];
   const shown = marks.find((m) => m.key === hover);
 
