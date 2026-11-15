@@ -73,7 +73,7 @@ async function rewrite(ed: Edition) {
     const out = (await res.json()) as WriteResult;
     if (out.mode !== "live") return;
     const pick = <T extends Story>(mine: T, theirs?: Story | null): T => (theirs ? { ...mine, headline: theirs.headline, body: theirs.body } : mine);
-    patch(ed.id, (e) => ({ ...e, mode: "live", campaign: pick(e.campaign, out.stories.campaign), rivals: pick(e.rivals, out.stories.rivals), voices: e.voices.map((v, i) => pick(v, out.stories.voices?.[i])) }));
+    patch(ed.id, (e) => ({ ...e, mode: "live", by: out.by, campaign: pick(e.campaign, out.stories.campaign), rivals: pick(e.rivals, out.stories.rivals), voices: e.voices.map((v, i) => pick(v, out.stories.voices?.[i])) }));
   } catch (err) {
     console.warn("[paper] newsroom unavailable, template stands:", err);
   }
