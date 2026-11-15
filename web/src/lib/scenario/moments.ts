@@ -38,13 +38,24 @@ const picks = () => Object.fromEntries(Object.entries(useGame.getState().moments
  */
 export function applyShift(s: Shift, label: string, summary: string, source: "event" | "moment", sources?: string[]) {
   const g = useGame.getState();
-  const k = supportPerPoint(g.day);
+  const k = supportPerPoint(g.day, g.sent);
+  // The case's poll points say how far the student moves citywide; its group points only say where. Group
+  // support is the case's second lens on the same voters, so it is never added on top of the poll.
   const sent: Record<number, number> = {};
   const mine = s.poll?.[ME.id] ?? 0;
-  for (const cd of Object.keys(g.sent).map(Number)) {
-    const race = districtBy(cd)?.demo?.race;
-    let d = mine;
-    for (const grp of CASE.groups) if (grp.census && race) d += ((s.groups?.[grp.id] ?? 0) * race[grp.census]) / 100;
+  const cds = Object.keys(g.sent).map(Number).filter((cd) => districtBy(cd)?.demo);
+  const tilt = (cd: number) => {
+    const race = districtBy(cd)!.demo!.race;
+    return CASE.groups.reduce((a, grp) => a + (grp.census ? ((s.groups?.[grp.id] ?? 0) * race[grp.census]) / 100 : 0), 0);
+  };
+  const t = Object.fromEntries(cds.map((cd) => [cd, tilt(cd)]));
+  const mean = cds.reduce((a, cd) => a + t[cd], 0) / Math.max(1, cds.length);
+  const spread = Math.max(1e-6, cds.reduce((a, cd) => a + Math.abs(t[cd] - mean), 0) / Math.max(1, cds.length));
+  for (const cd of cds) {
+    // Where the favoured groups live gets more of the move (weight 0.4..1.6 around the city average).
+    const w = s.groups ? Math.max(0.4, Math.min(1.6, 1 + (0.6 * (t[cd] - mean)) / spread)) : 1;
+    // With no citywide move, the groups still shift support between areas (net zero), at a small scale.
+    const d = mine ? mine * w : (s.groups ? 0.5 * (t[cd] - mean) : 0);
     if (d) sent[cd] = Math.round(d * k * 10) / 10;
   }
   const unions = s.groups?.union ?? 0;

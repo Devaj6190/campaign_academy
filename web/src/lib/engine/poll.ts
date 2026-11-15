@@ -13,7 +13,9 @@ export { undecidedShare };
 
 // Calibration: day 1 must read as the scenario's opening poll. One constant turns district support into votes
 // for the student; one weight per rival sets how their lean converts into votes. Solved once from the day-1 map.
-let ME_K = 1;
+// The student's share in a district is a curve of its support, (support/100)^GAMMA of the committed vote: low
+// support yields little, strong support can yield a majority. GAMMA is solved so day 1 matches the opening poll.
+let GAMMA = 1;
 const W: Record<string, number> = Object.fromEntries(RIVAL_LIST.map((r) => [r.id, 1]));
 
 /** How strongly a district leans to each rival, from its voter groups (census shares where they exist). */
@@ -23,7 +25,7 @@ export const lean = (cd: number): Record<string, number> => Object.fromEntries(R
 export function splitOf(cd: number, support: number, day: number, strength: Strength): Shares {
   const undecided = undecidedShare(day);
   const committed = 1 - undecided;
-  const mine = committed * Math.max(0, Math.min(1, (ME_K * support) / 100));
+  const mine = committed * Math.pow(Math.max(0, Math.min(1, support / 100)), GAMMA);
   const rest = committed - mine;
   const ids = activeRivals(day);
   const pull = Object.fromEntries(ids.map((id) => [id, W[id] * Math.max(0.0001, RIVAL_LIST.find((r) => r.id === id)!.lean(cd)) * (1 + (strength[id]?.[cd] ?? 0) / 100)]));
@@ -59,8 +61,11 @@ export function pollOf(s: { sent: Record<number, number>; day: number; rivals: R
 export function calibrate(sent: Record<number, number>) {
   const total = VOTERS.reduce((a, v) => a + v.votes, 0);
   const committed = 1 - undecidedShare(1);
-  const meanSupport = VOTERS.reduce((a, v) => a + (sent[v.cd] ?? 50) * v.votes, 0) / total / 100;
-  ME_K = (ACTIVE.startPoll[ME.id] ?? 0) / 100 / committed / meanSupport;
+  // Bisect GAMMA so the vote-weighted mean of (support/100)^GAMMA gives the opening share of the committed vote.
+  const mineTarget = (ACTIVE.startPoll[ME.id] ?? 0) / 100 / committed;
+  const meanAt = (g: number) => VOTERS.reduce((a, v) => a + Math.pow((sent[v.cd] ?? 50) / 100, g) * v.votes, 0) / total;
+  let lo = 0.2, hi = 8;
+  for (let i = 0; i < 60; i++) { GAMMA = (lo + hi) / 2; if (meanAt(GAMMA) > mineTarget) lo = GAMMA; else hi = GAMMA; }
   // Rival weights: scale each until its share of the rest matches the opening poll (iterative proportional fit).
   const ids = activeRivals(1);
   const target = Object.fromEntries(ids.map((id) => [id, ACTIVE.startPoll[id] ?? 0]));
@@ -76,4 +81,9 @@ export function calibrate(sent: Record<number, number>) {
 }
 
 /** How much district support it takes to move the student's citywide share by one point on this day. */
-export const supportPerPoint = (day: number) => 1 / Math.max(0.05, ME_K * (1 - undecidedShare(day)));
+export function supportPerPoint(day: number, sent: Record<number, number>) {
+  const total = VOTERS.reduce((a, v) => a + v.votes, 0);
+  // The slope of the curve at the current vote-weighted support.
+  const slope = VOTERS.reduce((a, v) => a + GAMMA * Math.pow(Math.max(0.05, (sent[v.cd] ?? 50) / 100), GAMMA - 1) * v.votes, 0) / total;
+  return 1 / Math.max(0.05, slope * (1 - undecidedShare(day)));
+}

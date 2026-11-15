@@ -21,6 +21,7 @@ export function SidebarBody() {
   const addTask = useGame((s) => s.addTask);
   const open = useGame((s) => s.open);
   const planks = useGame((s) => s.manifesto.length);
+  const electionDone = useGame((s) => !!s.election?.done);
   const unread = useGame((s) => s.editions.length > 0 && !s.editions[s.editions.length - 1].read);
   const [text, setText] = useState("");
   const left = tasks.filter((t) => !t.done).length;
@@ -56,6 +57,7 @@ export function SidebarBody() {
         <Row icon={<Newspaper />} onClick={() => { useGame.setState({ paperIndex: null }); open("paper"); }} dot={unread}>Morning paper</Row>
         <Row icon={<ScrollText />} onClick={() => open("manifesto")} badge={String(planks)}>Manifesto</Row>
         <Row icon={<CalendarDays />} onClick={() => open("calendar")}>Calendar</Row>
+        {electionDone && <Row icon={<ScrollText />} onClick={() => useGame.setState({ overlay: "debrief" })}>How it really went</Row>}
       </div>
       <Preview />
     </>

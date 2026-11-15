@@ -13,6 +13,7 @@ import { Avatar, Button, Dialog, Label, Meter } from "./ui";
 import { ShaderBackground } from "./ui21/dithering";
 import { PaperView } from "@/views/paper/Paper";
 import { MomentCard } from "./MomentCard";
+import { Debrief } from "./Debrief";
 import { ACTIVE, colorOf, fullNameOf, ME, nameOf } from "@/lib/scenario";
 
 export function Overlays() {
@@ -26,6 +27,7 @@ export function Overlays() {
       <Dialog open={overlay === "calendar"} onClose={close} className="max-w-[880px]"><Calendar /></Dialog>
       <Dialog open={overlay === "tactic"} onClose={close} className="max-w-[440px]"><Tactic close={close} /></Dialog>
       <Dialog open={overlay === "moment"} onClose={close} className="max-w-[860px]"><MomentCard close={close} /></Dialog>
+      <Dialog open={overlay === "debrief"} onClose={close} className="max-w-[980px]"><Debrief /></Dialog>
       <Dialog open={overlay === "election"} onClose={close} plate="plate-election" className="max-w-[520px]"><Election /></Dialog>
       <Toasts />
     </>
@@ -225,6 +227,11 @@ function Election() {
       <p className="mt-8 border-t border-line pt-4 text-[12.5px] leading-relaxed text-muted">
         {ME.short} carried {result.districtsWon[ME.id] ?? 0} of 59 districts ({result.ranked.filter((id) => id !== ME.id).map((id) => `${nameOf(id)} ${result.districtsWon[id] ?? 0}`).join(", ")}) with {(result.totals[ME.id] ?? 0).toLocaleString("en-US")} votes. Turnout starts from the real 2025 count in each district and rose where your field work was strongest.
       </p>
+      {ACTIVE.kind === "real" && (
+        <div className="relative mt-6 flex justify-end">
+          <Button variant="primary" onClick={() => useGame.setState({ overlay: "debrief" })}>See how it really went</Button>
+        </div>
+      )}
     </div>
   );
 }

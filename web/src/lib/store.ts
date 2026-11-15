@@ -26,7 +26,7 @@ export const DAY_END = 1320; // 22:00
 export const SPEEDS = [0.5, 1, 2, 4];
 
 type Line = { who: "me" | "them" | "note"; text: string };
-type Overlay = "paper" | "manifesto" | "calendar" | "tactic" | "election" | "moment" | null;
+type Overlay = "paper" | "manifesto" | "calendar" | "tactic" | "election" | "moment" | "debrief" | null;
 export type Toast = { id: number; staff: string; text: string };
 
 /** One change to the world, stamped with when it happened. Every view that explains "why" reads this. */
