@@ -20,6 +20,14 @@ function land(r: ReturnType<typeof tick>) {
 
 /** Keeps the days passing while the clock is running. Time waits while the paper is open or its notice is unanswered. Mount once. */
 export function useTicker() {
+  // Staff also react to events as they happen: a decision just made, a lead story just published.
+  useEffect(() => {
+    // The import may resolve after an unmount (React mounts twice in development): only watch if still mounted.
+    let off: (() => void) | undefined;
+    let live = true;
+    void import("@/lib/staff/speak").then((m) => { if (live) off = m.watch(); });
+    return () => { live = false; off?.(); };
+  }, []);
   const running = useCase((s) => s.running);
   const speed = useCase((s) => s.speed);
   const paper = usePaper((s) => s.open || s.unread);

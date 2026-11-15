@@ -4,10 +4,10 @@ import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
 import { platformAt } from "../cases/platform";
 import { factionWork, popShare, supportIn, useCase, worldNow } from "../cases/store";
 import { useGame } from "../store";
-import { ACTIONS, type ActionId } from "../engine/catalog";
+import { ACTIONS, BOOKING, type ActionId } from "../engine/catalog";
 import { resolve, type Effect } from "../engine/resolve";
 import { runOffline } from "./offline";
-import { RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
+import { budgetIn, RunCtx, type Line, type RunEvent, type RunRequest, type Step } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
 import { bumpMorale, nextId, pushChat, useStaff, type ChatItem, type FeedItem } from "./store";
 import { PLACES, short, shortPlace, type Snapshot } from "./world";
@@ -50,6 +50,8 @@ export function snapshot(): Snapshot {
     sent: Object.fromEntries(PLACES.map((p) => [p.cd, supportIn(p.cd) ?? mine])),
     factions: FACTIONS_2013.map((f) => ({ id: f.id, name: f.name, feel: factionNow(f, w.groups, mine, c.start.poll[c.follow] ?? 0, boost), size: f.share, values: [], dislikes: [] })),
     staff: g.staff,
+    booked: k.bookings.filter((b) => !b.done).map((b) => ({ date: b.date, label: `${BOOKING[b.kind].label} in ${shortPlace(b.cd)}` })),
+    daily: DAILY,
     // The platform on record so far, then the planks the student has added.
     manifesto: [...platformAt(c, k.at, k.picks).map((p) => p.text), ...k.work.filter((x) => x.by === "platform").map((x) => x.note ?? x.label)],
     hires: s.hires,
@@ -116,16 +118,39 @@ export const DAILY = 2;
 export const appearancesToday = () => { const { work, date } = useCase.getState(); return work.filter((x) => x.by === "candidate" && x.date === date).length; };
 
 /** What an appearance would cost and do, without doing it. */
-export const preview = (cd: number, id: ActionId) => resolve(snapshot(), "candidate", id, { district: cd }, { quality: 1, seed: cd * 7 + appearancesToday(), load: 1 });
+export const preview = (cd: number, id: ActionId, faction?: string) => resolve(snapshot(), "candidate", id, { district: cd, faction }, { quality: 1, seed: cd * 7 + appearancesToday(), load: 1 });
 
 /** The candidate does it. Refused when he is out of appearances for the day or the money is not there. */
-export function appear(cd: number, id: ActionId): { ok: boolean; text: string } {
+export function appear(cd: number, id: ActionId, faction?: string): { ok: boolean; text: string } {
   if (appearancesToday() >= DAILY) return { ok: false, text: "No appearances left today. Send staff, or let the clock run to tomorrow." };
-  const e = preview(cd, id);
+  const e = preview(cd, id, faction);
   if (e.cost > worldNow().w.budget) return { ok: false, text: "The campaign does not have the money for that." };
   apply(e);
   feed("candidate", `The candidate: ${e.summary}`, e.raised > e.cost ? "pos" : undefined);
   return { ok: true, text: e.summary };
+}
+
+/**
+ * The day's booked appearances happen: the candidate does each in person, inside his daily limit. One that does not
+ * fit today moves to tomorrow; one the campaign cannot pay for is cancelled. The clock calls this as each day starts.
+ */
+export function runBookings() {
+  const s = useCase.getState(), c = worldNow().c;
+  const set = (id: number, patch: Partial<{ date: string; done: string }>) => useCase.setState((k) => ({ bookings: k.bookings.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
+  for (const b of s.bookings.filter((x) => !x.done && x.date <= s.date)) {
+    const what = `${BOOKING[b.kind].label} in ${shortPlace(b.cd)}`;
+    // Nothing the campaign booked happens on election day or after it.
+    if (s.date >= c.electionDate) { set(b.id, { done: "Dropped: the election came first." }); continue; }
+    if (appearancesToday() >= DAILY) {
+      const next = new Date(Date.parse(s.date) + 86_400_000).toISOString().slice(0, 10);
+      if (next >= c.electionDate) set(b.id, { done: "Dropped: no day left before the election." });
+      else { set(b.id, { date: next }); feed("candidate", `The candidate's day is full, so ${what} moves to tomorrow.`); }
+      continue;
+    }
+    const r = appear(b.cd, BOOKING[b.kind].action, b.faction);
+    set(b.id, { done: r.ok ? r.text : `Cancelled: ${r.text}` });
+    if (!r.ok) feed("candidate", `Cancelled, ${what}: ${r.text}`, "neg");
+  }
 }
 
 /** Hand a district to the Field Director: a draft order waits in their box in the War room. */
@@ -171,6 +196,7 @@ function handle(director: string, runId: number, e: RunEvent) {
     }
     case "action": {
       apply(e.effect);
+      if (e.effect.booking && e.effect.district) useCase.getState().book({ date: e.effect.booking.date, kind: e.effect.booking.kind, cd: e.effect.district, faction: e.effect.faction, by: e.effect.by });
       if (!e.effect.fit) {
         const by = e.effect.by;
         useStaff.setState((s) => ({ misfit: { ...s.misfit, [by]: true } }));
@@ -191,9 +217,13 @@ function handle(director: string, runId: number, e: RunEvent) {
       patchRun((r) => { r.jobs = r.jobs.map((j) => (j.to === e.to && !j.done ? { ...j, done: true, summary: e.summary } : j)); });
       if (e.summary) pushChat(e.to, { k: "them", text: e.summary });
       break;
+    case "proposals":
+      pushChat(director, { k: "proposals", text: e.text, options: e.options, run: runId });
+      feed(director, `${cap(first(director))} answered with ${e.options.length} options.`);
+      break;
     case "report":
       pushChat(director, { k: "report", text: e.text, ask: e.ask, state: e.ask ? "open" : "approved", spent: e.spent, raised: e.raised, run: runId });
-      if (current()?.follow) break; // an approved ask continues an order that was already graded
+      if (current()?.follow || current()?.picked) break; // an approved ask or a picked option is not a new instruction to grade
       pushChat(director, { k: "coach", clarity: e.clarity, fit: e.fit, missing: e.missing, text: e.coaching, run: runId });
       // Clear orders to the right person lift morale; vague ones and misfits wear people down.
       bumpMorale(director, e.clarity >= 3 ? 3 : e.clarity <= 1 ? -3 : 0);
@@ -209,21 +239,32 @@ function handle(director: string, runId: number, e: RunEvent) {
   }
 }
 
-export async function instruct(id: string, text: string, extra = 0, followOf?: string) {
+/**
+ * `extra` is the approved amount when this continues an earlier order (`followOf`). `own` is a budget that comes with
+ * the order from elsewhere (a picked option's price). Otherwise the order's own words set it, or the default does.
+ */
+export async function instruct(id: string, text: string, extra = 0, followOf?: string, own?: number, steps?: Step[]) {
   const s = useStaff.getState();
   if (s.active[id]) {
     pushChat(id, { k: "note", text: `${cap(first(id))} is still on the last job. Wait for the report.` });
     return;
   }
   const runId = Date.now() % 1e9;
-  const history: Line[] = (s.chat[id] ?? []).flatMap((c) => (c.k === "me" || c.k === "them" ? [{ who: c.k, text: c.text }] : c.k === "report" ? [{ who: "them" as const, text: c.text }] : []));
-  pushChat(id, { k: "me", text, run: runId });
+  const history: Line[] = (s.chat[id] ?? []).flatMap((c) =>
+    c.k === "me" || c.k === "them" ? [{ who: c.k, text: c.text }]
+    : c.k === "report" ? [{ who: "them" as const, text: c.text }]
+    : c.k === "proposals" ? [{ who: "them" as const, text: `${c.text} Options: ${c.options.map((o, i) => `${i + 1}) ${o.title}`).join("; ")}.` }]
+    : []);
+  // The budget is what the order says, never more than the campaign has. An order that names no limit gets the default.
+  const stated = followOf ? null : (own ?? budgetIn(text));
+  const budget = Math.max(0, Math.min(followOf ? extra : (stated ?? BASE_BUDGET), worldNow().w.budget));
+  pushChat(id, { k: "me", text, run: runId, budget: stated === null ? undefined : budget });
   pushChat(id, { k: "thoughts", run: runId, items: [], live: true });
-  useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, origin: followOf ?? text, follow: !!followOf, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
+  useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, origin: followOf ?? text, follow: !!followOf, picked: !!steps?.length, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
   setBusy(id, "down");
   feed("you", `You → ${first(id)}: ${text}`);
 
-  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget: followOf ? extra : BASE_BUDGET, runId, followOf };
+  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget, runId, followOf, steps };
   const on = (e: RunEvent) => handle(id, runId, e);
   try {
     const res = await fetch("/api/staff/instruct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
@@ -264,6 +305,20 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
     setBusy(id);
     useStaff.setState((st) => { const active = { ...st.active }; delete active[id]; return { active }; });
   }
+}
+
+/** Turn one of a director's options into the order, as if the campaigner had typed it. */
+export function pick(id: string, index: number, option: number) {
+  const item = useStaff.getState().chat[id]?.[index];
+  if (item?.k !== "proposals" || item.picked !== undefined || !item.options[option]) return;
+  // A director still on another job cannot start this one: the card stays open to pick when they report.
+  if (useStaff.getState().active[id]) {
+    pushChat(id, { k: "note", text: `${cap(first(id))} is still on the last job. Pick this option again when they report.` });
+    return;
+  }
+  useStaff.setState((s) => ({ chat: { ...s.chat, [id]: s.chat[id].map((c, i) => (i === index && c.k === "proposals" ? { ...c, picked: option } : c)) } }));
+  const o = item.options[option];
+  void instruct(id, o.order, 0, undefined, o.cost, o.steps);
 }
 
 export function answerAsk(id: string, index: number, yes: boolean) {

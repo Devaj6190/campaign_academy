@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { DISTRICTS, districtBy } from "../geo";
+import type { BookingKind } from "../engine/catalog";
 import { CASES } from "./index";
 import { effectOf, simulate, type Case, type Decision, type Shift, type World } from "./types";
 
@@ -29,6 +30,9 @@ export type Work = {
   districts: Record<number, number>;
 };
 
+/** One appearance on the candidate's calendar. `done` says what happened when the day came. */
+export type Booking = { id: number; date: string; cd: number; kind: BookingKind; faction?: string; by: string; done?: string };
+
 type CaseState = {
   caseId: string;
   /** The step on screen in the Case tab: 0 is the briefing, 1..n are the decision points, n+1 is the debrief. */
@@ -43,13 +47,16 @@ type CaseState = {
   card: boolean;
   picks: Record<string, Pick>;
   work: Work[];
+  /** The candidate's calendar (lib/staff/run runBookings does them on their day). */
+  bookings: Booking[];
+  book: (b: Omit<Booking, "id">) => void;
   go: (step: number) => void;
   decide: (decision: string, pick: Pick) => void;
   addWork: (w: Omit<Work, "id" | "date">) => void;
   restart: () => void;
 };
 
-const fresh = () => ({ step: 0, at: 0, date: CASES[0].briefingDate, running: false, card: false, picks: {}, work: [] });
+const fresh = () => ({ step: 0, at: 0, date: CASES[0].briefingDate, running: false, card: false, picks: {}, work: [], bookings: [] });
 
 export const useCase = create<CaseState>((set) => ({
   caseId: CASES[0].id,
@@ -58,6 +65,7 @@ export const useCase = create<CaseState>((set) => ({
   go: (step) => set({ step }),
   decide: (decision, pick) => set((s) => ({ picks: { ...s.picks, [decision]: pick } })),
   addWork: (w) => set((s) => ({ work: [...s.work, { ...w, id: s.work.length + 1, date: s.date }] })),
+  book: (b) => set((s) => ({ bookings: [...s.bookings, { ...b, id: s.bookings.length + 1 }] })),
   restart: () => set(fresh()),
 }));
 

@@ -25,6 +25,9 @@ export type Snapshot = {
   /** The primary's voter groups: `feel` is the student's support there in percent, `size` the group's share of likely voters. */
   factions: Pick<Faction, "id" | "name" | "feel" | "size" | "values" | "dislikes">[];
   staff: Staff[];
+  /** The candidate's calendar: appearances booked and not yet done, and the most he can do in a day. */
+  booked: { date: string; label: string }[];
+  daily: number;
   manifesto: string[];
   /** Profiles for people hired during the game (seed staff use roster.ts). */
   hires: Record<string, Profile>;
