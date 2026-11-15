@@ -1,4 +1,4 @@
-import { ACTIONS, type ActionId } from "../engine/catalog";
+import { ACTIONS, type ActionId, type BookingKind } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
 import { jitter, RunCtx, sleep } from "./protocol";
 import { findBoros, findFactions, findPlaces, PLACES, short, shortPlace, type Snapshot } from "./world";
@@ -61,6 +61,16 @@ function pickFaction(w: Snapshot, text: string, action: ActionId) {
   return [...w.factions].filter((f) => f.size >= 20).sort((a, b) => a.feel - b.feel)[0]?.id ?? w.factions[0].id;
 }
 
+/**
+ * What to book when there is no model: the kind the order names (a rally, a house party, a meeting), door knocking
+ * otherwise, as the cheapest; on the days after today, one per job, so they do not all land tomorrow.
+ */
+function bookingFor(text: string, today: string, n: number): { kind: BookingKind; on: string } {
+  const t = text.toLowerCase();
+  const kind: BookingKind = /rally|speech/.test(t) ? "rally" : /house part|fundrais/.test(t) ? "house_party" : /meet|leaders|coalition|church|forum/.test(t) ? "meeting" : "doors";
+  return { kind, on: new Date(Date.parse(today) + (n + 1) * 86_400_000).toISOString().slice(0, 10) };
+}
+
 /** Words that ask for ideas rather than work. */
 const IDEAS = /\b(ideas?|suggest(ions?)?|options?|advice|advise|thoughts|recommend(ations?)?|what do you think|your (view|take|read))\b/i;
 
@@ -72,7 +82,10 @@ export const isQuestion = (text: string) => {
   const t = text.trim();
   if (IDEAS.test(t)) return true;
   if (/^(please\b|(can|could|would|will) (you|we)\b|let'?s\b)/i.test(t)) return false;
-  return /\?\s*$/.test(t) || /^(what|which|where|who|how|why|should|is|are|do|does|any)\b/i.test(t);
+  if (/\?\s*$/.test(t)) return true;
+  // A question word opens a question even without its mark. "Do", "is" or "should" open an order as often ("Do a
+  // canvass in Crown Heights"), so they need the question mark.
+  return /^(what|which|where|who|how|why)\b/i.test(t);
 };
 
 /** Without a model: two or three options from the post's usual work, aimed where the campaign is weakest. */
@@ -186,7 +199,7 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
     await wait(900);
     ctx.think(j.who, j.doing);
     await wait(700);
-    const r = ctx.act(j.who, j.a, { district: j.district, faction: j.faction });
+    const r = ctx.act(j.who, j.a, { district: j.district, faction: j.faction, ...(j.a === "schedule_event" ? bookingFor(basis, w.date, i) : {}) });
     notes.push(r.text);
     await wait(1100);
     if (j.who !== req.director) emit({ t: "job-done", to: j.who, summary: r.ok ? r.text.split(" Cost ")[0] : r.text });

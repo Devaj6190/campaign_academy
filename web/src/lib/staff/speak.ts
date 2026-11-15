@@ -19,6 +19,15 @@ const REPEAT = 14;
 
 type Trigger = { key: string; who: string; situation: string; text: string; suggest: string; moved?: boolean };
 
+// A restarted case is a new campaign: who spoke when, and what they last saw, start over. Without this, remarks stay
+// silent until the new campaign passes the old one's last remark day.
+useCase.subscribe((s, p) => {
+  if (s.at < p.at || s.date < p.date) {
+    seen = null;
+    if (Object.keys(useStaff.getState().spoken).length) useStaff.setState({ spoken: {} });
+  }
+});
+
 /** Where the numbers stood the last time the staff spoke up about them. */
 let seen: { poll: number; groups: Record<string, number> } | null = null;
 

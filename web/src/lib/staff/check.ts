@@ -5,6 +5,7 @@ import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
 import { budgetIn, RunCtx, type Proposal, type RunEvent } from "./protocol";
 import { BASE_BUDGET, DAILY, pick, runBookings, snapshot } from "./run";
+import "./speak"; // its restart hook is part of what is checked
 import { useStaff } from "./store";
 
 // Checks on the staff agents that need no API key (issue #41). Run with `npm run check:staff`.
@@ -21,6 +22,8 @@ const ORDERS = [
   "Could you run call time with our past donors tomorrow?",
   "Please pitch reporters on the pre-K plan",
   "Let's hold a rally in Harlem on Saturday",
+  "Do a canvass in Crown Heights this week",
+  "Is it worth canvassing Harlem? Do it if so: canvass Harlem this week",
   "Spend $30,000 on digital ads for voters under 45",
 ];
 const QUESTIONS = [
@@ -143,6 +146,29 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
   const tight = await offline("fd", "Canvass Crown Heights and train volunteers. Under $20,000.", budgetIn("Under $20,000.")!);
   if (tight.spent > 20000 || !tight.spent) problems.push(`budget: a $20,000 order spent $${tight.spent.toLocaleString("en-US")}`);
   report.push(`budget: a $20,000 order spent $${tight.spent.toLocaleString("en-US")}`);
+
+  // With no key, a booking order books what it names (door knocking when nothing is named), on different days.
+  {
+    useCase.getState().restart();
+    useCase.setState({ at: 1, step: 1 });
+    const e = await offline("cm", "Book the candidate for events in Harlem and Crown Heights this week");
+    const b = e.events.flatMap((x) => (x.t === "action" && x.effect.booking ? [x.effect.booking] : []));
+    if (!b.length) problems.push("offline booking: nothing was booked");
+    if (b.some((x) => x.kind === "rally")) problems.push("offline booking: a rally was booked though none was asked for");
+    if (new Set(b.map((x) => x.date)).size < b.length) problems.push(`offline booking: several events on one day (${b.map((x) => x.date).join(", ")})`);
+    const r = (await offline("cm", "Book a rally in Harlem this week", 300_000)).events.flatMap((x) => (x.t === "action" && x.effect.booking ? [x.effect.booking.kind] : []));
+    if (!r.includes("rally")) problems.push("offline booking: asked for a rally, got none");
+    report.push(`offline booking: ${b.map((x) => `${x.kind} on ${x.date}`).join(", ")}; a rally when asked`);
+  }
+
+  // "Play it again" starts the staff's remarks over.
+  {
+    useCase.setState({ at: 3, step: 3, date: "2013-07-20" });
+    useStaff.setState({ spoken: { _last: 170, "rivals-3": 170 } });
+    useCase.getState().restart();
+    if (Object.keys(useStaff.getState().spoken).length) problems.push("remarks: a restarted case kept the old campaign's record of who spoke when");
+    report.push("remarks: a restart starts them over");
+  }
 
   // An option card is used only when its order starts (Devaj's review, item 3): picking while the director is still
   // on another job leaves the card open and starts nothing.
