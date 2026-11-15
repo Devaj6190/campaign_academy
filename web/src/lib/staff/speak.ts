@@ -17,7 +17,8 @@ import { BOROS, PLACES, short, shortPlace } from "./world";
 const GAP = 3;
 const REPEAT = 14;
 
-type Trigger = { key: string; who: string; situation: string; text: string; suggest: string; moved?: boolean };
+/** `carryOut`: the decision just made, which the suggested order must carry out (chatter.ts SpeakRequest). */
+type Trigger = { key: string; who: string; situation: string; text: string; suggest: string; moved?: boolean; carryOut?: string };
 
 // A restarted case is a new campaign: who spoke when, and what they last saw, start over. Without this, remarks stay
 // silent until the new campaign passes the old one's last remark day.
@@ -138,6 +139,7 @@ async function say(t: Trigger, day: number) {
         situation: t.situation,
         context: `Today is ${useCase.getState().date}.${t.key === "money" ? ` ${shortMoney(w.w.budget)} left to spend under the cap.` : ""} Citywide standing ${Math.round(w.w.poll[w.c.follow] ?? 0)}%.`,
         fallback: said,
+        carryOut: t.carryOut,
       }),
     });
     if (res.ok) said = await res.json();
@@ -178,7 +180,7 @@ export function watch() {
     const g = useGame.getState();
     const owner = OWNER[d.skill] ?? "cm";
     const who = g.staff.some((x) => x.id === owner && x.name) ? owner : "cm";
-    void say({ key: `decided-${d.id}`, who, situation: `The campaigner has just decided "${d.title}" and chose: ${o.label}. ${o.detail} Your suggested instruction is the first piece of work your post would do to carry that choice out.`, text: `On "${d.title}": ${o.label}. Fine. My side can start on that as soon as you give the order.`, suggest: orderFor(o) }, dayNow());
+    void say({ key: `decided-${d.id}`, who, situation: `The campaigner has just decided "${d.title}" and chose: ${o.label}. ${o.detail} Your suggested instruction is the first piece of work your post would do to carry that choice out.`, text: `On "${d.title}": ${o.label}. Fine. My side can start on that as soon as you give the order.`, suggest: orderFor(o), carryOut: o.label }, dayNow());
   });
   let editions = 0;
   let offPaper: (() => void) | undefined;

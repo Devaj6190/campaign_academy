@@ -11,7 +11,11 @@ const text = (c: unknown) => (typeof c === "string" ? c : Array.isArray(c) ? c.m
 const live = () => !!process.env.ANTHROPIC_API_KEY;
 
 /** `name` is how the post is addressed ("the Field Director"); `campaign` says whose campaign and which race, from the case. */
-export type SpeakRequest = { name: string; campaign: string; voice: string; situation: string; context: string; fallback: { text: string; suggest: string } };
+/**
+ * `carryOut`: a decision the campaigner has just made. The remark may still disagree with it, but the suggested
+ * order must carry it out: one click sends that order, and it must not undo the choice (#51 review).
+ */
+export type SpeakRequest = { name: string; campaign: string; voice: string; situation: string; context: string; fallback: { text: string; suggest: string }; carryOut?: string };
 
 export async function speak(r: SpeakRequest): Promise<{ text: string; suggest: string; mode: "live" | "offline" }> {
   if (!live()) return { ...r.fallback, mode: "offline" };
@@ -19,7 +23,9 @@ export async function speak(r: SpeakRequest): Promise<{ text: string; suggest: s
     const ledger = new Ledger().add(r.situation, r.context);
     const messages: { role: string; content: string }[] = [
       { role: "system", content: `You are ${r.name} on ${r.campaign}. This is a nonpartisan teaching simulation built on the real race: speak as a professional in that post, never as an impersonation of a real person, and use only the figures you are given. Voice: ${r.voice}` },
-      { role: "user", content: `Something your boss should hear about, unprompted:\n${r.situation}\n\nCampaign state: ${r.context}\n\nWrite exactly two lines.\nLine 1: what you say to your boss, under 40 words, in your voice, no greeting. Have a view: say what you think it means and what you would do, and disagree with your boss if the facts say so.\nUse a figure only when it is the point, and no dollar amounts of your own.\nLine 2: SUGGEST: a short instruction (under 12 words) your boss could give you to act on it.` },
+      { role: "user", content: `Something your boss should hear about, unprompted:\n${r.situation}\n\nCampaign state: ${r.context}\n\nWrite exactly two lines.\nLine 1: what you say to your boss, under 40 words, in your voice, no greeting. Have a view: say what you think it means and what you would do, and disagree with your boss if the facts say so.\nUse a figure only when it is the point, and no dollar amounts of your own.\n${r.carryOut
+        ? `Line 2: SUGGEST: a short instruction (under 12 words) your boss could give you to start carrying out the decision "${r.carryOut}". The decision is made: the instruction must do what was chosen, not change, soften or reverse it, even if you disagreed in line 1.`
+        : "Line 2: SUGGEST: a short instruction (under 12 words) your boss could give you to act on it."}` },
     ];
     let res = await model().invoke(messages);
     const bad = ledger.unknown(text(res.content));
