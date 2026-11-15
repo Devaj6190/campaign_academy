@@ -95,7 +95,8 @@ export function DockButton({ icon, label, sub, primary, ...p }: ButtonHTMLAttrib
     <button
       {...p}
       className={cn(
-        "flex h-11 shrink-0 items-center gap-2.5 rounded-xl px-4 text-left transition-colors [&_svg]:size-4",
+        // ponytail: aria-disabled looks off but still takes the click, so the caller can say why nothing happened.
+        "flex h-11 shrink-0 items-center gap-2.5 rounded-xl px-4 text-left transition-colors [&_svg]:size-4 disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40",
         primary ? "btn-gold !rounded-xl" : "text-fg hover:bg-gold/10 hover:text-gold-bright [&_svg]:text-gold",
       )}
     >
