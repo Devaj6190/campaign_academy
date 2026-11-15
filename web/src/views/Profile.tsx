@@ -1,24 +1,38 @@
 "use client";
 
-import { ArrowRight, CalendarDays, Check, Lock, Newspaper, ScrollText, X } from "lucide-react";
-import { OPPONENTS, PROBLEMS, RECORD } from "@/lib/data";
-import { netPerDay, useGame } from "@/lib/store";
-import { cn, money, moneyK } from "@/lib/util";
+import { ArrowRight, BookOpen, Map as MapIcon } from "lucide-react";
 import { Dock, DockButton, Inspector, Label, Meter, Section } from "@/components/ui";
 import { ShaderBackground } from "@/components/ui21/dithering";
-import { districtBy } from "@/lib/geo";
+import { useCase, worldNow } from "@/lib/cases/store";
+import { useGame } from "@/lib/store";
+import { cn } from "@/lib/util";
+import { Cite, Claims } from "./CaseView";
+
+// The real candidate and race of the current case. Everything here is read from the case file; the only
+// simulated numbers are the student's own standing and money, which follow their decisions so far.
+
+const DAY = 86_400_000;
+const money = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n / 1000)}k`);
 
 export function Profile() {
-  const s = useGame();
-  const net = netPerDay(s);
-  const undecided = 100 - s.poll.cole - s.poll.hale - s.poll.brandt;
-  const stats: [string, string, string, string?][] = [
-    ["Polling", `${s.poll.cole}%`, "2nd of 3"],
-    ["Days left", String(30 - s.day), `Day ${s.day} of 30`],
-    ["Cash", money(s.cash), "On hand"],
-    ["Burn", `${net < 0 ? "−" : "+"}${moneyK(net)}`, "Per day", net < 0 ? "text-neg" : "text-pos"],
+  const step = useCase((s) => s.step);
+  useCase((s) => s.picks); // re-render when a decision is made
+  const go = useGame((s) => s.go);
+  const { c, w } = worldNow();
+  const me = c.candidates.find((x) => x.id === c.follow)!;
+  const rivals = c.candidates.filter((x) => x.id !== c.follow);
+
+  const today = step === 0 ? c.briefingDate : (c.decisions[step - 1]?.date ?? c.electionDate);
+  const daysLeft = Math.max(0, Math.round((Date.parse(c.electionDate) - Date.parse(today)) / DAY));
+  const race = c.candidates.map((x) => ({ ...x, poll: w.poll[x.id] ?? 0 })).filter((x) => x.poll > 0 || x.id === c.follow).sort((a, b) => b.poll - a.poll);
+  const rank = race.findIndex((x) => x.id === c.follow) + 1;
+  const undecided = Math.max(0, 100 - race.reduce((n, x) => n + x.poll, 0));
+  const stats: [string, string, string][] = [
+    ["Polling", `${Math.round(w.poll[c.follow] ?? 0)}%`, `${rank} of ${race.length} in the field`],
+    ["Days left", String(daysLeft), `Primary on ${new Date(c.electionDate).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}`],
+    ["Money left", money(Math.max(0, w.budget)), "To spend under the cap"],
+    ["To win outright", `${c.threshold}%`, "Below it, a runoff"],
   ];
-  const race: [string, number, string][] = [["Victoria Hale", s.poll.hale, "rgb(255 255 255 / .45)"], ["Adrian Cole", s.poll.cole, "var(--color-warm)"], ["Naomi Brandt", s.poll.brandt, "rgb(255 255 255 / .25)"], ["Undecided", undecided, "rgb(255 255 255 / .1)"]];
 
   return (
     <div className="flex h-full">
@@ -28,138 +42,71 @@ export function Profile() {
             <div className="grid grid-cols-[176px_1fr] items-end gap-9">
               <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-[#1b1b20] to-[#0c0c0e]">
                 <div className="absolute inset-0 opacity-45 [mask-image:linear-gradient(to_top,black,transparent_85%)]"><ShaderBackground /></div>
-                <span className="absolute inset-0 grid place-items-center font-serif text-[72px] text-white/70 mix-blend-overlay">AC</span>
-                <span className="absolute inset-x-0 bottom-3 text-center text-[10px] tracking-[0.12em] text-faint uppercase">Portrait</span>
+                <span className="absolute inset-0 grid place-items-center font-serif text-[64px] text-white/70 mix-blend-overlay">{me.name.split(" ").map((p) => p[0]).join("")}</span>
               </div>
               <div className="pb-1">
-                <Label>Your candidate</Label>
-                <h1 className="mt-2 font-serif text-[64px] leading-[0.95] tracking-tight">Adrian Cole</h1>
-                <p className="mt-3 text-[14px] text-soft">Council Member, western Queens. Running for Mayor of New York City.</p>
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {["Housing near transit", "Better buses", "Level police funding", "Small-business relief"].map((t) => (
-                    <span key={t} className={cn("rounded-full border px-2.5 py-0.5 text-[11.5px]", "border-line text-soft")}>{t}</span>
-                  ))}
-                </div>
+                <Label>The campaign you run</Label>
+                <h1 className="mt-2 font-serif text-[64px] leading-[0.95] tracking-tight">{me.name}</h1>
+                <p className="mt-3 text-[14px] text-soft">{me.standing}. Running for {c.office}.</p>
               </div>
             </div>
 
             <div className="mt-9 grid grid-cols-4 divide-x divide-line rounded-xl border border-line bg-surface">
-              {stats.map(([k, v, sub, tone]) => (
+              {stats.map(([k, v, sub]) => (
                 <div key={k} className="px-5 py-4">
                   <Label>{k}</Label>
-                  <div className={cn("tnum mt-1.5 font-mono text-[22px] font-medium tracking-tight", tone)}>{v}</div>
+                  <div className="tnum mt-1.5 font-mono text-[22px] font-medium tracking-tight">{v}</div>
                   <div className="text-[11.5px] text-faint">{sub}</div>
                 </div>
               ))}
             </div>
+            <p className="mt-2 text-[11.5px] text-faint">Polling and money follow your decisions so far and are simulated. Everything else on this page is from the record.</p>
 
-            <p className="mt-8 max-w-[62ch] text-[14px] leading-relaxed text-soft">
-              Son of a bus mechanic and a school aide. A tenant organiser first, then a small-business loan officer. He is cross-pressured: nobody is fully happy with him, so every choice you make will cost him someone.
-            </p>
+            <div className="mt-8"><Claims c={c} items={me.about} /></div>
 
-            <div className="mt-10 grid grid-cols-2 gap-10">
-              <div>
-                <Label>Record</Label>
-                <ul className="mt-3 space-y-3.5">
-                  {RECORD.map((r) => (
-                    <li key={r.text} className="flex gap-3">
-                      <span className={cn("mt-0.5 grid size-4 shrink-0 place-items-center rounded-full", r.ok ? "bg-pos/15 text-pos" : "bg-neg/15 text-neg")}>
-                        {r.ok ? <Check className="size-2.5" strokeWidth={3} /> : <X className="size-2.5" strokeWidth={3} />}
-                      </span>
-                      <div>
-                        <div className="text-[13px]">{r.text}</div>
-                        <div className="text-[11.5px] text-faint">Liked by {r.liked.toLowerCase()} · not by {r.not.toLowerCase()}</div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <Label>Where he stands</Label>
-                <dl className="mt-3 space-y-3 text-[13px]">
-                  {([["Strong", "var(--color-warm)", "Western Queens, north Brooklyn"], ["Weak", "var(--color-cool)", "Staten Island, southern Brooklyn, Upper East Side"], ["Open", "var(--color-faint)", "The Bronx, Upper Manhattan, southeast Queens"]] as const).map(([k, c, v]) => (
-                    <div key={k} className="flex gap-3">
-                      <dt className="flex w-16 shrink-0 items-center gap-2 text-muted"><i className="size-1.5 rounded-full" style={{ background: c }} />{k}</dt>
-                      <dd>{v}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <button onClick={() => s.go("map")} className="mt-4 inline-flex items-center gap-1 text-[12.5px] text-muted transition-colors hover:text-fg">Open the map <ArrowRight className="size-3.5" /></button>
-
-                <div className="mt-8 flex items-center justify-between"><Label>Manifesto</Label><span className="tnum font-mono text-[11px] text-faint">{s.manifesto.length} of 5</span></div>
-                <ol className="mt-3 space-y-2">
-                  {s.manifesto.map((m, i) => (
-                    <li key={i} className="flex gap-3 text-[13px]">
-                      <span className="tnum w-4 shrink-0 font-mono text-[11px] leading-[20px] text-faint">{String(i + 1).padStart(2, "0")}</span>
-                      <span className="flex-1 text-soft">{m}</span>
-                      <Lock className="mt-1 size-3 shrink-0 text-faint" />
-                    </li>
-                  ))}
-                </ol>
-              </div>
+            <div className="mt-10">
+              <Label>Platform</Label>
+              <ul className="mt-3 space-y-4">
+                {c.platform.map((p) => (
+                  <li key={p.text}>
+                    <div className="text-[14px] leading-relaxed">{p.text}{p.sources.map((id) => <Cite key={id} c={c} id={id} />)}</div>
+                    {p.likedBy && <div className="mt-1 text-[12.5px] text-muted"><span className="text-pos">For it: </span>{p.likedBy.text}{p.likedBy.sources.map((id) => <Cite key={id} c={c} id={id} />)}</div>}
+                    {p.dislikedBy && <div className="mt-1 text-[12.5px] text-muted"><span className="text-neg">Against it: </span>{p.dislikedBy.text}{p.dislikedBy.sources.map((id) => <Cite key={id} c={c} id={id} />)}</div>}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
         <Dock>
-          <DockButton primary icon={<ScrollText />} label="Build the manifesto" sub={`${s.manifesto.length} of 5 planks`} onClick={() => s.open("manifesto")} />
-          <DockButton icon={<Newspaper />} label="Morning paper" onClick={() => s.open("paper")} />
-          <DockButton icon={<CalendarDays />} label="Calendar" onClick={() => s.open("calendar")} />
-          <DockButton icon={<ArrowRight />} label="War room" onClick={() => s.go("war")} />
+          <DockButton primary icon={<BookOpen />} label="Back to the case" onClick={() => go("case")} />
+          <DockButton icon={<MapIcon />} label="Map" onClick={() => go("map")} />
+          <DockButton icon={<ArrowRight />} label="War room" onClick={() => go("war")} />
         </Dock>
       </section>
 
       <Inspector>
-        <Section title="The race">
+        <Section title="The race, as your campaign stands">
           <div className="space-y-3">
-            {race.map(([n, v, c]) => (
+            {[...race.map((x) => [x.name, x.poll, x.id === c.follow] as const), ["Undecided or others", undecided, false] as const].map(([n, v, mine]) => (
               <div key={n}>
-                <div className="flex justify-between text-[13px]"><span className={n === "Adrian Cole" ? "" : "text-soft"}>{n}</span><span className="tnum font-mono text-[12px]">{v}%</span></div>
-                <Meter value={v * 2} color={c} className="mt-1.5" />
+                <div className="flex justify-between text-[13px]"><span className={cn(!mine && "text-soft")}>{n}</span><span className="tnum font-mono text-[12px]">{Math.round(v)}%</span></div>
+                <Meter value={v * 2} color={mine ? "var(--color-warm)" : "rgb(255 255 255 / .35)"} className="mt-1.5" />
               </div>
             ))}
           </div>
         </Section>
-        <Section title="Rivals">
+        <Section title="Opponents">
           <div className="space-y-2">
-            {OPPONENTS.map((o) => <RivalCard key={o.id} id={o.id} name={o.name} tag={o.tag} note={o.note} />)}
+            {rivals.map((o) => (
+              <div key={o.id} className="rounded-lg border border-line bg-raised p-3">
+                <div className="text-[13px] font-medium">{o.name}</div>
+                <div className="text-[11.5px] text-muted">{o.standing}</div>
+              </div>
+            ))}
           </div>
         </Section>
-        <Section title="Opening problems">
-          <ol className="space-y-2.5">
-            {PROBLEMS.map((p, i) => (
-              <li key={p} className="flex gap-3 text-[13px] text-soft"><span className="tnum font-mono text-[11px] leading-[20px] text-faint">{i + 1}</span>{p}</li>
-            ))}
-          </ol>
-        </Section>
       </Inspector>
-    </div>
-  );
-}
-
-// What a rival campaign has been doing: their poll, money, last moves and where they've built strength.
-function RivalCard({ id, name, tag, note }: { id: "hale" | "brandt"; name: string; tag: string; note: string }) {
-  const r = useGame((s) => s.rivals[id]);
-  const poll = useGame((s) => s.poll[id]);
-  const ledger = useGame((s) => s.ledger);
-  const moves = ledger.filter((l) => l.source === "rival" && l.effect.by === id).slice(-3).reverse();
-  const strong = Object.entries(r.strength).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([cd]) => districtBy(+cd)?.name.split("-")[0]).filter(Boolean);
-  return (
-    <div className="rounded-lg border border-line bg-raised p-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <div className="text-[13px] font-medium">{name}</div>
-        <div className="tnum font-mono text-[12px]">{poll}%</div>
-      </div>
-      <div className="text-[11.5px] text-muted">{tag}</div>
-      <div className="mt-1.5 flex justify-between text-[11.5px] text-muted">
-        <span>{moneyK(r.cash)} in the bank</span>
-        <span className={cn(r.plan.status === "planning" && "breathe text-warm")}>{r.plan.status === "planning" ? "Planning tonight…" : r.plan.mode === "live" ? "AI campaign" : ""}</span>
-      </div>
-      <div className="mt-1.5 text-[12px] text-soft">Strong with: {strong.length ? strong.join(", ") : note.toLowerCase()}</div>
-      {!!moves.length && (
-        <ul className="mt-2 space-y-1 border-t border-line pt-2 text-[11.5px] text-muted">
-          {moves.map((l) => <li key={l.id}><span className="tnum font-mono text-faint">D{l.day}</span> {l.effect.summary}</li>)}
-        </ul>
-      )}
     </div>
   );
 }

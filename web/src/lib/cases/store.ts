@@ -58,6 +58,31 @@ export function worldNow(): { c: Case; w: World } {
   return { c, w: { budget: w.budget + (ch.budget ?? 0), poll: plus(w.poll, ch.poll), groups: plus(w.groups, ch.groups) } };
 }
 
+/** The case as the student sees it now: their world, the date they have reached and the days left. Re-renders the caller. */
+export function useCaseNow() {
+  const step = useCase((s) => s.step);
+  useCase((s) => s.picks);
+  useCase((s) => s.caseId);
+  const { c, w } = worldNow();
+  const today = step === 0 ? c.briefingDate : (c.decisions[step - 1]?.date ?? c.electionDate);
+  const daysLeft = Math.max(0, Math.round((Date.parse(c.electionDate) - Date.parse(today)) / 86_400_000));
+  return { c, w, step, today, daysLeft };
+}
+
+/**
+ * Where a district's support sits on the map's colour scale (20 cold, 47.5 neutral, 75 warm): its distance from the
+ * student's citywide standing. About five points either side spans the scale, so the map has contrast early and late.
+ */
+export function mapValue(support: number): number {
+  const { c, w } = worldNow();
+  return 47.5 + (support - (w.poll[c.follow] ?? support)) * 5;
+}
+
+/** "27 January 2013" from an ISO date. */
+export const longDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+/** "$4.3M" or "$850k". */
+export const shortMoney = (n: number) => (Math.abs(n) >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n ? `$${Math.round(n / 1000)}k` : "$0");
+
 /**
  * The student's support in one community district, in percent: each group's support weighted by the share of
  * residents the census puts in that group there. Residents outside the tracked groups count at the citywide figure.
