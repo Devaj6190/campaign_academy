@@ -18,10 +18,10 @@ const YES = /^\s*(y|yes|yep|yeah|ok|okay|sure|go|do it|approve|approved)\b/i;
 
 /** What a YES answers: the staffer's suggested order, or a request for more money in a report. */
 type Pending = { who: string; order?: string; ask?: number } | null;
-type PhoneState = { phone: string | null; enabled: boolean | null; after: number; pending: Pending; awaiting: Record<string, number>; error: string | null };
+type PhoneState = { phone: string | null; enabled: boolean | null; line: string | null; code: string | null; after: number; pending: Pending; awaiting: Record<string, number>; error: string | null };
 
 const stored = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
-export const usePhone = create<PhoneState>(() => ({ phone: null, enabled: null, after: Date.now(), pending: null, awaiting: {}, error: null }));
+export const usePhone = create<PhoneState>(() => ({ phone: null, enabled: null, line: null, code: null, after: Date.now(), pending: null, awaiting: {}, error: null }));
 
 const staffer = (id: string) => useGame.getState().staff.find((p) => p.id === id);
 /** How a post signs a text: a post held by a real person in the record signs as the post, never as that person. */
@@ -41,19 +41,33 @@ async function post(text: string, thread = false) {
   }
 }
 
-/** Link a number (E.164) and send the first text. Returns an error to show, or null. */
-export async function linkPhone(raw: string): Promise<string | null> {
-  const phone = raw.replace(/[\s().-]/g, "");
-  if (!/^\+[1-9]\d{7,14}$/.test(phone)) return "Use the full number with its country code, like +15551234567.";
-  try { localStorage.setItem(KEY, phone); } catch {}
-  usePhone.setState({ phone, after: Date.now() });
-  const ok = await post("Campaign Academy: your campaign staff will text you here. Reply to any of them to give an order.");
-  return ok ? null : (usePhone.getState().error ?? "The text did not go out");
+/**
+ * Link a phone the way Photon's lines work: the student texts the line first ("JOIN 4821"), and the phone that sent
+ * the code is theirs. Then the line can text back in that conversation. Resolves to an error to show, or null.
+ */
+export async function linkPhone(): Promise<string | null> {
+  const code = `JOIN ${Math.floor(1000 + Math.random() * 9000)}`;
+  usePhone.setState({ code, error: null });
+  for (let i = 0; i < 90 && usePhone.getState().code === code; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      const { from } = (await (await fetch(`/api/photon/join?code=${encodeURIComponent(code)}`)).json()) as { from: string | null };
+      if (!from) continue;
+      try { localStorage.setItem(KEY, from); } catch {}
+      usePhone.setState({ phone: from, code: null, after: Date.now() });
+      const ok = await post("Campaign Academy: you're linked. Your campaign staff will text you here when something needs your call. Reply to any of them to give an order.", true);
+      return ok ? null : (usePhone.getState().error ?? "The text did not go out");
+    } catch {}
+  }
+  if (usePhone.getState().code === code) usePhone.setState({ code: null });
+  return "No text with the code arrived. Try again.";
 }
+
+export const cancelLink = () => usePhone.setState({ code: null });
 
 export function unlinkPhone() {
   try { localStorage.removeItem(KEY); } catch {}
-  usePhone.setState({ phone: null, pending: null, awaiting: {} });
+  usePhone.setState({ phone: null, code: null, pending: null, awaiting: {} });
 }
 
 /** A staff remark, texted. Called from lib/staff/speak say(). */
@@ -87,7 +101,7 @@ export function watchPhone() {
   started = true;
   const phone = stored();
   usePhone.setState({ phone, after: Date.now() });
-  void fetch("/api/photon/status").then((r) => r.json()).then((x: { enabled: boolean }) => usePhone.setState({ enabled: x.enabled })).catch(() => usePhone.setState({ enabled: false }));
+  void fetch("/api/photon/status").then((r) => r.json()).then((x: { enabled: boolean; line: string | null }) => usePhone.setState({ enabled: x.enabled, line: x.line })).catch(() => usePhone.setState({ enabled: false }));
 
   // Replies from the phone.
   const poll = setInterval(async () => {
@@ -98,7 +112,7 @@ export function watchPhone() {
       const { messages } = (await res.json()) as { messages: { text: string; at: number }[] };
       if (!messages?.length) return;
       usePhone.setState({ after: Math.max(after, ...messages.map((m) => m.at)) });
-      for (const m of messages) handle(m.text);
+      for (const m of messages) if (!/^\s*join\s+\d{4}\s*$/i.test(m.text)) handle(m.text);
     } catch {}
   }, 3000);
 

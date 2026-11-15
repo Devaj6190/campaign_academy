@@ -13,8 +13,12 @@ export type Reply = { id: string; from: string; text: string; at: number };
 /** Photon is set up on this server: the project's id and secret are in the environment. */
 export const photonReady = () => !!(process.env.SPECTRUM_PROJECT_ID && process.env.SPECTRUM_PROJECT_SECRET);
 
-/** A phone number as the last ten digits, so "+1 (555) 111-2222" and "any;-;+15551112222" match. */
-export const sameNumber = (a: string, b: string) => a.replace(/\D/g, "").slice(-10) === b.replace(/\D/g, "").slice(-10);
+/** A handle as a key: a phone as its last ten digits ("+1 (555) 111-2222", "any;-;+15551112222"), an email as itself. */
+export const handleKey = (h: string) => { const d = h.replace(/\D/g, ""); return d.length >= 10 && !h.includes("@") ? d.slice(-10) : h.toLowerCase().replace(/^.*;-;/, ""); };
+export const sameNumber = (a: string, b: string) => handleKey(a) === handleKey(b);
+
+/** The project's iMessage line, for the student to text first (Photon's free lines are inbound-first). */
+export const photonLine = () => process.env.SPECTRUM_IMESSAGE_LINE ?? null;
 
 /** `last`: each number's latest message, so the answer can come back as a threaded reply to it. */
 type State = { app: Promise<App>; inbox: Reply[]; spaces: Map<string, Space>; last: Map<string, Inbound> };
@@ -40,7 +44,7 @@ function state(): State {
       for await (const [space, m] of a.messages) {
         if (m.direction !== "inbound" || m.content.type !== "text" || !m.content.text?.trim()) continue;
         const from = m.sender?.id ?? "";
-        const key = from.replace(/\D/g, "").slice(-10);
+        const key = handleKey(from);
         spaces.set(key, space);
         last.set(key, m);
         inbox.push({ id: m.id, from, text: m.content.text.trim(), at: Date.now() });
@@ -72,7 +76,7 @@ function state(): State {
 export async function sendText(to: string, text: string, thread = false) {
   const s = state();
   const app = await s.app;
-  const key = to.replace(/\D/g, "").slice(-10);
+  const key = handleKey(to);
   const prior = s.last.get(key);
   if (thread && prior?.reply) {
     await s.spaces.get(key)?.stopTyping?.().catch(() => {});
@@ -88,6 +92,13 @@ export async function sendText(to: string, text: string, thread = false) {
     s.spaces.set(key, space);
   }
   await space.send(text);
+}
+
+/** Who texted the line a message containing `code` (linking a phone), or null. Starts the connection if needed. */
+export function whoSent(code: string): string | null {
+  const c = code.trim().toLowerCase();
+  const from = [...state().inbox].reverse().find((m) => m.text.toLowerCase().includes(c))?.from;
+  return from ? from.replace(/^.*;-;/, "") : null;
 }
 
 /** Replies from `from` that arrived after `after` (ms). Starts the connection if it is not running yet. */

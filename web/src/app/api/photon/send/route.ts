@@ -1,7 +1,8 @@
 import { photonReady, sendText } from "@/lib/photon/server";
 
 // One text from the staff's line to the number the student entered (#53).
-const E164 = /^\+[1-9]\d{7,14}$/;
+// A handle iMessage knows: a phone in E.164, or an email.
+const E164 = /^(\+[1-9]\d{7,14}|[^\s@]+@[^\s@]+\.[^\s@]+)$/;
 
 export async function POST(request: Request) {
   if (!photonReady()) return Response.json({ ok: false, error: "Photon is not set up on this server" }, { status: 503 });

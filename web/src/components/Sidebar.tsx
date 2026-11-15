@@ -7,7 +7,7 @@ import { useGame } from "@/lib/store";
 import { useTasks } from "@/lib/tasks";
 import { cn } from "@/lib/util";
 import { usePaper } from "./Paper";
-import { linkPhone, unlinkPhone, usePhone } from "@/lib/photon/client";
+import { cancelLink, linkPhone, unlinkPhone, usePhone } from "@/lib/photon/client";
 import { loadDemo, resetAll } from "@/lib/save";
 import { Dialog, Label } from "./ui";
 
@@ -169,48 +169,44 @@ function DeskMenu() {
 }
 
 /**
- * Link the student's phone (#53, Photon): the staff text their remarks and reports to it, and a reply by text is an
- * order. The number stays in this browser.
+ * Link the student's phone (#53, Photon). Photon's free lines are inbound-first: the student texts the line a short
+ * code from their phone, and that phone is linked. Then the staff text their remarks and reports there, and a reply
+ * by text is an order. The handle stays in this browser.
  */
 function PhoneDialog({ open, close }: { open: boolean; close: () => void }) {
-  const { phone, enabled, error } = usePhone();
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { phone, enabled, line, code, error } = usePhone();
   const [note, setNote] = useState<string | null>(null);
+  const shown = line?.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "+1 ($1) $2-$3") ?? line;
   const link = async () => {
-    setBusy(true);
     setNote(null);
-    const err = await linkPhone(value || phone || "");
-    setBusy(false);
-    setNote(err ?? "Linked. Check your phone for the first text.");
+    const err = await linkPhone();
+    setNote(err ?? "Linked. Check your phone.");
   };
   return (
-    <Dialog open={open} onClose={close} className="max-w-[440px]">
+    <Dialog open={open} onClose={() => { cancelLink(); close(); }} className="max-w-[460px]">
       {open && (
         <div className="p-6">
           <h2 className="font-display text-[20px] text-gold-bright">Texts on my phone</h2>
           <p className="mt-2 text-[13px] leading-relaxed text-soft">
-            Your staff text you when something needs your call, by iMessage through Photon. Reply YES to take their suggestion, or reply with your own order. The report comes back by text.
+            Your staff text you by iMessage, through Photon, when something needs your call. Reply YES to take their suggestion, or reply with your own order. The report comes back by text.
           </p>
           {enabled === false ? (
             <p className="mt-4 text-[13px] text-warm">Texting is not set up on this server (no Photon keys).</p>
+          ) : code ? (
+            <div className="mt-5 rounded-xl border border-gold/40 bg-gold/[0.06] p-4 text-center">
+              <div className="text-[12px] text-muted">From your phone, text</div>
+              <div className="mt-1 font-mono text-[26px] tracking-wider text-gold-bright">{code}</div>
+              <div className="mt-1 text-[12px] text-muted">to</div>
+              <a href={`sms:${line ?? ""}&body=${encodeURIComponent(code)}`} className="mt-1 block font-mono text-[18px] text-fg hover:text-gold-bright">{shown ?? "your project's iMessage line"}</a>
+              <div className="mt-3 text-[12px] text-faint">Waiting for your text…</div>
+            </div>
           ) : (
             <>
-              <label className="mt-4 block text-[12px] text-muted" htmlFor="phone">Your mobile number, with country code</label>
-              <input
-                id="phone"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={phone ?? "+15551234567"}
-                inputMode="tel"
-                autoComplete="tel"
-                className="mt-1 h-10 w-full rounded-lg border border-line-strong bg-raised px-3 font-mono text-[14px] text-fg outline-none placeholder:text-faint focus:border-gold"
-              />
-              <p className="mt-2 text-[11.5px] text-faint">Used only to text you during this campaign. It stays in this browser.</p>
-              {(note || error) && <p className={cn("mt-3 text-[12.5px]", note?.startsWith("Linked") ? "text-pos" : "text-neg")}>{note ?? error}</p>}
+              <p className="mt-4 text-[13px] text-muted">{phone ? `Linked to ${phone}.` : "Not linked yet."}</p>
+              {(note || error) && <p className={cn("mt-2 text-[12.5px]", note?.startsWith("Linked") ? "text-pos" : "text-neg")}>{note ?? error}</p>}
               <div className="mt-5 flex justify-end gap-2">
                 {phone && <button onClick={() => { unlinkPhone(); setNote(null); }} className="btn-pill h-8 px-4 text-[12px]">Stop texts</button>}
-                <button onClick={link} disabled={busy || (!value && !phone)} className="btn-gold h-8 px-4 text-[12px] disabled:opacity-40">{busy ? "Sending…" : phone && !value ? "Send a test text" : "Link and text me"}</button>
+                <button onClick={link} className="btn-gold h-8 px-4 text-[12px]">{phone ? "Link a different phone" : "Link my phone"}</button>
               </div>
             </>
           )}
