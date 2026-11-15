@@ -7,7 +7,7 @@ import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
 import { budgetIn, memoryFile, RunCtx, type Proposal, type RunEvent } from "./protocol";
 import { BASE_BUDGET, DAILY, dueFollowUps, pick, runBookings, snapshot } from "./run";
-import "./speak"; // its restart hook is part of what is checked
+import { orderFor } from "./speak"; // importing it also mounts the restart hook, which is checked below
 import { useStaff } from "./store";
 
 // Checks on the staff agents that need no API key (issue #41). Run with `npm run check:staff`.
@@ -165,6 +165,19 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
     const r = (await offline("cm", "Book a rally in Harlem this week", 300_000)).events.flatMap((x) => (x.t === "action" && x.effect.booking ? [x.effect.booking.kind] : []));
     if (!r.includes("rally")) problems.push("offline booking: asked for a rally, got none");
     report.push(`offline booking: ${b.map((x) => `${x.kind} on ${x.date}`).join(", ")}; a rally when asked`);
+  }
+
+  // A decision hands work to the staff: every option of every decision gives an order, not a question, naming the choice.
+  {
+    const options = currentCase(useCase.getState().caseId).decisions.flatMap((d) => d.options);
+    for (const o of options) {
+      const order = orderFor(o);
+      if (isQuestion(order)) problems.push(`decision order: read as a question: ${order}`);
+      if (!order.includes(o.label)) problems.push(`decision order: does not name the choice: ${order}`);
+    }
+    const e = await offline("fin", orderFor({ label: "Lead with targeted mail" }));
+    if (!e.events.some((x) => x.t === "action")) problems.push("decision order: the rules planner started no work from it");
+    report.push(`decision orders: ${options.length} options each give an order, and the rules planner acts on one`);
   }
 
   // "Play it again" starts the staff's remarks over.
