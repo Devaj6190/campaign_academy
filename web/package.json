@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "node scripts/copy-map-worker.mjs",
-    "check:engine": "node scripts/check-engine.mjs"
+    "check:engine": "node scripts/check-engine.mjs",
+    "refit:case": "node scripts/refit-case.mjs"
   },
   "dependencies": {
     "@langchain/anthropic": "^1.6.5",

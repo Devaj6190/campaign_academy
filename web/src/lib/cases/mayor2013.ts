@@ -277,7 +277,7 @@ export const mayor2013: Case = {
           sh("You raised $240,000. Thompson raised $600,000 and Quinn $510,000.", c("You raised $240,000 in the last filing period. Thompson raised $600,000 and Quinn $510,000.", "dna-0514")),
           sh("A forum turns on Police Commissioner Kelly. Quinn would keep him; you would not.", c("After the Boston Marathon bombing, a forum turned on whether to keep Police Commissioner Ray Kelly. Quinn would keep him; you would not.", "wfuv-0425")),
         ],
-        shift: { poll: { deblasio: -2, quinn: -10, thompson: -1, liu: -3, weiner: 15 } },
+        shift: { poll: { deblasio: -2.3, quinn: -10.5, thompson: -1.4, liu: -3.3, weiner: 15 } },
       },
       situation: [
         sh("Coverage says Weiner's middle-class talk is crowding out your message.", c("Coverage says the new entrant's talk of middle-class struggles is crowding out your message.", "wnyc-lucky")),
@@ -316,7 +316,7 @@ export const mayor2013: Case = {
       date: "2013-07-10",
       title: "A hospital is closing and there is a protest today",
       skill: "policy",
-      since: { notes: [c("Thompson has won the teachers' union endorsement and risen to 16 percent. Weiner now leads some polls.", "q-0626", "m-0725")], shift: { poll: { weiner: 10, quinn: -3, thompson: 1, liu: 1 } } },
+      since: { notes: [c("Thompson has won the teachers' union endorsement and risen to 16 percent. Weiner now leads some polls.", "q-0626", "m-0725")], shift: { poll: { weiner: 9.7, quinn: -3.5, thompson: 0.6, liu: 0.7, deblasio: -0.3 } } },
       situation: [
         sh("The state university may sell Long Island College Hospital. A judge has ordered it kept running.", c("The state university is considering selling Long Island College Hospital in Brooklyn and has diverted ambulances from it. A judge has ordered the hospital kept running.", "dna-arrest", "bkpaper-lich")),
         sh("Organised with 1199 SEIU, which endorsed you, and the nurses, who have endorsed nobody.", c("The protest is organised with 1199 SEIU, which has endorsed you, and the state nurses' association, which has not endorsed anyone yet.", "dna-arrest", "npq-lich")),
@@ -383,7 +383,7 @@ export const mayor2013: Case = {
           sh("Bloomberg tells voters to pick a mayor who refuses retroactive raises.", c("Citing Detroit's bankruptcy, Mayor Bloomberg told voters to pick a mayor who would refuse retroactive raises for city workers.", "fa-detroit")),
           sh("End of July: Quinn 26 or 27. You, Thompson and Weiner at 15 to 21.", c("Polls of likely voters at the end of July: Quinn 26 or 27, with you, Thompson and Weiner between 15 and 21.", "q-0813", "m-0725")),
         ],
-        shift: { poll: { deblasio: 6, quinn: 5, thompson: 10, weiner: -9, liu: -1 }, groups: { black: 3, white: 5, hispanic: 4, union: 3 } },
+        shift: { poll: { deblasio: 5.7, quinn: 4.5, thompson: 9.6, weiner: -9.3, liu: -1.3 }, groups: { black: 3, white: 5, hispanic: 4, union: 3 } },
       },
       situation: [
         c("You need to finish in the top two to reach a runoff, or pass 40 percent to avoid one.", "cfb-ao"),
@@ -423,7 +423,7 @@ export const mayor2013: Case = {
       date: "2013-08-19",
       title: "The second ad, and whose voters you go after",
       skill: "voter-groups",
-      since: { notes: [sh("A federal judge rules stop-and-frisk unconstitutional and orders a monitor.", c("On August 12 a federal judge ruled stop-and-frisk unconstitutional and ordered a monitor. Thompson promised to work with the monitor without backing the Council's oversight bills.", "dna-0812"))], shift: { poll: { deblasio: 2, quinn: -3, thompson: 2, weiner: -6 } } },
+      since: { notes: [sh("A federal judge rules stop-and-frisk unconstitutional and orders a monitor.", c("On August 12 a federal judge ruled stop-and-frisk unconstitutional and ordered a monitor. Thompson promised to work with the monitor without backing the Council's oversight bills.", "dna-0812"))], shift: { poll: { deblasio: 1.7, quinn: -3.5, thompson: 1.6, weiner: -6.3, liu: -0.3 } } },
       situation: [
         sh("Black voters: Thompson 39, you 22, Quinn 18. White voters: you 39, Quinn 31, Thompson 12.", c("Among Black likely voters the August 13 poll has Thompson 39, de Blasio 22, Quinn 18. Among white likely voters: de Blasio 39, Quinn 31, Thompson 12.", "q-0813")),
         c("60 percent of likely primary voters call stop-and-frisk excessive.", "q-0813"),
@@ -462,7 +462,7 @@ export const mayor2013: Case = {
 
   close: {
     notes: [c("The campaign's last large television payment before the primary, about $1 million, is dated August 28.", "cfb-exp")],
-    shift: { poll: { deblasio: 2, quinn: -8, thompson: 4, weiner: -5, liu: 1 }, groups: { black: 3, white: 4, hispanic: 4, union: 4 }, budget: -1_000_000 },
+    shift: { poll: { deblasio: 1.7, quinn: -8.5, thompson: 3.6, weiner: -5.3, liu: 0.7 }, groups: { black: 3, white: 4, hispanic: 4, union: 4 }, budget: -1_000_000 },
   },
 
   press: [
