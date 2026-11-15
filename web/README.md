@@ -40,7 +40,7 @@ work layer ────────────────┘    (worldNow, use
 | Rivals | `lib/cases/rivals.ts` (when they plan, how a move lands), `lib/engine/rivalAgent.ts` (the agent and its rules fallback) |
 | Platform planks | `lib/manifesto/` (shape, rules, run), `components/PlankDesk.tsx` |
 | Election night | `lib/cases/night.ts`, `lib/cases/mayor2013-ad.json` (certified result by Assembly District) |
-| API routes | `app/api/staff/instruct`, `staff/candidates`, `staff/speak`, `rivals/plan`, `manifesto/shape` |
+| API routes | `app/api/staff/instruct`, `staff/memo`, `staff/candidates`, `staff/speak`, `rivals/plan`, `manifesto/shape`, `paper/write`, `paper/stances`, `photon/send`, `photon/inbox`, `photon/join`, `photon/status`, `status` |
 | Screens | `views/CaseView.tsx`, `Profile.tsx`, `WarRoom.tsx`, `MapView.tsx`, `VoterGroups.tsx` (the Factions tab) |
 | Shell | `app/page.tsx`, `components/TopBar.tsx`, `Sidebar.tsx`, `Paper.tsx`, `Toasts.tsx` |
 | Map data | `lib/nyc.json` (real NYC Open Data; refresh with `node scripts/build-data.mjs`), `lib/geo.ts` |
@@ -73,7 +73,7 @@ Each is a first guess, in one place.
 | How much of a group's gain from plan work spills into linked groups (lost with opposed ones) | `SPILL` in `lib/cases/allocation.ts` | 0.25 |
 | How much less a donor pool gives for each time the plan asked it in the last four weeks | `FATIGUE` in `lib/cases/allocation.ts` | 0.2, compounding |
 | Most of each plan line a week; call time is capped by the candidate's day | `max` on each of `LINES` in `lib/cases/allocation.ts` | 2 to 8 |
-| Days between unprompted staff remarks | `GAP`, `REPEAT` in `lib/staff/speak.ts` | 8, 30 |
+| Days between unprompted staff remarks; before the same worry repeats | `GAP`, `REPEAT` in `lib/staff/speak.ts` | 3, 14 |
 
 Money the staff raise pays for staff work but never lifts the campaign above the spending cap (`staffMoney` in `lib/cases/store.ts`). The top bar lists what was raised beyond that as "Raised over the cap, not spendable".
 
