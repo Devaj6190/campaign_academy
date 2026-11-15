@@ -10,7 +10,7 @@ import { PLACES } from "../staff/world";
 import { hash } from "../util";
 
 // A whole campaign without the browser: briefing to election night, through the same stores, staff actions and
-// rival rules the game uses. For the engine checks (scripts/check-engine.ts), the refit, and the evals (#28).
+// rival rules the game uses. For the engine check (npm run check:engine) and the refit (npm run refit:case).
 //
 // Deterministic: the same picks, staff plan and seed give the same world. The rivals run in rules mode (the live
 // agents are not deterministic), and they plan once per step, right after the student decides, as in the game.
