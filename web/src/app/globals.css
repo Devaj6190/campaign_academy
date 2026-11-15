@@ -248,3 +248,27 @@ a {
     animation: none;
   }
 }
+
+/* A short run of light travelling down a War room line. */
+@keyframes wire-run {
+  to {
+    stroke-dashoffset: -150;
+  }
+}
+.wire-run {
+  stroke-dasharray: 22 128;
+  stroke-opacity: 0.85;
+  animation: wire-run 2.6s linear infinite;
+}
+.wire-run.busy {
+  stroke-dasharray: 10 20;
+  animation-duration: 0.9s;
+}
+.wire-run.up {
+  animation-direction: reverse;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wire-run {
+    animation: none;
+  }
+}

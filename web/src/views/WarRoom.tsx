@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownRight, ArrowUp, Brain, Check, ChevronDown, CircleDollarSign, Loader2, MapPin, MessageSquare, Plus, Shuffle, Sparkles, UserMinus, UserPlus, Users, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { animate, AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Fit } from "@/components/Fit";
 import { TypeOut } from "@/components/TypeOut";
@@ -21,25 +21,52 @@ import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 import { Cite } from "./CaseView";
 
-// Fixed logical canvas: you on top, direct reports below, their people below them.
-const W = 900, H = 520;
-const YOU = { x: 450, y: 58, r: 30 };
-type Pt = { x: number; y: number; r: number };
+// The room is real 3D: a stepped stone fan lying on a tilted floor, like a chamber seen from the gallery.
+// You stand on the round dais at the point of the fan, direct reports on the step below, their people on the floor.
+// Everything is placed in floor coordinates (x across, y toward the camera, z up) and the browser does the projection.
+const W = 900, H = 680;
+/** Where the point of the fan sits on the canvas, how far the floor leans back, and how far back the camera stands. */
+const APEX = 222, TILT = 52, ZOOM = 0.8;
+/** A level: the radius people stand at, how high its surface is, and how tall its people are drawn. */
+const LEVELS = [
+  { r: 0, z: 140, h: 108, label: 170 },
+  { r: 340, z: 70, h: 116, label: 134 },
+  { r: 520, z: 0, h: 124, label: 110 },
+];
+/** The marble: a dais, a step and the floor, each a slice of pie opening toward the camera. `half` is half its angle. */
+const DAIS = 86, STEP = { r: 430, half: 72 }, FLOOR = { r: 690, half: 76 };
+/** The floor is itself a low plinth standing on the ground of the hall. */
+const GROUND = -26;
+type Pt = { a: number; t: number };
+const YOU: Pt = { a: 0, t: 0 };
+/** A point on the floor plan: `r` out from the point of the fan, `a` degrees off the line toward the camera. */
+const at = (r: number, a: number) => ({ x: r * Math.sin((a * Math.PI) / 180), y: r * Math.cos((a * Math.PI) / 180) });
+const xy = (r: number, a: number) => { const q = at(r, a); return `${q.x.toFixed(1)} ${q.y.toFixed(1)}`; };
+/** A slice of pie with a round back, so the dais has stone under it. */
+const pie = (r: number, half: number) => `M0 0L${xy(r, -half)}A${r} ${r} 0 0 0 ${xy(r, half)}ZM${DAIS + 26} 0A${DAIS + 26} ${DAIS + 26} 0 1 0 ${-DAIS - 26} 0A${DAIS + 26} ${DAIS + 26} 0 1 0 ${DAIS + 26} 0Z`;
 
 function layout(staff: Staff[]) {
   const pos: Record<string, Pt> = { you: YOU };
   const dirs = staff.filter((p) => !p.boss);
-  dirs.forEach((p, i) => (pos[p.id] = { x: 75 + (i * 750) / (dirs.length - 1), y: 226, r: 26 }));
+  dirs.forEach((p, i) => (pos[p.id] = { a: -60 + (i * 120) / (dirs.length - 1), t: 1 }));
   const subs = dirs.flatMap((d) => staff.filter((p) => p.boss === d.id));
-  subs.forEach((p, i) => (pos[p.id] = { x: 50 + (i * 800) / Math.max(1, subs.length - 1), y: 408, r: 21 }));
+  subs.forEach((p, i) => (pos[p.id] = { a: -50 + (i * 100) / Math.max(1, subs.length - 1), t: 2 }));
   return pos;
 }
 
-// Bezier from a boss's label to a report's avatar. Reversed for reports travelling back up.
-function edge(a: Pt, b: Pt, sub: boolean, up = false) {
-  const y1 = a.y + a.r + (sub ? 52 : 46), y2 = b.y - b.r - 10, ym = (y1 + y2) / 2;
-  return up ? `M${b.x} ${y2}C${b.x} ${ym},${a.x} ${ym},${a.x} ${y1}` : `M${a.x} ${y1}C${a.x} ${ym},${b.x} ${ym},${b.x} ${y2}`;
-}
+// Standing figures, one cut-out per post in /art/staff, all facing the front. Bodies are generated. Walzak and Singleton
+// carry the head from a news photo. No photo of Hyers was found, so that post is a figure left in shadow.
+const ART = "/art/staff/";
+const FIGURES = new Set(["fd", "fin", "com", "sch", "oq", "ob", "vc", "ct", "ev", "pr", "dg"]);
+const SPARES = 4;
+/** Whoever holds the post: its own figure for the first holder, one from the bench for someone hired later. */
+const figureFor = (p: Staff, hired: boolean) =>
+  !p.name || (p.id === "cm" && !hired) ? undefined : hired || !FIGURES.has(p.id) ? `${ART}spare${1 + ([...p.name].reduce((a, c) => a + c.charCodeAt(0), 0) % SPARES)}.webp` : `${ART}${p.id}.webp`;
+const CREDIT: Record<string, string> = {
+  cm: "Figure: a stand-in left in shadow. No photo was found.",
+  com: "Head: photo courtesy of the Mayor's Office, via amNY. Body: AI-generated.",
+  dg: "Head: photo from Personal Democracy Forum. Body: AI-generated.",
+};
 
 // Things a student might plausibly say to each post, to get them started. Places and voter groups are the case's own.
 const IDEAS: Record<string, string[]> = {
@@ -71,48 +98,197 @@ export function WarRoom() {
   const confirm = !!person && confirmFor === person;
   // Reassigning opens a chooser in the side panel (a menu inside the dock would be clipped by its scroll area).
   const [moving, setMoving] = useState<string | null>(null);
+  const hires = useStaff((s) => s.hires);
+  // The pointer moves the camera a little. The room is real 3D, so near things shift more than far ones.
+  const still = useReducedMotion();
+  const mx = useMotionValue(0), my = useMotionValue(0);
+  const sx = useSpring(mx, { stiffness: 90, damping: 18 }), sy = useSpring(my, { stiffness: 90, damping: 18 });
+  const rotateY = useTransform(sx, [-1, 1], [-2, 2]), rotateX = useTransform(sy, [-1, 1], [1.2, -1.2]);
+  const look = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (still) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    mx.set(((e.clientX - r.left) / r.width) * 2 - 1);
+    my.set(((e.clientY - r.top) / r.height) * 2 - 1);
+  };
+  // Selecting someone moves the camera in on them and the people they work with: a director with their team, anyone
+  // else with their boss. The move is a flat pan and scale of the finished picture, so the 3D room itself is untouched.
+  const frame = sel ? [sel.id, ...(sel.boss ? [sel.boss] : staff.filter((p) => p.boss === sel.id).map((p) => p.id))].join() : "";
+  const inFrame = (id: string) => !frame || id === "you" || frame.split(",").includes(id);
+  const cam = useRef<HTMLDivElement>(null);
+  const cx = useMotionValue(0), cy = useMotionValue(0), cs = useMotionValue(1);
+  useEffect(() => {
+    const go = (x: number, y: number, s: number) => ([[cx, x], [cy, y], [cs, s]] as const).forEach(([m, v]) => (still ? m.set(v) : animate(m, v, { duration: 0.7, ease: [0.22, 1, 0.36, 1] })));
+    const el = cam.current?.parentElement;
+    if (!frame || !el) return go(0, 0, 1);
+    // Where the framed people are on the canvas with the camera at rest, worked back from where they are on screen now.
+    const o = el.getBoundingClientRect(), f = o.width / W, s0 = cs.get();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const id of frame.split(",")) {
+      const r = el.querySelector(`[data-feet="${id}"]`)?.getBoundingClientRect();
+      if (!r) continue;
+      x0 = Math.min(x0, ((r.left - o.left) / f - cx.get()) / s0); x1 = Math.max(x1, ((r.right - o.left) / f - cx.get()) / s0);
+      y0 = Math.min(y0, ((r.top - o.top) / f - cy.get()) / s0); y1 = Math.max(y1, ((r.bottom - o.top) / f - cy.get()) / s0);
+    }
+    if (x0 === Infinity) return go(0, 0, 1);
+    // Room for the names over heads and under feet.
+    y0 -= 50; y1 += 60;
+    const s = Math.max(1, Math.min(1.7, (W * 0.84) / (x1 - x0), (H * 0.88) / (y1 - y0)));
+    go(W / 2 - (s * (x0 + x1)) / 2, H / 2 - (s * (y0 + y1)) / 2, s);
+  }, [frame, still, cx, cy, cs]);
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement)) useGame.setState({ person: null }); };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, []);
+  // One sheet of marble at a given height, sized to what it holds (`r` is how far out it reaches).
+  const sheet = (z: number, r: number, children: React.ReactNode, key?: string) => (
+    <svg key={key} viewBox={`${-r} -150 ${2 * r} ${r + 160}`} className="pointer-events-none absolute overflow-visible" style={{ left: -r, top: -150, width: 2 * r, height: r + 160, transform: `translateZ(${z}px)` }} aria-hidden>
+      {children}
+    </svg>
+  );
+  // A wall: plain sheets stacked a few pixels apart, lighter toward the top where the light reaches.
+  const wall = (from: number, to: number, r: number, d: string, key: string) => {
+    const n = Math.round((to - from) / 6);
+    return Array.from({ length: n }, (_, i) => { const v = Math.round(34 + (i / n) * 58); return sheet(from + i * 6, r, <path d={d} fill={`rgb(${v} ${Math.round(v * 0.92)} ${Math.round(v * 0.8)})`} />, key + i); });
+  };
+  const circle = `M${DAIS} 0A${DAIS} ${DAIS} 0 1 0 ${-DAIS} 0A${DAIS} ${DAIS} 0 1 0 ${DAIS} 0Z`;
+  // The top of a level: marble, darker away from the light, with a gold inlay round the edge.
+  const top = (d: string) => (
+    <>
+      <path d={d} fill="url(#marble)" />
+      <path d={d} fill="url(#marble-shade)" stroke="var(--color-gold-bright)" strokeOpacity={0.85} strokeWidth={2.5} />
+    </>
+  );
+  // The ring on the marble under each pair of feet carries the state.
+  const ringOf = (id: string) => (id === person ? "#fff" : misfit[id] ? "var(--color-neg)" : busy[id] || active[id] ? "var(--color-warm)" : "var(--color-gold)");
+  const rings = (t: number) =>
+    [...(t === 0 ? [{ id: "you" }] : []), ...staff.filter((p) => pos[p.id].t === t)].map((p) => {
+      const q = at(LEVELS[t].r, pos[p.id].a), c = ringOf(p.id), lit = c !== "var(--color-gold)";
+      return (
+        <g key={p.id} transform={`translate(${q.x} ${q.y})`}>
+          <circle r="38" fill="url(#foot)" />
+          <circle r="40" fill="none" stroke={c} strokeWidth={p.id === person ? 3.6 : lit ? 2.6 : 1.6} strokeOpacity={lit ? 1 : 0.55} className={cn((!!active[p.id] || !!busy[p.id]) && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 6px ${c})` } : undefined} />
+        </g>
+      );
+    });
+  // The lines from each person to their reports are drawn flat over the room, straight from one to the other, as on the
+  // old chart. The room is 3D and moves with the pointer, so each frame they are redrawn from where people actually are.
+  const room = useRef<HTMLDivElement>(null);
+  const paths = useRef<Record<string, [down: string, up: string]>>({});
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const el = room.current;
+      if (el) {
+        const o = el.getBoundingClientRect();
+        const point = (sel: string, bottom: boolean) => { const n = el.querySelector(sel); if (!n) return null; const r = n.getBoundingClientRect(); return [r.left + r.width / 2 - o.left, (bottom ? r.bottom : r.top) - o.top] as const; };
+        el.querySelectorAll("[data-wire]").forEach((g) => {
+          const [from, to] = g.getAttribute("data-wire")!.split(">");
+          const a = point(`[data-feet="${from}"]`, true), b = point(`[data-head="${to}"]`, false);
+          if (!a || !b) return;
+          const [x1, y1, x2, y2] = [a[0], a[1] + 2, b[0], b[1] - 6].map((v) => Math.round(v * 10) / 10);
+          // A line always leaves downward and arrives from above, like a slack cable, even to someone standing level
+          // with their boss: otherwise it runs flat across the names in between.
+          const k = Math.round(Math.max((y2 - y1) / 2, 14)), ya = y1 + k, yb = y2 - k;
+          const d = `M${x1} ${y1}C${x1} ${ya},${x2} ${yb},${x2} ${y2}`;
+          paths.current[to] = [d, `M${x2} ${y2}C${x2} ${yb},${x1} ${ya},${x1} ${y1}`];
+          // Checked per path, not per line: the glow and the running light are added when a line lights up.
+          for (const path of g.children) if (path.getAttribute("d") !== d) path.setAttribute("d", d);
+        });
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  // Something standing in the hall behind the fan, facing the camera: the back wall and its columns.
+  const upright = (x: number, y: number, w: number, h: number): React.CSSProperties => ({ left: x, top: y, width: w, height: h, transformOrigin: "50% 100%", transform: `translate(-50%, -100%) translateZ(${GROUND}px) rotateX(${-TILT}deg)` });
 
   return (
     <div className="flex h-full">
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader title="War room" sub="You direct. Your reports plan the work and hand it to their people." right={<ModeBadge />} />
-        <div className="relative min-h-0 flex-1 px-6 pb-24" onClick={() => pick(null)}>
-          <div className="pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-screen [mask-image:radial-gradient(ellipse_65%_60%_at_50%_0%,black,transparent)]">
+        <div className="relative min-h-0 flex-1 px-6 pb-24" onClick={() => pick(null)} onMouseMove={look} onMouseLeave={() => { mx.set(0); my.set(0); }}>
+          <motion.div className="pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-screen [mask-image:radial-gradient(ellipse_65%_60%_at_50%_0%,black,transparent)]">
             <ShaderBackground />
-          </div>
+          </motion.div>
+          {sel && <Button size="sm" className="absolute top-1 left-6 z-10 !text-[13px]" onClick={(e) => { e.stopPropagation(); pick(null); }}><Users className="size-3.5" />Whole room</Button>}
+          {/* The hall fades into the page on every side instead of ending at an edge; the lines fade with it. */}
+          <div ref={room} className="relative h-full [mask-composite:intersect] [mask-image:linear-gradient(90deg,transparent,black_9%,black_91%,transparent),linear-gradient(transparent,black_10%,black_86%,transparent)]">
           <Fit w={W} h={H}>
-            <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 overflow-visible" aria-hidden>
-              <defs>
-                <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3" /></filter>
-              </defs>
-              {staff.map((p) => {
-                const state = busy[p.id];
-                return (
-                  <path
-                    key={p.id}
-                    d={edge(pos[p.boss ?? "you"], pos[p.id], !!p.boss)}
-                    fill="none"
-                    strokeWidth={state || misfit[p.id] ? 1.4 : 1}
-                    stroke={misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "rgb(255 255 255 / 0.1)"}
-                    strokeOpacity={state === "work" ? 0.45 : 1}
-                    className={cn(state === "down" && "edge-flow", state === "up" && "edge-flow up")}
-                  />
-                );
-              })}
-              {/* Work in transit: a spark runs down when a job is handed over, and back up with the report. */}
-              {packets.map((k) => {
-                const child = staff.find((p) => p.id === k.to && p.boss === k.from) ?? staff.find((p) => p.id === k.from && p.boss === k.to);
-                if (!child || !pos[child.id]) return null;
-                const up = child.id === k.from;
-                const d = edge(pos[child.boss ?? "you"], pos[child.id], !!child.boss, up);
-                return <Spark key={k.id} d={d} up={up} />;
-              })}
-            </svg>
-            <Node at={YOU} name="You" role="The campaigner" you />
-            {staff.map((p) => (
-              <Node key={p.id} id={p.id} at={pos[p.id]} name={p.name} role={p.role} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} thinking={!!active[p.id]} selected={p.id === person} busy={!!busy[p.id]} unread={unread[p.id]} onClick={() => pick(p.id)} />
-            ))}
+            <motion.div ref={cam} className="absolute inset-0 origin-top-left" style={{ x: cx, y: cy, scale: cs }}>
+            <div className="absolute inset-0" style={{ perspective: 2400, perspectiveOrigin: "50% 36%" }}>
+              <motion.div className="absolute inset-0" style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}>
+                <div className="absolute" style={{ left: W / 2, top: APEX, transform: `scale3d(${ZOOM}, ${ZOOM}, ${ZOOM}) rotateX(${TILT}deg)`, transformStyle: "preserve-3d" }}>
+                  {/* The hall: its ground, the back wall with the light on it, and a row of columns. */}
+                  {sheet(
+                    GROUND,
+                    1100,
+                    <>
+                      <defs>
+                        <pattern id="marble" patternUnits="userSpaceOnUse" x="-700" y="-150" width="1400" height="850"><image href={`${ART}marble.jpg`} width="1400" height="850" preserveAspectRatio="none" /></pattern>
+                        {/* Light falls on the dais; the marble darkens away from it. */}
+                        <radialGradient id="marble-shade" gradientUnits="userSpaceOnUse" cx="0" cy="0" r={FLOOR.r}><stop offset="0" stopColor="#070605" stopOpacity="0" /><stop offset="0.65" stopColor="#070605" stopOpacity="0.35" /><stop offset="1" stopColor="#070605" stopOpacity="0.8" /></radialGradient>
+                        {/* The shadow a figure casts where it stands, and the pool of light on the dais. */}
+                        <radialGradient id="foot"><stop offset="0" stopColor="#000" stopOpacity="0.9" /><stop offset="0.55" stopColor="#000" stopOpacity="0.55" /><stop offset="1" stopColor="#000" stopOpacity="0" /></radialGradient>
+                        <radialGradient id="pool"><stop offset="0" stopColor="#f3d999" stopOpacity="0.42" /><stop offset="1" stopColor="#f3d999" stopOpacity="0" /></radialGradient>
+                        <radialGradient id="ground-shade" gradientUnits="userSpaceOnUse" cx="0" cy="200" r="1000"><stop offset="0.35" stopColor="#070605" stopOpacity="0.55" /><stop offset="1" stopColor="#070605" /></radialGradient>
+                      </defs>
+                      <rect x="-1100" y="-150" width="2200" height="1260" fill="url(#marble)" />
+                      <rect x="-1100" y="-150" width="2200" height="1260" fill="url(#ground-shade)" />
+                    </>,
+                  )}
+                  <div className="pointer-events-none absolute [mask-image:linear-gradient(90deg,transparent,black_22%,black_78%,transparent)]" style={{ ...upright(0, -150, 1500, 560), backgroundImage: `linear-gradient(#0000 55%, #070605e6), url(${ART}room.jpg)`, backgroundSize: "100% 100%" }} />
+                  {[-560, -400, -240, 240, 400, 560].map((x) => (
+                    <div key={x} className="pointer-events-none absolute" style={{ ...upright(x, -128, 46, 520), opacity: 1 - Math.abs(x) / 900 }}>
+                      <i className="absolute inset-x-1 top-5 bottom-4 bg-[linear-gradient(90deg,#0f0d09,#7a6d55_32%,#4a4233_55%,#15120d)]" />
+                      <i className="absolute inset-x-0 top-0 h-5 bg-[linear-gradient(90deg,#5a4520,#f3d999_35%,#8c6b2e)]" />
+                      <i className="absolute inset-x-0 bottom-0 h-4 bg-[linear-gradient(90deg,#15120d,#6b5f48_35%,#1c1812)]" />
+                    </div>
+                  ))}
+                  {/* The fan itself: the floor as a low plinth, the step, the dais. */}
+                  {wall(GROUND + 6, 0, FLOOR.r + 10, pie(FLOOR.r, FLOOR.half), "f")}
+                  {sheet(0, FLOOR.r + 10, <>{top(pie(FLOOR.r, FLOOR.half))}{rings(2)}</>)}
+                  {wall(6, LEVELS[1].z, STEP.r + 10, pie(STEP.r, STEP.half), "s")}
+                  {sheet(LEVELS[1].z, STEP.r + 10, <>{top(pie(STEP.r, STEP.half))}{rings(1)}</>)}
+                  {wall(LEVELS[1].z + 6, LEVELS[0].z, DAIS + 10, circle, "d")}
+                  {sheet(LEVELS[0].z, DAIS + 10, <>{top(circle)}<circle r={DAIS} fill="url(#pool)" />{rings(0)}</>)}
+                  <Node id="you" at={YOU} name="You" role="The campaigner" you />
+                  {staff.map((p) => (
+                    <Node key={p.id} id={p.id} at={pos[p.id]} name={p.name} role={p.role} figure={figureFor(p, !!hires[p.id])} shadow={p.id === "cm" && !hires[p.id]} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} selected={p.id === person} full={!!frame && inFrame(p.id)} dim={!inFrame(p.id)} unread={unread[p.id]} onClick={() => pick(p.id)} />
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+            </motion.div>
           </Fit>
+          <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
+            <defs>
+              <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3" /></filter>
+            </defs>
+            {staff.map((p) => {
+              const state = busy[p.id];
+              // A line stays dim until something is on it: work going down, a report coming back, or a wrong-person flag.
+              const lit = !!state || misfit[p.id];
+              const c = misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "var(--color-gold)";
+              return (
+                <g key={p.id} data-wire={`${p.boss ?? "you"}>${p.id}`} fill="none" strokeLinecap="round">
+                  {lit && <path stroke={c} strokeWidth={8} strokeOpacity={0.55} filter="url(#glow)" />}
+                  <path stroke={c} strokeWidth={lit ? 2.4 : 1.2} strokeOpacity={lit ? 0.95 : 0.28} />
+                  {/* Light running along the line while work is moving: down with a job, back up with a report. */}
+                  {state && state !== "work" && <path stroke="#fff" strokeWidth={3} className={cn("wire-run busy", state === "up" && "up")} />}
+                </g>
+              );
+            })}
+            {/* Work in transit: a spark runs along the line when a job is handed over, and back with the report. */}
+            {packets.map((k) => {
+              const child = staff.find((p) => p.id === k.to && p.boss === k.from) ?? staff.find((p) => p.id === k.from && p.boss === k.to);
+              if (!child) return null;
+              const up = child.id === k.from;
+              return <Spark key={k.id} path={() => paths.current[child.id]?.[up ? 1 : 0]} up={up} />;
+            })}
+          </svg>
+          </div>
         </div>
         <Dock label={sel ? (sel.name ?? `${sel.role} · vacant`) : "Nobody selected"}>
           {sel?.name && <DockButton primary icon={<MessageSquare />} label="Instruct" onClick={() => document.getElementById("instruct")?.focus()} />}
@@ -138,15 +314,20 @@ export function WarRoom() {
   );
 }
 
-// A spark running along an edge. SMIL animations added after load start at once only when begun explicitly.
-function Spark({ d, up }: { d: string; up: boolean }) {
+// A spark running along a line. SMIL animations added after load start at once only when begun explicitly.
+function Spark({ path, up }: { path: () => string | undefined; up: boolean }) {
   const a = useRef<SVGAnimateMotionElement>(null);
   const b = useRef<SVGAnimateMotionElement>(null);
-  useEffect(() => { a.current?.beginElement(); b.current?.beginElement(); }, []);
+  useEffect(() => {
+    const d = path();
+    if (!d) return;
+    for (const m of [a.current, b.current]) { m?.setAttribute("path", d); m?.beginElement(); }
+    // The line as it was when the spark set off: it is gone before the room can move far.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <g>
-      <circle r="7" fill="var(--color-warm)" opacity="0.5" filter="url(#glow)"><animateMotion ref={a} begin="indefinite" dur="1.1s" path={d} fill="freeze" /></circle>
-      <circle r="3" fill={up ? "var(--color-pos)" : "#fff"}><animateMotion ref={b} begin="indefinite" dur="1.1s" path={d} fill="freeze" /></circle>
+      <circle r="9" fill="var(--color-warm)" opacity="0.6" filter="url(#glow)"><animateMotion ref={a} begin="indefinite" dur="1.1s" fill="freeze" /></circle>
+      <circle r="4" fill={up ? "var(--color-pos)" : "#fff"}><animateMotion ref={b} begin="indefinite" dur="1.1s" fill="freeze" /></circle>
     </g>
   );
 }
@@ -177,50 +358,69 @@ function Landed({ id }: { id: string }) {
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: [0, 1, 1, 0], y: [4, -6, -6, -10] }}
       transition={{ duration: 2.8, times: [0, 0.12, 0.8, 1], ease: "easeOut" }}
-      className={cn("tnum pointer-events-none absolute -top-5 left-1/2 z-10 -translate-x-1/2 rounded px-1.5 font-mono text-[10.5px] leading-[16px] whitespace-nowrap shadow-[0_6px_18px_-6px_rgba(0,0,0,0.9)]", net >= 0 ? "bg-pos/15 text-pos" : "bg-neg/15 text-neg")}
+      // In the room it pops over the figure's chest: above the head is where a director's name sits.
+      className={cn("tnum pointer-events-none absolute top-[22%] left-1/2 z-10 -translate-x-1/2 rounded px-2 font-mono text-[18px] leading-[26px] whitespace-nowrap shadow-[0_6px_18px_-6px_rgba(0,0,0,0.9)]", net >= 0 ? "bg-[#0d2a1c]/90 text-pos" : "bg-[#2e1210]/90 text-neg")}
     >
       {text}
     </motion.span>
   );
 }
 
-function Node({ id, at, name, role, job, misfit, morale, thinking, you, selected, busy, unread, onClick }: { id?: string; at: Pt; name?: string; role: string; job?: string; misfit?: boolean; morale?: number; thinking?: boolean; you?: boolean; selected?: boolean; busy?: boolean; unread?: boolean; onClick?: () => void }) {
-  const size = at.r * 2;
+/** A person standing on the stone: placed on the floor plan, then stood upright to face the camera. */
+function Node({ id, at: where, name, role, figure, shadow, job, misfit, morale, you, selected, full, dim, unread, onClick }: { id: string; at: Pt; name?: string; role: string; figure?: string; shadow?: boolean; job?: string; misfit?: boolean; morale?: number; you?: boolean; selected?: boolean; full?: boolean; dim?: boolean; unread?: boolean; onClick?: () => void }) {
+  const lv = LEVELS[where.t], q = at(lv.r, where.a);
+  // With the whole room in view there is space for one line each: the second shows on hover and once the camera is in.
+  const more = !you && !full && "hidden group-hover:block";
+  // You are a gilded figure under the light; an empty post is the dark shape of whoever will fill it.
+  const tone = you
+    ? "grayscale(1) sepia(1) saturate(2.2) brightness(1.5) contrast(1.05) drop-shadow(0 0 6px rgb(214 178 110 / 0.5))"
+    : !name
+      ? "brightness(0) drop-shadow(0 0 1px rgb(214 178 110 / 0.75))"
+      : shadow
+        ? "brightness(0.3) drop-shadow(0 0 1px rgb(214 178 110 / 0.6))"
+        : // Further from the light on the dais is a little darker; people outside the camera's subject step back.
+          `brightness(${(selected ? 1.12 : where.t === 2 ? 0.9 : 0.96) * (dim ? 0.5 : 1)}) drop-shadow(0 3px 4px rgb(0 0 0 / 0.55))`;
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       disabled={you}
-      className="group absolute flex -translate-x-1/2 flex-col items-center text-center"
-      style={{ left: at.x, top: at.y - at.r - 4, width: at.r < 24 ? 94 : 124 }}
+      data-feet={id}
+      data-head={where.t === 1 ? undefined : id}
+      className="group absolute text-center"
+      style={{ left: q.x, top: q.y, width: lv.h * 0.5, height: lv.h, transformOrigin: "50% 100%", transformStyle: "preserve-3d", transform: `translate(-50%, -100%) translateZ(${lv.z}px) rotateX(${-TILT}deg)` }}
     >
-      <span className={cn("relative rounded-full p-1 transition-shadow duration-300", selected && "shadow-[0_0_0_1.5px_#fff,0_0_36px_rgba(255,255,255,0.28)]", busy && !selected && !misfit && "shadow-[0_0_0_1.5px_var(--color-warm),0_0_28px_rgba(240,162,59,0.35)]", misfit && "shadow-[0_0_0_1.5px_var(--color-neg),0_0_28px_rgba(240,112,95,0.4)]")}>
-        {name ? (
-          <Avatar name={you ? undefined : name} size={size} className={cn("transition-colors group-hover:border-white/30", you && "border-white/40 from-white to-[#c9c9cf]")} />
-        ) : (
-          <span className="grid rounded-full border border-dashed border-line-strong text-faint transition-colors group-hover:border-muted group-hover:text-fg" style={{ width: size, height: size }}>
-            <Plus className="m-auto size-4" />
-          </span>
-        )}
-        {(thinking || busy) && <span className="absolute -inset-0.5 animate-spin rounded-full border border-transparent border-t-warm [animation-duration:1.4s]" />}
-        {id && <Landed id={id} />}
-        {unread && <i className="absolute top-0.5 right-0.5 size-2.5 rounded-full border-2 border-bg bg-warm" />}
-        {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute bottom-0.5 left-0.5 size-2.5 rounded-full border-2 border-bg bg-neg" />}
+      {/* eslint-disable-next-line @next/next/no-img-element -- a cut-out sized by the scene, not a content image */}
+      <img src={figure ?? `${ART}generic.webp`} alt="" draggable={false} className={cn("absolute bottom-0 left-1/2 h-full w-auto max-w-none -translate-x-1/2 transition-[filter,transform] duration-300 group-hover:-translate-y-0.5", !name && "opacity-80")} style={{ filter: tone }} />
+      {!name && <Plus className="absolute top-[30%] left-1/2 size-4 -translate-x-1/2 text-gold" />}
+      {!you && <Landed id={id} />}
+      {unread && <i className="absolute top-0 right-1 size-2.5 rounded-full border-2 border-bg bg-warm" />}
+      {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute top-0 left-1 size-2.5 rounded-full border-2 border-bg bg-neg" />}
+      {/*
+        Where the name goes depends on where there is clear stone: under the feet on the floor, over the head on the
+        step (the floor row stands in front), beside you on the dais. Always upright and facing the camera.
+      */}
+      <span
+        data-head={where.t === 1 ? id : undefined}
+        className={cn("absolute flex flex-col items-center transition-opacity duration-300 [text-shadow:0_1px_4px_#000,0_0_2px_#000,0_0_8px_#000]", where.t === 2 ? "top-full left-1/2 mt-2" : where.t === 1 ? "bottom-full left-1/2 mb-1.5" : "top-1/4 left-full ml-3 items-start rounded-md bg-black/60 px-2.5 py-1 text-left", dim && "opacity-40")}
+        // Below the feet is below the floor, so the floor row's names are brought toward the camera until they clear it.
+        style={{ width: lv.label, marginLeft: where.t === 0 ? undefined : -lv.label / 2, transform: where.t === 2 ? "translateZ(130px)" : undefined }}
+      >
+        <span className={cn("font-display text-[20px] leading-tight font-medium", !name && cn("text-faint", more))}>{name ?? "Vacant"}</span>
+        {/* A post shown by its title has no separate name to print. */}
+        {role !== name && <span className={cn("text-[20px] leading-tight", name ? cn("text-soft", more) : "text-faint")}>{role}</span>}
+        <AnimatePresence>
+          {misfit && (
+            <motion.span key="misfit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("my-0.5 rounded bg-neg/30 px-1.5 text-[18px] leading-[23px] whitespace-nowrap text-neg", where.t === 1 && "order-first")}>
+              Wrong person
+            </motion.span>
+          )}
+          {job && (
+            <motion.span key="job" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("my-0.5 max-w-full truncate rounded bg-warm/25 px-1.5 text-[18px] leading-[23px] text-warm", where.t === 1 && "order-first")}>
+              {job}
+            </motion.span>
+          )}
+        </AnimatePresence>
       </span>
-      <span className={cn("mt-1.5 text-[12.5px] leading-tight font-medium", !name && "text-faint")}>{name ?? "Vacant"}</span>
-      {/* A post shown by its title has no separate name to print. */}
-      {role !== name && <span className="text-[10.5px] leading-tight text-muted">{role}</span>}
-      <AnimatePresence>
-        {misfit && (
-          <motion.span key="misfit" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 rounded bg-neg/15 px-1.5 text-[10px] leading-[16px] text-neg">
-            Wrong person
-          </motion.span>
-        )}
-        {job && (
-          <motion.span key="job" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 max-w-full truncate rounded bg-warm/10 px-1.5 text-[10px] leading-[16px] text-warm">
-            {job}
-          </motion.span>
-        )}
-      </AnimatePresence>
     </button>
   );
 }
@@ -361,6 +561,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Section title="Profile">
           {p.onRecord && <p className="mb-2 text-[12px] leading-relaxed text-muted">The record names {p.name} in this post.<Cite c={c} id={p.onRecord} /> What this post says and does here is simulated{p.good || p.weak ? ", and so are its strengths and weaknesses below: they describe the post in this exercise, not the person" : ""}.</p>}
+          {!hired && CREDIT[p.id] && <p className="mb-2 text-[12px] text-faint">{CREDIT[p.id]}</p>}
           <dl className="space-y-2 text-[13px]">
             {[["Good at", p.good], ["Weak at", p.weak], ["Working on", job ?? p.doing ?? "Nothing yet"]].filter(([, v]) => v).map(([k, v]) => (
               <div key={k} className="flex gap-3"><dt className="w-[76px] shrink-0 text-muted">{k}</dt><dd className="text-soft">{v}</dd></div>
