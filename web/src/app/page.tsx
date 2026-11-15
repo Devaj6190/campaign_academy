@@ -7,6 +7,7 @@ import { Paper, PaperNotice } from "@/components/Paper";
 import { Sidebar } from "@/components/Sidebar";
 import { Toasts } from "@/components/Toasts";
 import { TopBar } from "@/components/TopBar";
+import { watchPhone } from "@/lib/photon/client";
 import { startSaving } from "@/lib/save";
 import { useGame } from "@/lib/store";
 import { CaseView } from "@/views/CaseView";
@@ -24,6 +25,8 @@ export default function Home() {
   const View = VIEWS[view];
   // The saved campaign loads before the clock and the staff watchers start (they mount in useTicker), then keeps saving.
   useEffect(() => startSaving(), []);
+  // The staff text the student's phone, when one is linked (#53).
+  useEffect(() => watchPhone(), []);
   useTicker();
 
   return (
