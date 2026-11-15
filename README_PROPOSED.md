@@ -43,25 +43,22 @@ The first case is the **2013 Democratic primary for Mayor of New York**. You run
 4. **The calendar runs.** You give your staff orders in plain English, send the candidate out on the map and set a weekly spending plan. Rivals make their own moves, and a morning paper reports it all.
 5. **Election night, 10 September 2013.** 65 Assembly Districts count in, then the certified result appears beside yours.
 
-<table>
-<tr>
-<td width="50%"><img src="docs/readme/screens/decision-card.jpg" alt="Decision 2: a famous rival enters"><br><sub><b>A real decision.</b> 22 May 2013: Anthony Weiner enters. Every line is cited.</sub></td>
-<td width="50%"><img src="docs/readme/screens/advisers.jpg" alt="Two adviser memos argue different options"><br><sub><b>Your advisers.</b> Two of your own staff argue opposite options. The game never says which is best.</sub></td>
-</tr>
-</table>
+<p align="center"><img src="docs/readme/screens/decision-card.jpg" alt="Decision 2: a famous rival enters" width="100%"></p>
+<p align="center"><sub><b>A real decision.</b> 22 May 2013: Anthony Weiner enters with $4.8 million. Every line is cited.</sub></p>
 
 ## Inside the app
 
-<table>
-<tr>
-<td width="50%"><img src="docs/readme/screens/map-district.jpg" alt="The map flown into Crown Heights"><br><sub><b>Map.</b> Real streets and the 59 community districts. Click one for your support, who lives there (census) and where to send the candidate.</sub></td>
-<td width="50%"><img src="docs/readme/screens/factions.jpg" alt="Voter groups"><br><sub><b>Factions.</b> 22 voter groups from the 2013 polls, sized by share of the vote, with the groups that pull together or apart.</sub></td>
-</tr>
-<tr>
-<td><img src="docs/readme/screens/morning-paper.jpg" alt="The Five Borough Ledger"><br><sub><b>The morning paper.</b> The lead is the real 2013 headline, cited. The rest is simulated, and you can answer the story.</sub></td>
-<td><img src="docs/readme/screens/weekly-plan.jpg" alt="The weekly spending plan"><br><sub><b>The weekly plan.</b> Eight actions bought every week through the same engine as the staff's work.</sub></td>
-</tr>
-</table>
+| Screen | What the student does there |
+|---|---|
+| **Case** | Reads the briefing, makes the six decisions, sees what the real campaign did |
+| **War room** | Gives orders to live staff agents, hires and lets people go, approves money asks |
+| **Map** | Real New York streets and 59 districts; sends the candidate to knock doors, rally or host a house party |
+| **Factions** | 22 voter groups from the 2013 polls, and which groups pull together or apart |
+| **Morning paper** | The real headline each morning, cited; answers the story with a stance from the comms team |
+| **Top bar** | Money left, the polls, the rivals' moves and a weekly spending plan |
+
+<p align="center"><img src="docs/readme/screens/morning-paper.jpg" alt="The Five Borough Ledger" width="100%"></p>
+<p align="center"><sub><b>The morning paper.</b> The lead is the real 2013 headline, paraphrased and cited. The rest of the paper is simulated, and you can answer the story.</sub></p>
 
 ---
 
