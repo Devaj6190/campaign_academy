@@ -40,7 +40,7 @@ const IDEAS: Record<string, string[]> = {
   cm: ["Get us in the room with the union locals before day 3", "Plan this week around the debate on day 7"],
   fd: ["Win back Jackson Heights before Friday: canvass renters", "Recruit and train volunteers in the Bronx this weekend"],
   fin: ["Raise $40k this week with call time and a donor dinner", "Send a small-dollar email to transit riders tonight"],
-  com: ["Hit back on Hale's crime ad with seniors today", "Pitch the housing story to reporters for renters"],
+  com: ["Hit back on the front-runner's latest ad with seniors today", "Pitch the housing story to reporters for renters"],
   pol: ["Draft a transit plan that bus riders will love", "Write a brief that answers homeowners' worries about density"],
   dat: ["Build target lists for the open Bronx districts", "Find where seniors are winnable in southeast Queens"],
 };
@@ -297,6 +297,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-medium tracking-tight">{p.name}</div>
           <div className="truncate text-[12px] text-muted">{p.role}{boss ? ` · reports to ${boss.name?.split(" ")[0] ?? "a vacant post"}` : " · direct report"}</div>
+          {p.onRecord && <div className="text-[11px] text-warm">A real person in this role in 2013 (<a href={p.onRecord} target="_blank" rel="noreferrer" className="underline">source</a>). What they say here is simulated.</div>}
         </div>
         <Status on={busy || thinking} label={thinking ? "On it" : undefined} />
       </div>

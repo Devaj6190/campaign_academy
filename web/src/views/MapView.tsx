@@ -12,6 +12,7 @@ import { DISTRICTS, FETCHED, districtBy } from "@/lib/geo";
 import { sentimentOf, useGame } from "@/lib/store";
 import { clock, cn, heat, tone } from "@/lib/util";
 import { colorOf, nameOf } from "@/lib/scenario";
+import { ME } from "@/lib/scenario";
 
 // The map itself touches the browser (WebGL), so it only renders on the client.
 const MapCanvas = dynamic(() => import("./map/MapCanvas").then((m) => m.MapCanvas), {
@@ -51,7 +52,7 @@ export function MapView() {
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader
           title="New York City"
-          sub="59 community districts on the real street map. Colour shows how each one feels about Cole."
+          sub={`59 community districts on the real street map. Colour shows how each one feels about ${ME.short}.`}
           right={
             <div className="flex shrink-0 items-center gap-5">
               <div className="hidden items-center gap-2 text-[11px] text-muted @[700px]:flex">
@@ -92,7 +93,7 @@ export function MapView() {
           <AnimatePresence>
             {notice && (
               <motion.div key={notice.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cn("absolute bottom-24 left-1/2 z-30 max-w-[460px] -translate-x-1/2 rounded-lg border px-3.5 py-2 text-[12.5px] shadow-xl backdrop-blur", notice.ok ? "border-pos/30 bg-raised/90 text-soft" : "border-neg/30 bg-raised/90 text-neg")}>
-                {notice.ok && <span className="mr-1.5 font-medium text-pos">Cole:</span>}
+                {notice.ok && <span className="mr-1.5 font-medium text-pos">{ME.short}:</span>}
                 {notice.text}
               </motion.div>
             )}
@@ -105,7 +106,7 @@ export function MapView() {
             <span className="tnum ml-2 font-mono text-muted">{Math.round(sentimentOf(world, hovered.cd))}%</span>
           </div>
         )}
-        <Dock label={sel ? `${sel.name} · Cole ${left}/${DAILY} left today` : "Select a district to act there"}>
+        <Dock label={sel ? `${sel.name} · ${ME.short} ${left}/${DAILY} left today` : "Select a district to act there"}>
           {sel && !sel.park && (
             <>
               {APPEARANCES.map((a, i) => {
@@ -177,7 +178,7 @@ function DistrictPanel({ cd }: { cd: number }) {
         <Section title="Your field read" right={<Tag kind="sim" />}>
           <div className="flex items-baseline gap-2">
             <span className="tnum font-mono text-[30px] leading-none font-medium tracking-tight" style={{ color: tone(v) }}>{v}%</span>
-            <span className="text-[12px] text-muted">{world.filter === "all" ? "support for Cole" : `support among ${name(world.filter).toLowerCase()}`}</span>
+            <span className="text-[12px] text-muted">{world.filter === "all" ? `support for ${ME.short}` : `support among ${name(world.filter).toLowerCase()}`}</span>
           </div>
           <Meter value={v} color={tone(v)} className="mt-3" />
           <p className="mt-2 text-[11px] text-faint">From your own canvassing where you worked; the whole map refreshes when a new poll comes out.</p>

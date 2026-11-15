@@ -1,26 +1,23 @@
 import type { ActionId } from "../engine/catalog";
+import { ACTIVE } from "../scenario";
 
-// Campaign money, modelled on New York City's public financing program for the 2025 citywide elections.
-// Per-donor rules are the real ones; campaign-wide totals are scaled 1:10 to fit the game's $412k campaign.
-// Sources: https://www.nyccfb.info/candidate-services/limits-thresholds/2025 and
-// https://www.nyccfb.info/program/how-the-matching-funds-program-works (NYC Campaign Finance Board).
+// Campaign money, modelled on New York City's public financing program for the race's election year.
+// Per-donor rules are the real ones; campaign-wide totals are scaled (1:10) to fit the game's campaign.
+// Figures and source: the scenario's `finance` (lib/scenario), from the NYC Campaign Finance Board.
 
-export const SCALE = 0.1;
-export const SOURCE_NOTE = "Modelled on NYC Campaign Finance Board rules (2025); campaign totals scaled 1:10.";
+const F = ACTIVE.finance;
+export const SCALE = F.scale;
+export const SOURCE_NOTE = `Modelled on NYC Campaign Finance Board rules (${F.year}); campaign totals scaled 1:${Math.round(1 / F.scale)}.`;
 
 export const NYC = {
-  /** Most one donor may give to a mayoral campaign in the cycle. */
-  limitParticipant: 2100,
-  limitNonParticipant: 3700,
-  /** Public funds match the first $250 of each NYC resident's gift, 8 to 1 (up to $2,000 per donor). */
-  matchable: 250,
-  ratio: 8,
-  /** To qualify: $250,000 in matchable money from at least 1,000 NYC residents (real figures). */
-  thresholdDollars: 250_000,
-  thresholdDonors: 1_000,
-  /** Public funds cap and spending limit for mayor (real figures). */
-  publicCap: 7_050_667,
-  spendingLimit: 7_932_000,
+  limitParticipant: F.limitParticipant,
+  limitNonParticipant: F.limitNonParticipant,
+  matchable: F.matchable,
+  ratio: F.ratio,
+  thresholdDollars: F.thresholdDollars,
+  thresholdDonors: F.thresholdDonors,
+  publicCap: F.publicCap,
+  spendingLimit: F.spendingLimit,
 };
 
 /** The game's campaign-wide numbers (real × SCALE). Per-donor numbers stay real. */
@@ -58,7 +55,7 @@ export const ENVELOPE_OF: Partial<Record<ActionId | "tactic", Envelope>> = {
 };
 
 /** Day one, as the README describes it: about $22k a day out (payroll $9.2k + $12.6k of budgets). */
-export const START_ENVELOPES: Envelopes = { ads: 6000, field: 4100, events: 2500 };
+export const START_ENVELOPES: Envelopes = { ...F.envelopes };
 
 export type Source = "Small donors" | "Fundraisers" | "Large donors" | "Public funds";
 export const SOURCES: Source[] = ["Small donors", "Fundraisers", "Large donors", "Public funds"];

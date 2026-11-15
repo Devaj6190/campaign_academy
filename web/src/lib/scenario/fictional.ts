@@ -1,4 +1,5 @@
 import { shares } from "../demographics";
+import { PROBLEMS, RECORD, STRONG, WEAK } from "../data";
 import type { Scenario } from "./index";
 
 // The original race: invented candidates in a real city. Day 1 reads as the README describes it.
@@ -51,4 +52,32 @@ export const FICTIONAL: Scenario = {
   undecided: { start: 0.17, end: 0.03 },
   threshold: 0,
   startCash: 412_000,
+  finance: {
+    year: 2025,
+    limitParticipant: 2100,
+    limitNonParticipant: 3700,
+    matchable: 250,
+    ratio: 8,
+    thresholdDollars: 250_000,
+    thresholdDonors: 1_000,
+    publicCap: 7_050_667,
+    spendingLimit: 7_932_000,
+    scale: 0.1,
+    source: "https://www.nyccfb.info/candidate-services/limits-thresholds/2025",
+    envelopes: { ads: 6000, field: 4100, events: 2500 },
+  },
+  story: {
+    initials: "AC",
+    standing: "Council Member, western Queens. Running for Mayor of New York City.",
+    about: { text: "Son of a bus mechanic and a school aide. A tenant organiser first, then a small-business loan officer. He is cross-pressured: nobody is fully happy with him, so every choice you make will cost him someone." },
+    tags: ["Housing near transit", "Better buses", "Level police funding", "Small-business relief"],
+    record: RECORD,
+    problems: PROBLEMS.map((text) => ({ text })),
+    strong: STRONG,
+    weak: WEAK,
+    manifesto: ["Build housing near every subway station.", "Extend small-business rent relief citywide.", "Keep police headcount level; add mental-health response teams."],
+    tasks: ["Take the manifesto to five planks", "Hire a Policy Director", "Rally in the Bronx", "Two hours of call time"],
+    calendar: { 1: ["Campaign handover"], 3: ["Union endorsement meeting"], 7: ["First debate"], 14: ["Fundraising deadline"], 21: ["Second debate"], 30: ["Election day"] },
+    tactic: { target: "hale", title: "A contrast ad on Hale's council attendance", note: "Every claim in it is accurate. It is still a negative ad." },
+  },
 };

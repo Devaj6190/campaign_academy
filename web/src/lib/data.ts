@@ -23,10 +23,12 @@ export const FACTIONS: Faction[] = [
   { id: "smallbiz", name: "Small business", size: 50, feel: 62, about: "Shop, restaurant and service owners working on thin margins and high rents.", values: ["Affordable commercial rent", "Less red tape"], dislikes: ["Fines", "Street changes without consultation"] },
   { id: "activists", name: "Young activists", size: 46, feel: 38, about: "Activist, online and energetic. They supply volunteers when they believe, and criticism when they do not.", values: ["Bold housing and climate action", "Police accountability"], dislikes: ["Compromise sold as victory", "The police budget vote"] },
   { id: "donors", name: "Donors & real estate", size: 26, feel: 24, about: "Few in number, large in money. They fund campaigns and expect a hearing.", values: ["Predictability", "Development rights"], dislikes: ["Rent regulation", "Surprises"] },
-  { id: "students", name: "Students", size: 24, feel: 50, about: "Low turnout, high energy. Many are deciding between you and Brandt.", values: ["Affordable housing and transit", "Being taken seriously"], dislikes: ["Being treated as free labour"] },
+  { id: "students", name: "Students", size: 24, feel: 50, about: "Low turnout, high energy. Many are still deciding.", values: ["Affordable housing and transit", "Being taken seriously"], dislikes: ["Being treated as free labour"] },
 ];
 
 export type Staff = {
+  /** Set when the record names this person in this post: a source URL. What they say in the game is simulated. */
+  onRecord?: string;
   id: string;
   boss?: string;
   role: string;
@@ -79,7 +81,7 @@ export const PROBLEMS = [
 export const QUIPS: [string, string][] = [
   ["fd", "We have nobody in the Bronx. I need an organizer there this week."],
   ["fin", "At this burn we are out of money by day 24."],
-  ["com", "Hale's crime ad is landing. I have an idea, but you may not like it."],
+  ["com", "The front-runner's latest ad is landing. I have an idea, but you may not like it."],
   ["cm", "The unions are meeting on day 3. You should be in the room."],
 ];
 

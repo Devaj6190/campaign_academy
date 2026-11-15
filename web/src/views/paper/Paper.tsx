@@ -8,7 +8,7 @@ import { markRead, respond } from "@/lib/paper/run";
 import { appearancesToday, DAILY } from "@/lib/candidate";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
-import { CANDIDATES } from "@/lib/scenario";
+import { CANDIDATES, ME } from "@/lib/scenario";
 
 // The Five Borough Ledger. A broadsheet in four sections, with every past edition one click away.
 // It never opens itself: it arrives as a chip in the top bar.
@@ -97,13 +97,13 @@ function Front({ e, close }: { e: Edition; close: () => void }) {
           {r && isLatest && !e.decision && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <Button size="sm" variant="primary" disabled={left <= 0} title={left <= 0 ? "No appearances left today" : undefined} onClick={() => setNote(respond(e, "statement"))}>
-                <Megaphone className="size-3.5" />{r.kind === "attack" ? "Cole hits back" : "Cole responds"} · {left}/{DAILY} left
+                <Megaphone className="size-3.5" />{r.kind === "attack" ? `${ME.short} hits back` : `${ME.short} responds`} · {left}/{DAILY} left
               </Button>
               <Button size="sm" onClick={() => { respond(e, "staff"); close(); }}><MessageSquare className="size-3.5" />Hand it to Comms</Button>
               <Button size="sm" variant="ghost" onClick={() => setNote(respond(e, "pass"))}><X className="size-3.5" />Let it pass</Button>
             </div>
           )}
-          {(note || e.decision) && <p className="mt-3 text-[12px] text-muted">{note || (e.decision === "respond" ? "Cole responded." : e.decision === "staff" ? "Handed to Leo." : "The campaign let it pass.")}</p>}
+          {(note || e.decision) && <p className="mt-3 text-[12px] text-muted">{note || (e.decision === "respond" ? `${ME.short} responded.` : e.decision === "staff" ? "Handed to Leo." : "The campaign let it pass.")}</p>}
           {e.lead.cd && <button onClick={() => { select({ district: e.lead.cd! }); go("map"); close(); }} className="mt-3 flex items-center gap-1 text-[12px] text-muted hover:text-fg"><MapPin className="size-3.5" />See it on the map</button>}
         </div>
         <aside className="border-l border-line pl-6">
@@ -186,7 +186,7 @@ function Polls({ e }: { e: Edition }) {
         </svg>
         <p className="mt-2 text-[11.5px] text-muted">Polls carry a margin of error of about ±3. Read the trend across several polls, not one number.</p>
 
-        <Label className="mt-6 block">How each group feels about Cole</Label>
+        <Label className="mt-6 block">How each group feels about {ME.short}</Label>
         <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[12.5px]">
           {factions.map((f) => {
             const g = p.groups[f.id], was = prev?.groups[f.id];

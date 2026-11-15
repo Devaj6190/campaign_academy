@@ -1,5 +1,6 @@
 import type { Profile } from "../staff/roster";
 import { FICTIONAL } from "./fictional";
+import { NYC2013 } from "./nyc2013";
 
 // The race the game plays. Everything the engine needs to know about who is running comes from here, so the
 // rest of the code never names a candidate. Two scenarios exist: the original fictional race, and a real one
@@ -33,6 +34,27 @@ export type RivalDef = {
   estimates?: string[];
 };
 
+/** A line on the Profile with where it comes from. `source` is a URL; absent in a fictional race. */
+export type Sourced = { text: string; source?: string; publisher?: string };
+
+/** Campaign finance rules for the race (real per-donor rules; campaign totals scaled by `scale`). */
+export type Finance = {
+  year: number;
+  limitParticipant: number;
+  limitNonParticipant: number;
+  /** Public funds match the first `matchable` dollars of each NYC resident's gift, `ratio` to 1. */
+  matchable: number;
+  ratio: number;
+  thresholdDollars: number;
+  thresholdDonors: number;
+  publicCap: number;
+  spendingLimit: number;
+  scale: number;
+  source: string;
+  /** Day-one daily budgets (game scale). */
+  envelopes: { ads: number; field: number; events: number };
+};
+
 export type Scenario = {
   id: string;
   /** "fiction" or "real": real scenarios carry sources and must never invent claims about the people in them. */
@@ -48,9 +70,34 @@ export type Scenario = {
   startCash: number;
   /** Optional real date for each game day. */
   dateOf?: (day: number) => Date;
+  finance: Finance;
+  /** What the Profile and the opening screens say. In a real race every line carries a source. */
+  story: {
+    initials: string;
+    standing: string;
+    about?: Sourced;
+    tags: string[];
+    record: (Sourced & { ok: boolean; liked: string; not: string })[];
+    problems: Sourced[];
+    /** Districts where the student starts strong or weak (simulated starting support; calibrated to the poll). */
+    strong: number[];
+    weak: number[];
+    /** Planks on the record at the start. */
+    manifesto: string[];
+    tasks: string[];
+    calendar: Record<number, string[]>;
+    /** Starting feeling of each voter group toward the student (0..100). Estimates in a real race. */
+    feel?: Record<string, number>;
+    /** Staff posts filled by people named in the record: post id → name and the source that names them. */
+    staff?: Record<string, { name: string; source: string }>;
+    /** The contrast-ad tactic: who it targets and what it is about. */
+    tactic: { target: string; title: string; note: string };
+  };
 };
 
-export const ACTIVE: Scenario = FICTIONAL;
+/** The race the app plays: the real 2013 primary. FICTIONAL is the original invented race. */
+export const ACTIVE: Scenario = NYC2013;
+export const SCENARIOS = { FICTIONAL, NYC2013 };
 
 export const ME = ACTIVE.me;
 export const RIVAL_LIST = ACTIVE.rivals;

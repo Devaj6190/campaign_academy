@@ -1,13 +1,12 @@
 "use client";
 
 import { ArrowRight, CalendarDays, Check, Lock, Newspaper, ScrollText, X } from "lucide-react";
-import { PROBLEMS, RECORD } from "@/lib/data";
 import { netPerDay, useGame } from "@/lib/store";
 import { cn, money, moneyK } from "@/lib/util";
 import { Dock, DockButton, Inspector, Label, Meter, Section } from "@/components/ui";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import { districtBy } from "@/lib/geo";
-import { activeRivals, CANDIDATES, ME, rivalDef } from "@/lib/scenario";
+import { ACTIVE, activeRivals, CANDIDATES, dayLabel, ME, rivalDef, type Sourced } from "@/lib/scenario";
 
 export function Profile() {
   const s = useGame();
@@ -17,7 +16,7 @@ export function Profile() {
   const rank = inRace.findIndex((c) => c.id === ME.id) + 1;
   const stats: [string, string, string, string?][] = [
     ["Polling", `${s.poll[ME.id] ?? 0}%`, `${rank} of ${inRace.length}`],
-    ["Days left", String(30 - s.day), `Day ${s.day} of 30`],
+    ["Days left", String(30 - s.day), dayLabel(s.day) ? `Day ${s.day} of 30, ${dayLabel(s.day)}` : `Day ${s.day} of 30`],
     ["Cash", money(s.cash), "On hand"],
     ["Burn", `${net < 0 ? "−" : "+"}${moneyK(net)}`, "Per day", net < 0 ? "text-neg" : "text-pos"],
   ];
@@ -31,15 +30,15 @@ export function Profile() {
             <div className="grid grid-cols-[176px_1fr] items-end gap-9">
               <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-[#1b1b20] to-[#0c0c0e]">
                 <div className="absolute inset-0 opacity-45 [mask-image:linear-gradient(to_top,black,transparent_85%)]"><ShaderBackground /></div>
-                <span className="absolute inset-0 grid place-items-center font-serif text-[72px] text-white/70 mix-blend-overlay">AC</span>
+                <span className="absolute inset-0 grid place-items-center font-serif text-[72px] text-white/70 mix-blend-overlay">{ACTIVE.story.initials}</span>
                 <span className="absolute inset-x-0 bottom-3 text-center text-[10px] tracking-[0.12em] text-faint uppercase">Portrait</span>
               </div>
               <div className="pb-1">
                 <Label>Your candidate</Label>
-                <h1 className="mt-2 font-serif text-[64px] leading-[0.95] tracking-tight">Adrian Cole</h1>
-                <p className="mt-3 text-[14px] text-soft">Council Member, western Queens. Running for Mayor of New York City.</p>
+                <h1 className="mt-2 font-serif text-[64px] leading-[0.95] tracking-tight">{ME.name}</h1>
+                <p className="mt-3 text-[14px] text-soft">{ACTIVE.story.standing}</p>
                 <div className="mt-4 flex flex-wrap gap-1.5">
-                  {["Housing near transit", "Better buses", "Level police funding", "Small-business relief"].map((t) => (
+                  {ACTIVE.story.tags.map((t) => (
                     <span key={t} className={cn("rounded-full border px-2.5 py-0.5 text-[11.5px]", "border-line text-soft")}>{t}</span>
                   ))}
                 </div>
@@ -57,20 +56,20 @@ export function Profile() {
             </div>
 
             <p className="mt-8 max-w-[62ch] text-[14px] leading-relaxed text-soft">
-              Son of a bus mechanic and a school aide. A tenant organiser first, then a small-business loan officer. He is cross-pressured: nobody is fully happy with him, so every choice you make will cost him someone.
+              {ACTIVE.story.about?.text}<Src s={ACTIVE.story.about} />
             </p>
 
             <div className="mt-10 grid grid-cols-2 gap-10">
               <div>
                 <Label>Record</Label>
                 <ul className="mt-3 space-y-3.5">
-                  {RECORD.map((r) => (
+                  {ACTIVE.story.record.map((r) => (
                     <li key={r.text} className="flex gap-3">
                       <span className={cn("mt-0.5 grid size-4 shrink-0 place-items-center rounded-full", r.ok ? "bg-pos/15 text-pos" : "bg-neg/15 text-neg")}>
                         {r.ok ? <Check className="size-2.5" strokeWidth={3} /> : <X className="size-2.5" strokeWidth={3} />}
                       </span>
                       <div>
-                        <div className="text-[13px]">{r.text}</div>
+                        <div className="text-[13px]">{r.text}<Src s={r} /></div>
                         <div className="text-[11.5px] text-faint">Liked by {r.liked.toLowerCase()} · not by {r.not.toLowerCase()}</div>
                       </div>
                     </li>
@@ -78,9 +77,9 @@ export function Profile() {
                 </ul>
               </div>
               <div>
-                <Label>Where he stands</Label>
+                <Label>Where he stands (your field read)</Label>
                 <dl className="mt-3 space-y-3 text-[13px]">
-                  {([["Strong", "var(--color-warm)", "Western Queens, north Brooklyn"], ["Weak", "var(--color-cool)", "Staten Island, southern Brooklyn, Upper East Side"], ["Open", "var(--color-faint)", "The Bronx, Upper Manhattan, southeast Queens"]] as const).map(([k, c, v]) => (
+                  {stands(s.fieldRead).map(([k, c, v]) => (
                     <div key={k} className="flex gap-3">
                       <dt className="flex w-16 shrink-0 items-center gap-2 text-muted"><i className="size-1.5 rounded-full" style={{ background: c }} />{k}</dt>
                       <dd>{v}</dd>
@@ -116,7 +115,7 @@ export function Profile() {
           <div className="space-y-3">
             {race.map(([n, v, c]) => (
               <div key={n}>
-                <div className="flex justify-between text-[13px]"><span className={n === "Adrian Cole" ? "" : "text-soft"}>{n}</span><span className="tnum font-mono text-[12px]">{v}%</span></div>
+                <div className="flex justify-between text-[13px]"><span className={n === ME.name ? "" : "text-soft"}>{n}</span><span className="tnum font-mono text-[12px]">{v}%</span></div>
                 <Meter value={v * 2} color={c} className="mt-1.5" />
               </div>
             ))}
@@ -129,8 +128,8 @@ export function Profile() {
         </Section>
         <Section title="Opening problems">
           <ol className="space-y-2.5">
-            {PROBLEMS.map((p, i) => (
-              <li key={p} className="flex gap-3 text-[13px] text-soft"><span className="tnum font-mono text-[11px] leading-[20px] text-faint">{i + 1}</span>{p}</li>
+            {ACTIVE.story.problems.map((p, i) => (
+              <li key={p.text} className="flex gap-3 text-[13px] text-soft"><span className="tnum font-mono text-[11px] leading-[20px] text-faint">{i + 1}</span><span>{p.text}<Src s={p} /></span></li>
             ))}
           </ol>
         </Section>
@@ -165,4 +164,19 @@ function RivalCard({ id, name, tag, note }: { id: string; name: string; tag: str
       )}
     </div>
   );
+}
+
+/** A small source link after a line from the record. Nothing in a fictional race. */
+function Src({ s }: { s?: Sourced }) {
+  if (!s?.source) return null;
+  return <a href={s.source} target="_blank" rel="noreferrer" title={s.publisher} className="ml-1 align-super text-[10px] text-gold hover:underline">[source]</a>;
+}
+
+/** Strongest, weakest and most open districts by the campaign's own read, shortest names first. */
+function stands(read: Record<number, number>): [string, string, string][] {
+  const rows = Object.entries(read).map(([cd, v]) => ({ cd: +cd, v, d: districtBy(+cd) })).filter((r) => r.d && !r.d.park && r.d.vote);
+  const name = (xs: typeof rows) => xs.map((r) => r.d!.name.split("-")[0]).join(", ");
+  const by = [...rows].sort((a, b) => b.v - a.v);
+  const open = [...rows].filter((r) => r.v >= 44 && r.v <= 56).sort((a, b) => b.d!.vote!.votes - a.d!.vote!.votes);
+  return [["Strong", "var(--color-warm)", name(by.slice(0, 3))], ["Weak", "var(--color-cool)", name(by.slice(-3).reverse())], ["Open", "var(--color-faint)", name(open.slice(0, 3))]];
 }

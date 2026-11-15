@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FACTIONS, LOSSES, STAFF, STRONG, WEAK, type Faction, type Flow, type Staff, type View } from "./data";
+import { FACTIONS, LOSSES, STAFF, type Faction, type Flow, type Staff, type View } from "./data";
 import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
 import { DISTRICTS } from "./geo";
 import { shares } from "./demographics";
@@ -8,7 +8,7 @@ import { effectOf, type Effect } from "./engine/resolve";
 import { knockOns } from "./relations";
 import { calibrate, pollOf, type Rival } from "./engine/poll";
 import { publish, type PollRecord } from "./engine/polls";
-import { RIVAL_LIST } from "./scenario";
+import { ACTIVE, ME, RIVAL_LIST } from "./scenario";
 import { tacticOutcome, type Deliverer } from "./engine/tactic";
 import { electionResult, type ElectionResult } from "./engine/election";
 import type { Edition } from "./paper/edition";
@@ -108,7 +108,13 @@ let uid = 10;
 /** Money in minus money out per day: last week's average income against payroll and tomorrow's budgets. */
 export const netPerDay = (s: Pick<State, "losses" | "money" | "day">) => avgIncome(s.money, s.day) - burn(s.losses[0]?.v ?? 0, s.money);
 
+/** Voter groups as the race opens: their feeling toward the student from the scenario (estimates in a real race). */
+const START_FACTIONS: Faction[] = FACTIONS.map((f) => ({ ...f, feel: ACTIVE.story.feel?.[f.id] ?? f.feel }));
+/** Staff as the race opens: posts the record names get those names (what they say in the game is simulated). */
+const START_STAFF: Staff[] = STAFF.map((p) => (ACTIVE.story.staff?.[p.id] ? { ...p, name: ACTIVE.story.staff[p.id].name, onRecord: ACTIVE.story.staff[p.id].source } : p));
+
 const sent: Record<number, number> = {};
+const { strong: STRONG, weak: WEAK } = ACTIVE.story;
 for (const d of DISTRICTS) sent[d.cd] = STRONG.includes(d.cd) ? 62 + hash(d.cd) * 12 : WEAK.includes(d.cd) ? 22 + hash(d.cd) * 12 : 38 + hash(d.cd) * 18;
 // Day 1 is half the README's story (above) and half real data: how each district's mix of voter groups
 // (census shares) feels about Cole. Both halves are spread over the same range so neither drowns the other.
@@ -118,7 +124,7 @@ for (const d of DISTRICTS) sent[d.cd] = STRONG.includes(d.cd) ? 62 + hash(d.cd) 
     const s = shares(d.cd);
     if (!s) continue;
     let w = 0, v = 0;
-    for (const f of FACTIONS) { w += s[f.id] ?? 0; v += (s[f.id] ?? 0) * f.feel; }
+    for (const f of START_FACTIONS) { w += s[f.id] ?? 0; v += (s[f.id] ?? 0) * f.feel; }
     lean[d.cd] = v / w;
   }
   const vals = Object.values(lean);
@@ -181,30 +187,25 @@ const START_RIVALS: Record<Rival, RivalState> = Object.fromEntries(
   RIVAL_LIST.map((r) => [r.id, { cash: r.cash, raised: 0, spent: 0, matchable: 0, matchPaid: 0, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } } satisfies RivalState]),
 );
 const DAY1_TRUTH = pollOf({ sent, day: 1, rivals: START_RIVALS });
-const DAY1_POLL = publish({ truth: DAY1_TRUTH, factions: FACTIONS, ledger: [] }, 1);
+const DAY1_POLL = publish({ truth: DAY1_TRUTH, factions: START_FACTIONS, ledger: [] }, 1);
 
 export const useGame = create<State>((set, get) => ({
   view: "profile",
   day: 1,
   min: DAY_START,
   speed: 1,
-  cash: 412000,
+  cash: ACTIVE.startCash,
   poll: DAY1_POLL.shares,
   truth: DAY1_TRUTH,
   polls: [DAY1_POLL],
   fieldRead: { ...sent },
   losses: LOSSES,
   money: START_MONEY,
-  tasks: [
-    { id: 1, text: "Take the manifesto to five planks", done: false },
-    { id: 2, text: "Hire a Policy Director", done: false },
-    { id: 3, text: "Rally in the Bronx", done: false },
-    { id: 4, text: "Two hours of call time", done: false },
-  ],
-  calendar: { 1: ["Campaign handover"], 3: ["Union endorsement meeting"], 7: ["First debate"], 14: ["Fundraising deadline"], 21: ["Second debate"], 30: ["Election day"] },
-  manifesto: ["Build housing near every subway station.", "Extend small-business rent relief citywide.", "Keep police headcount level; add mental-health response teams."],
-  factions: FACTIONS,
-  staff: STAFF,
+  tasks: ACTIVE.story.tasks.map((text, i) => ({ id: i + 1, text, done: false })),
+  calendar: ACTIVE.story.calendar,
+  manifesto: ACTIVE.story.manifesto,
+  factions: START_FACTIONS,
+  staff: START_STAFF,
   sent,
   filter: "all",
   district: null,
@@ -298,6 +299,8 @@ export const useGame = create<State>((set, get) => ({
     set({
       day: s.day + 1,
       min: DAY_START,
+      // A new day can change the field (a rival enters), so the true opinion is recomputed.
+      truth: pollOf({ sent: s.sent, day: s.day + 1, rivals: s.rivals }),
       cash: books.cash,
       money: books.money,
       tasks: s.tasks.filter((t) => !t.done),
@@ -311,7 +314,7 @@ export const useGame = create<State>((set, get) => ({
   joinPublicFinancing: (yes) =>
     set((s) => {
       if (s.money.participant !== null || s.day > 1) return {};
-      const text = yes ? "Cole joined the city's public financing program: matching funds, and a spending limit." : "Cole declined public financing: no matching funds, no spending limit, bigger checks allowed.";
+      const text = yes ? `${ME.short} joined the city's public financing program: matching funds, and a spending limit.` : `${ME.short} declined public financing: no matching funds, no spending limit, bigger checks allowed.`;
       return { money: { ...s.money, participant: yes, events: [...s.money.events, { day: s.day, kind: yes ? "joined" : "declined", text }] } };
     }),
 

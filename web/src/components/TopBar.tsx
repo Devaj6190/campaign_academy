@@ -128,9 +128,9 @@ function Clock() {
   return (
     <div className="flex items-center justify-end gap-4">
       <PaperChip />
-      <div className="hidden w-48 xl:block" title={`${latest.pollster}, day ${latest.day}: ${latest.n.toLocaleString("en-US")} likely voters, margin of error ±${latest.moe}`}>
+      <div className="hidden w-60 xl:block" title={`${latest.pollster}, day ${latest.day}: ${latest.n.toLocaleString("en-US")} likely voters, margin of error ±${latest.moe}`}>
         <div className="tnum mb-1 flex justify-between gap-2 font-mono text-[11px]">
-          {inPoll.slice(0, 3).map((c) => <span key={c.id} className="truncate" style={{ color: c.id === ME.id ? "var(--color-warm)" : undefined }}>{c.short} {poll[c.id]}</span>)}
+          {inPoll.slice(0, 3).map((c) => <span key={c.id} className="whitespace-nowrap" style={{ color: c.id === ME.id ? "var(--color-warm)" : undefined }}>{c.short} {poll[c.id]}</span>)}
         </div>
         <div className="flex h-1 gap-px overflow-hidden rounded-full">
           {inPoll.map((c) => <div key={c.id} className="transition-[width] duration-500" style={{ width: `${poll[c.id]}%`, background: c.color }} />)}

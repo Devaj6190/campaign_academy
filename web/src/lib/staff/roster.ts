@@ -1,4 +1,5 @@
 import type { ActionId, Skill } from "../engine/catalog";
+import { ME } from "../scenario";
 
 // How each person actually works, beyond the one-line "good at / weak at" on the profile.
 // The engine uses the numbers; the agents use the voice.
@@ -62,7 +63,7 @@ export const CANDIDATE: Profile = {
   cost: 1,
   effect: 1.15,
   home: [401, 402, 403],
-  voice: "Adrian Cole, the candidate.",
+  voice: `${ME.name}, the candidate.`,
   salary: 0,
 };
 

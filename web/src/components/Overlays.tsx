@@ -48,7 +48,7 @@ function Manifesto() {
     <>
       <div className="border-b border-line px-7 pt-8 pb-6">
         <Label>Manifesto</Label>
-        <h2 className="mt-2 font-serif text-[34px] leading-none tracking-tight">What Cole stands for</h2>
+        <h2 className="mt-2 font-serif text-[34px] leading-none tracking-tight">What {ME.short} stands for</h2>
         <p className="mt-3 text-[13px] text-muted">Once a plank goes in, it cannot be removed. Speeches, ads and door scripts are written from this.</p>
       </div>
       <ol className="min-h-0 flex-1 overflow-y-auto px-7 py-3">
@@ -138,8 +138,8 @@ function Tactic({ close }: { close: () => void }) {
   return (
     <div className="p-7">
       <div className="flex items-center gap-2.5"><Avatar name="Leo Santos" size={26} /><span className="text-[12.5px] text-muted">Leo Santos proposes</span></div>
-      <h2 className="mt-4 font-serif text-[30px] leading-[1.1] tracking-tight">A contrast ad on Hale&apos;s council attendance</h2>
-      <p className="mt-2 text-[13px] text-muted">Every claim in it is accurate. It is still a negative ad.</p>
+      <h2 className="mt-4 font-serif text-[30px] leading-[1.1] tracking-tight">{ACTIVE.story.tactic.title}</h2>
+      <p className="mt-2 text-[13px] text-muted">{ACTIVE.story.tactic.note}</p>
       <dl className="mt-5 space-y-2 text-[13px]">
         <div className="flex justify-between"><dt className="text-muted">Cost</dt><dd className="tnum font-mono">$8,000 <span className="text-faint">from today&apos;s Ads budget (${Math.max(0, adsLeft).toLocaleString("en-US")} left)</span></dd></div>
         <div className="flex justify-between"><dt className="text-muted">If it lands</dt><dd className="text-pos">+3 with seniors</dd></div>

@@ -148,7 +148,7 @@ export function FinancePanel() {
 
       <Label className="mt-4 block">Public matching funds</Label>
       {m.participant === false ? (
-        <p className="mt-1.5 text-[12px] text-muted">Cole stayed out: no matching funds and no spending limit.</p>
+        <p className="mt-1.5 text-[12px] text-muted">{ME.short} stayed out: no matching funds and no spending limit.</p>
       ) : (
         <div className="mt-2 space-y-2 text-[12px]">
           {!ms.qualified && (
