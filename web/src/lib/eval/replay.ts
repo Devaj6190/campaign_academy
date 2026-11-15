@@ -7,7 +7,7 @@ import { writers } from "../staff/memos";
 import { snapshot } from "../staff/run";
 import { describeWorld, PLACES, type Snapshot } from "../staff/world";
 import { hash } from "../util";
-import { CHANGED, DROPPED, mask, recognised, type Condition } from "./conditions";
+import { CHANGED, isDropped, mask, recognised, type Condition } from "./conditions";
 import { decideLive, decideRules, optionLines, probe, recall, system, type Card, type CardOption, type Choice, type Trace } from "./decider";
 import { HELD_OUT } from "./heldout";
 import { factsBefore, PEOPLE, personNamed, type Person } from "./people";
@@ -55,6 +55,7 @@ async function memosFor(d: Decision, i: number): Promise<Memo[]> {
   const w = snapshot({ at: i + 1, date: d.date });
   const campaign = describeWorld(w);
   const decision = memoDecision(d);
+  decision.situation = decision.situation.filter((t) => !isDropped(d.id, t)); // the memo must not repeat a line the card leaves out
   const out: Memo[] = [];
   for (const p of writers(d)) {
     const req: MemoRequest = {
@@ -101,8 +102,7 @@ function masked(card: Card, p: Person): Card {
 export function caseCard(c: Case, d: Decision, i: number, n: number, memos: Memo[], who: Person, ask: Card["ask"], chips: boolean): { card: Card; dropped: string[] } {
   const w = snapshot({ at: i + 1, date: d.date });
   const t = worldText(w);
-  const drop = DROPPED[d.id] ?? [];
-  const keep = (x: { text: string }) => !drop.some((p) => x.text.startsWith(p));
+  const keep = (x: { text: string }) => !isDropped(d.id, x.text);
   const dropped = [...(d.since?.notes ?? []), ...d.situation].filter((x) => !keep(x)).map((x) => x.text);
   const order = shuffle(d.options, n, d.id);
   const options: CardOption[] = order.map((o, k) => {

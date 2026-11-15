@@ -6,7 +6,9 @@ import { finished, run, tick, waiting } from "../cases/clock";
 import { inRace, isRival, useRivals } from "../cases/rivals";
 import { currentCase, useCase, worldNow } from "../cases/store";
 import { useGame } from "../store";
-import { useMemos, watchMemos } from "../staff/memos";
+import type { Memo } from "../staff/memo";
+import { setMemoWriter, useMemos, watchMemos } from "../staff/memos";
+import { isDropped } from "./conditions";
 import { instruct, snapshot } from "../staff/run";
 import { useStaff } from "../staff/store";
 import { PLACES } from "../staff/world";
@@ -97,6 +99,11 @@ export async function freeRun(o: FreeOptions) {
     useCase.getState().restart();
     useStaff.setState(STAFF0, true);
     useMemos.setState({ byDecision: {} });
+    // The game's memos read the whole card; here they skip the lines the eval's card leaves out (conditions DROPPED).
+    setMemoWriter(async (req) => {
+      const r = { ...req, decision: { ...req.decision, situation: req.decision.situation.filter((t) => !isDropped(req.decision.id, t)) } };
+      return (await (await fetch("/api/staff/memo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(r) })).json()) as Memo;
+    });
     const off = watchMemos();
     let lastWeek = c.briefingDate, firstDifferent: string | null = null, orders = 0;
     const trace = (extra: Record<string, unknown> = {}): Trace => ({ tags: ["eval", o.tag, "free"], metadata: { run: n, ...extra } });
@@ -145,6 +152,7 @@ export async function freeRun(o: FreeOptions) {
       log(`run ${n + 1} done: ${top.slice(0, 3).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(", ")}${fin.runoff ? ", runoff" : ""}`);
     } finally {
       off();
+      setMemoWriter(null);
     }
   }
   useCase.getState().restart();

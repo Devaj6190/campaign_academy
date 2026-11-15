@@ -76,7 +76,7 @@ export function decideRules(c: Card, chips = true): Choice {
 
 /** After a masked card: does the model know which real race it was? */
 export async function probe(c: Card, trace: Trace): Promise<string> {
-  const model = new ChatAnthropic({ model: EVAL_MODEL, maxTokens: 400, outputConfig: { effort: "low" } });
+  const model = new ChatAnthropic({ model: EVAL_MODEL, maxTokens: 1500, outputConfig: { effort: "low" } });
   const out = await model.invoke(
     [
       { role: "system", content: "You will see a decision from a teaching simulation. Names, places and dates in it have been replaced." },
@@ -90,13 +90,15 @@ export async function probe(c: Card, trace: Trace): Promise<string> {
 /** No card: what the model remembers the real person doing, from the title and the option labels alone. */
 export async function recall(c: Card, who: string, date: string, trace: Trace): Promise<Choice> {
   const t0 = Date.now();
-  const model = new ChatAnthropic({ model: EVAL_MODEL, maxTokens: 400, outputConfig: { effort: "low" } });
+  const model = new ChatAnthropic({ model: EVAL_MODEL, maxTokens: 1500, outputConfig: { effort: "low" } });
   const options = c.options.map((o) => `${o.key}. ${o.label}`).join("\n");
   const out = await model.invoke(
     [{ role: "user", content: `In the 2013 Democratic primary for mayor of New York City, on ${date}, ${who} faced this choice: "${c.title}". Which of these did ${who} actually do?\n${options}\nReply with JSON only: {"option": "<letter>", "why": "<one sentence>"}.` }],
     { runName: `eval:recall:${c.decision}`, tags: trace.tags, metadata: trace.metadata },
   );
-  const r = json<{ option: string; why: string }>(text(out.content));
-  const key = c.options.some((o) => o.key === r?.option) ? r!.option : null;
-  return { key, why: r?.why ?? text(out.content), read: [], mode: "live", ms: Date.now() - t0 };
+  const raw = text(out.content);
+  // A reply cut short still names its letter first.
+  const letter = json<{ option: string }>(raw)?.option ?? raw.match(/"option"\s*:\s*"([A-G])"/)?.[1];
+  const key = c.options.some((o) => o.key === letter) ? letter! : null;
+  return { key, why: json<{ why: string }>(raw)?.why ?? raw, read: [], mode: "live", ms: Date.now() - t0 };
 }

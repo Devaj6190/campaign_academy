@@ -19,6 +19,9 @@ export const DROPPED: Record<string, string[]> = {
   budget: ["Outside money is in play for a rival: the teachers' union will spend"],
 };
 
+/** Is this card line one the eval leaves out? Used for the card and for the memo requests built from it. */
+export const isDropped = (decision: string, text: string) => (DROPPED[decision] ?? []).some((p) => text.startsWith(p));
+
 /**
  * The changed-facts cards: a new situation for each case decision, and the 2013 choice a reasoning agent should
  * move away from given it. Written before the first run. The world's numbers are left as they are, so nothing here
@@ -105,6 +108,16 @@ const RULES: [RegExp, string | ((...m: string[]) => string)][] = [
   [/\b(City )?Comptroller\b/g, "chief financial officer"],
   [/\b(the )?(stop-and-frisks?|stop and frisk)\b/gi, "the police stop policy"],
   [/\b(a )?tale of two cities( divided by income)?/gi, "a city divided by income"],
+  // Figures and details that name the race on their own (the first probe recognised nearly every masked card).
+  [/\bincomes above \$500,000\b|\bincomes over \$500,000\b/g, "the highest incomes"],
+  [/\$6,426,000/g, "the legal limit"],
+  [/\$4\.8 million\b/g, "a large sum"],
+  [/\btwelve years\b|\bthree terms\b/g, "several terms"],
+  [/\b15-year-old\b/g, "teenage"],
+  [/\b(further )?explicit messages\b|\blewd images\b/gi, "embarrassing messages"],
+  [/\bsexting( scandal)?\b/gi, "messaging scandal"],
+  [/\bCongress\b/g, "national office"],
+  [/\b(the |a )?paid sick (days|leave)( bill)?/gi, "the worker benefits bill"],
   [/\b(the )?Boston Marathon bombing\b/g, "a terror attack in another city"],
   [/\b(the )?Zimmerman verdict( in Florida)?|\bTrayvon Martin\b/g, "a national verdict on race and policing"],
   [/\bDetroit's bankruptcy\b/g, "another city's bankruptcy"],
