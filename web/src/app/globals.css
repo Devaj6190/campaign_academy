@@ -229,8 +229,21 @@ a {
   animation: breathe 1.4s ease-in-out infinite;
 }
 
+/* Something is waiting to be read: a gold frame whose light swells and fades until the thing is opened.
+   The one place light is used as a signal; it is never decoration. */
+@keyframes signal {
+  50% {
+    box-shadow: 0 0 0 1px var(--color-gold-bright), 0 0 18px -2px var(--color-gold);
+  }
+}
+.signal {
+  box-shadow: 0 0 0 1px rgb(214 178 110 / 0.5), 0 0 6px -2px var(--color-gold);
+  animation: signal 1.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .edge-flow,
+  .signal,
   .breathe {
     animation: none;
   }

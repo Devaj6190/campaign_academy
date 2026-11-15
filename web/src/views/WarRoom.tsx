@@ -13,10 +13,11 @@ import { profileFor } from "@/lib/staff/roster";
 import { answerAsk, hire, letGo, loadCandidates, reassign } from "@/lib/staff/run";
 import { useStaff, type ChatItem, type Run } from "@/lib/staff/store";
 import { FACTIONS_2013 } from "@/lib/cases/mayor2013-factions";
-import { shortDate, shortMoney, staffMoney, useCase } from "@/lib/cases/store";
+import { currentCase, shortDate, shortMoney, staffMoney, useCase } from "@/lib/cases/store";
 import { short, shortPlace } from "@/lib/staff/world";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
+import { Cite } from "./CaseView";
 
 // Fixed logical canvas: you on top, direct reports below, their people below them.
 const W = 900, H = 520;
@@ -277,6 +278,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
   const busy = useGame((s) => !!s.busy[p.id]);
   const boss = staff.find((x) => x.id === p.boss);
   const team = staff.filter((x) => x.boss === p.id);
+  const c = currentCase(useCase((s) => s.caseId));
   const instruct = useGame((s) => s.instruct);
   // A draft handed over from elsewhere (the map's "Send staff") starts in the box, ready to edit and send.
   const [text, setText] = useState(() => useStaff.getState().draft[p.id] ?? "");
@@ -303,7 +305,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Section title="Profile">
-          {p.onRecord && <p className="mb-2 text-[12px] leading-relaxed text-muted">The record names {p.name} in this post. What this post says and does here is simulated.</p>}
+          {p.onRecord && <p className="mb-2 text-[12px] leading-relaxed text-muted">The record names {p.name} in this post.<Cite c={c} id={p.onRecord} /> What this post says and does here is simulated{p.good || p.weak ? ", and so are its strengths and weaknesses below: they describe the post in this exercise, not the person" : ""}.</p>}
           <dl className="space-y-2 text-[13px]">
             {[["Good at", p.good], ["Weak at", p.weak], ["Working on", job ?? p.doing ?? "Nothing yet"]].filter(([, v]) => v).map(([k, v]) => (
               <div key={k} className="flex gap-3"><dt className="w-[76px] shrink-0 text-muted">{k}</dt><dd className="text-soft">{v}</dd></div>

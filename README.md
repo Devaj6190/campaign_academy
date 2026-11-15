@@ -105,12 +105,12 @@ A case is a data file. Adding a case means researching and writing one more file
 | Screen | Shows |
 |---|---|
 | **Case** | The briefing, each decision you have reached, and the debrief |
-| **Profile** | The real candidate and race as of your date: record, platform (each plank dated and cited), the rivals and their latest moves, and the planks you add |
+| **Profile** | The real candidate and race as of your date: record, platform (each plank dated and cited), and the planks you add |
 | **War room** | The campaign's staff. You give orders in plain language and watch the work travel down and back |
 | **Map** | The city: where your campaign is stronger or weaker, the candidate's own appearances, and on primary day the count as it comes in |
 | **Factions** | The voter groups the polls reported: how large each is and where you stand with it |
 
-The top bar holds the money (spent, left under the cap, raised), the poll, the date and the clock. The morning paper opens from the sidebar and on mornings with news.
+The top bar holds the money (spent, left under the cap, raised), the poll, the date and the clock. Hovering the poll lists what each rival is doing, and it glows when one of them has done something you have not read. The morning paper opens from the sidebar and on mornings with news.
 
 ---
 

@@ -28,7 +28,7 @@ const slug = (name: string) => name.toLowerCase().replace(/[^a-z]+/g, "_").repla
 
 /** How a post introduces itself to its agent. A post held by a real person is played as the post, not as that person. */
 const post = (p: { name?: string; role: string; onRecord?: string }) =>
-  p.onRecord ? `the ${p.role} (the post ${p.name} held in the real campaign; speak as a professional in that post, never as an impersonation of him)` : p.name === p.role ? `the ${p.role}` : `${p.name}, ${p.role}`;
+  p.onRecord ? `the ${p.role} (the post ${p.name} held in the real campaign; speak as a professional in that post, never as an impersonation of that person)` : p.name === p.role ? `the ${p.role}` : `${p.name}, ${p.role}`;
 
 const frame = (w: Snapshot) => `on ${w.candidate}'s campaign in ${w.race}. This is a nonpartisan teaching simulation built on the real race: the people, dates and standings up to today are real, and what your work achieves is simulated`;
 
@@ -74,7 +74,7 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
 
   const subagents: SubAgent[] = team.map((p) => ({
     name: slug(p.name!),
-    description: `${p.name}, ${p.role}. Good at: ${p.good ?? p.profile.skills.join(", ")}. Weak at: ${p.weak ?? "nothing noted"}. Skills: ${p.profile.skills.join(", ")}.`,
+    description: `${p.onRecord ? `The ${p.role}` : `${p.name}, ${p.role}`}. Good at: ${p.good ?? p.profile.skills.join(", ")}. Weak at: ${p.weak ?? "nothing noted"}. Skills: ${p.profile.skills.join(", ")}.`,
     model: worker(),
     tools: [actionTool(ctx, p.id)],
     systemPrompt: `You are ${post(p)} ${frame(w)}.
