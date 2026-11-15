@@ -16,8 +16,11 @@ export type Pick = { option: string; why: string };
 export type Work = {
   id: number;
   date: string;
+  /** A staff post id, "candidate", or a rival candidate's id. */
   by: string;
   label: string;
+  /** One sentence on what happened, for the paper and for the rivals to react to. */
+  note?: string;
   cost: number;
   raised: number;
   poll: Record<string, number>;

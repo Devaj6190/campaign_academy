@@ -21,6 +21,8 @@ export function Profile() {
   const picks = useCase((s) => s.picks);
   const me = c.candidates.find((x) => x.id === c.follow)!;
   const rivals = c.candidates.filter((x) => x.id !== c.follow);
+  const work = useCase((s) => s.work);
+  const lastMove = (id: string) => [...work].reverse().find((x) => x.by === id)?.note;
 
   const race = c.candidates.map((x) => ({ ...x, poll: w.poll[x.id] ?? 0 })).filter((x) => x.poll > 0 || x.id === c.follow).sort((a, b) => b.poll - a.poll);
   const rank = race.findIndex((x) => x.id === c.follow) + 1;
@@ -89,6 +91,7 @@ export function Profile() {
               <div key={o.id} className="rounded-lg border border-line bg-raised p-3">
                 <div className="text-[13px] font-medium">{o.name}</div>
                 <div className="text-[11.5px] text-muted">{o.standing}</div>
+                {lastMove(o.id) && <div className="mt-1.5 text-[11.5px] leading-snug text-soft">Latest move (simulated): {lastMove(o.id)!.replace(`${o.name}: `, "")}</div>}
               </div>
             ))}
           </div>

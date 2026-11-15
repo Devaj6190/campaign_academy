@@ -288,7 +288,7 @@ function Debrief({ c }: { c: Case }) {
     <>
       <Section title="Your election night">
         <p className="text-[15px] text-fg">{verdict}</p>
-        <p className="mt-2 text-[12.5px] text-muted">A simulated result, fitted so that the real campaign&rsquo;s choices land on the real one.</p>
+        <p className="mt-2 text-[12.5px] text-muted">A simulated result. The six decisions are fitted so that the real campaign&rsquo;s choices land on the real one; what your staff did and what your rivals did then moved it from there.</p>
       </Section>
       <Section title={`What really happened · ${day(c.electionDate)}`}>
         <div className="space-y-2.5">

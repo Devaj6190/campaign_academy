@@ -32,7 +32,8 @@ export function snapshot(): Snapshot {
   const { c, w } = worldNow();
   const mine = w.poll[c.follow] ?? 0;
   const boost = factionWork();
-  const gained = k.work.reduce((a, x) => a + (x.poll[c.follow] ?? 0), 0);
+  // Only the campaign's own work counts toward its cap, not what rivals took away.
+  const gained = k.work.reduce((a, x) => a + (c.candidates.some((r) => r.id === x.by) ? 0 : (x.poll[c.follow] ?? 0)), 0);
   const room = Math.max(0, 1 - gained / STAFF_CAP);
   const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
   return {
@@ -97,7 +98,7 @@ function apply(e: Effect) {
     else factions[id] = (factions[id] ?? 0) + d;
     citywide += (d * f.share) / 100;
   }
-  useCase.getState().addWork({ by: e.by, label: e.label, cost: e.cost, raised: e.raised, poll: { [c.follow]: citywide }, groups, factions, districts: e.sent });
+  useCase.getState().addWork({ by: e.by, label: e.label, note: e.summary.replace(/ \(Not their strength.*$/, ""), cost: e.cost, raised: e.raised, poll: { [c.follow]: citywide }, groups, factions, districts: e.sent });
 }
 
 // --- The candidate in person, from the map ---

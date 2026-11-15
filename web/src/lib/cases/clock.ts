@@ -3,7 +3,8 @@ import type { Case } from "./types";
 
 // The campaign clock. It runs on the case's real calendar, one day at a time, between decisions. It never runs past
 // a decision: on the decision's date it stops and the decision card opens, and it starts again only when the student
-// has chosen and says so. Mornings with news pause it for the paper (the caller opens it).
+// has chosen and says so. Mornings with news pause it for the paper (the caller opens it). When a stretch gets
+// under way, the rivals plan their moves for it (lib/cases/rivals).
 
 /** One day of the campaign at 1x, in milliseconds. */
 export const DAY_MS = 2000;
@@ -14,8 +15,10 @@ const nextDay = (iso: string) => new Date(Date.parse(iso) + 86_400_000).toISOStr
 /** The date of a step: the briefing, each decision, then the election. */
 export const dateOf = (c: Case, step: number) => (step <= 0 ? c.briefingDate : (c.decisions[step - 1]?.date ?? c.electionDate));
 
-/** A morning with news: the day after a press item or a finance filing. More dated entries in the case mean more of these. */
-export const isEventDay = (c: Case, date: string) => [...c.press, ...c.finance].some((x) => nextDay(x.date) === date);
+/** A morning with news: the day after a press item, a finance filing, or a rival's move. More dated entries in the case mean more of these. */
+export const isEventDay = (c: Case, date: string) =>
+  [...c.press, ...c.finance].some((x) => nextDay(x.date) === date) ||
+  useCase.getState().work.some((x) => x.by !== c.follow && c.candidates.some((r) => r.id === x.by) && nextDay(x.date) === date);
 
 /** The decision the campaign has reached and not yet made, if any. */
 export function waiting() {
@@ -37,6 +40,8 @@ function arrive(): "arrived" {
 export function tick(): "arrived" | "event" | undefined {
   const s = useCase.getState(), c = currentCase(s.caseId);
   if (waiting() || finished()) return;
+  // The stretch is under way, however it started (run or skip): the rivals plan for it, once per step.
+  void import("./rivals").then((m) => m.planRivals());
   const date = nextDay(s.date);
   if (date >= dateOf(c, s.at + 1)) return arrive();
   useCase.setState({ date });

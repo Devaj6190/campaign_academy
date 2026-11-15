@@ -3,7 +3,8 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { create } from "zustand";
 import { FACTIONS_2013, factionNow } from "@/lib/cases/mayor2013-factions";
-import { factionWork, longDate, useCaseNow } from "@/lib/cases/store";
+import { dateOf } from "@/lib/cases/clock";
+import { factionWork, longDate, useCase, useCaseNow } from "@/lib/cases/store";
 import { Cite, Claims } from "@/views/CaseView";
 import { Button, Dialog, Label, Meter, Tag } from "./ui";
 
@@ -34,6 +35,8 @@ function Edition({ close }: { close: () => void }) {
   const standing = FACTIONS_2013.map((f) => ({ f, v: factionNow(f, w.groups, mine, mineStart, factionWork()) })).sort((a, b) => b.v - a.v);
   const poll = c.candidates.map((x) => ({ id: x.id, name: x.id === c.follow ? "You" : x.name, v: Math.round(w.poll[x.id] ?? 0) })).filter((x) => x.v > 0).sort((a, b) => b.v - a.v).slice(0, 5);
   const [head, body] = lead ? split(lead.summary) : ["", ""];
+  // What the rival campaigns did since the student last decided. Their moves are simulated (lib/cases/rivals).
+  const rivals = useCase((s) => s.work).filter((x) => x.by !== c.follow && c.candidates.some((r) => r.id === x.by) && x.date >= dateOf(c, step)).reverse();
 
   return (
     <div className="overflow-y-auto px-10 pt-9 pb-8">
@@ -75,6 +78,18 @@ function Edition({ close }: { close: () => void }) {
           ) : <p className="mt-2 text-[13px] leading-relaxed text-muted">This is the first edition of the campaign.</p>}
         </article>
       </div>
+
+      {!!rivals.length && (
+        <div className="mt-8 border-t border-line pt-6">
+          <div className="flex items-center gap-2"><Label>What your rivals did</Label><Tag kind="sim" /></div>
+          <ul className="mt-2 space-y-1.5">
+            {rivals.slice(0, 6).map((x) => (
+              <li key={x.id} className="text-[13px] leading-relaxed text-soft"><span className="tnum mr-2 font-mono text-[11px] text-muted">{longDate(x.date)}</span>{x.note}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[12px] text-muted">The candidates are real. These moves are the simulation&rsquo;s: each rival campaign reacts to what yours did.</p>
+        </div>
+      )}
 
       <div className="mt-8 grid grid-cols-2 gap-8 border-t border-line pt-6">
         <div>
