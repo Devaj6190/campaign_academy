@@ -564,6 +564,8 @@ function Proposals({ c, index, id }: { c: Extract<ChatItem, { k: "proposals" }>;
   const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
   const staff = useGame((s) => s.staff);
   const done = c.picked !== undefined;
+  // While the director is on another job, an option cannot start: the buttons wait.
+  const busy = useStaff((s) => !!s.active[id]);
   return (
     <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start">
       <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft">{c.text}</div>
@@ -588,7 +590,7 @@ function Proposals({ c, index, id }: { c: Extract<ChatItem, { k: "proposals" }>;
                 <span className="tnum shrink-0 font-mono text-[11px] text-warm" title="The engine's price for exactly these steps">{usd(o.cost)}</span>
               </div>
               {!done && (
-                <Button size="sm" variant="primary" className="mt-2" onClick={() => pick(id, index, i)}>
+                <Button size="sm" variant="primary" className="mt-2" disabled={busy} title={busy ? "Still on the last job" : undefined} onClick={() => pick(id, index, i)}>
                   <Check className="size-3.5" />Do this
                 </Button>
               )}
@@ -596,7 +598,7 @@ function Proposals({ c, index, id }: { c: Extract<ChatItem, { k: "proposals" }>;
           );
         })}
       </div>
-      {!done && <span className="mt-1 pl-1 text-[11px] text-faint">Each price is exact for the steps listed. Nothing is spent until you pick one, or give your own order.</span>}
+      {!done && <span className="mt-1 pl-1 text-[11px] text-faint">{busy ? "Still on the last job: pick one when the report is in." : "Each price is exact for the steps listed. Nothing is spent until you pick one, or give your own order."}</span>}
     </motion.div>
   );
 }

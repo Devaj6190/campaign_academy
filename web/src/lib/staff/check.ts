@@ -3,7 +3,8 @@ import { currentCase, useCase } from "../cases/store";
 import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
 import { budgetIn, RunCtx, type Proposal, type RunEvent } from "./protocol";
-import { BASE_BUDGET, DAILY, runBookings, snapshot } from "./run";
+import { BASE_BUDGET, DAILY, pick, runBookings, snapshot } from "./run";
+import { useStaff } from "./store";
 
 // Checks on the staff agents that need no API key (issue #41). Run with `npm run check:staff`.
 // 1. An order and a question are told apart from their wording (the rules fallback; live agents decide themselves).
@@ -131,6 +132,18 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
   const tight = await offline("fd", "Canvass Crown Heights and train volunteers. Under $20,000.", budgetIn("Under $20,000.")!);
   if (tight.spent > 20000 || !tight.spent) problems.push(`budget: a $20,000 order spent $${tight.spent.toLocaleString("en-US")}`);
   report.push(`budget: a $20,000 order spent $${tight.spent.toLocaleString("en-US")}`);
+
+  // An option card is used only when its order starts (Devaj's review, item 3): picking while the director is still
+  // on another job leaves the card open and starts nothing.
+  {
+    const offer = { k: "proposals" as const, text: "Two ways.", options: [{ title: "Canvass Crown Heights", why: "", steps: [{ by: "ob", action: "canvass" as const, district: 308 }], cost: 18000, order: "Door canvass in Crown Heights." }] };
+    useStaff.setState({ chat: { fd: [offer] }, active: { fd: 123 } });
+    pick("fd", 0, 0);
+    const after = useStaff.getState().chat.fd[0];
+    if (after.k === "proposals" && after.picked !== undefined) problems.push("option card: picked while the director was busy, so it was used up without running");
+    useStaff.setState({ chat: {}, active: {} });
+    report.push("option card: picking while the director is busy leaves it open");
+  }
 
   // Scheduling: book through the run, then let the day come.
   useCase.getState().restart();

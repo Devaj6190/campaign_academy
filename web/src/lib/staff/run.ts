@@ -311,6 +311,11 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
 export function pick(id: string, index: number, option: number) {
   const item = useStaff.getState().chat[id]?.[index];
   if (item?.k !== "proposals" || item.picked !== undefined || !item.options[option]) return;
+  // A director still on another job cannot start this one: the card stays open to pick when they report.
+  if (useStaff.getState().active[id]) {
+    pushChat(id, { k: "note", text: `${cap(first(id))} is still on the last job. Pick this option again when they report.` });
+    return;
+  }
   useStaff.setState((s) => ({ chat: { ...s.chat, [id]: s.chat[id].map((c, i) => (i === index && c.k === "proposals" ? { ...c, picked: option } : c)) } }));
   const o = item.options[option];
   void instruct(id, o.order, 0, undefined, o.cost, o.steps);
