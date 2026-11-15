@@ -12,6 +12,7 @@
     "refit:case": "node scripts/refit-case.mjs",
     "check:staff": "node scripts/check-staff.mjs",
     "check:memos": "node scripts/check-memos.mjs",
+    "eval": "node scripts/eval.mjs",
     "check:save": "node scripts/check-save.mjs",
     "demo:start": "node scripts/demo-start.mjs"
   },
