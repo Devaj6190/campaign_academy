@@ -289,7 +289,8 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
   // The plan is a live checklist: shown while an order runs. Once the report is in, the order card says it all.
   const plan = useMemo(() => (thinking ? toPlan(runs?.slice(0, 1), staff) : []), [thinking, runs, staff]);
   const lastSuggest = [...(chat ?? [])].reverse().find((c): c is Extract<ChatItem, { k: "them" }> => c.k === "them" && !!c.suggest)?.suggest;
-  const ideas = [...(lastSuggest ? [lastSuggest] : []), ...ideasFor(p)].slice(0, 3);
+  // The post's last suggestion can be one of the stock ideas; each idea is offered once.
+  const ideas = [...new Set([...(lastSuggest ? [lastSuggest] : []), ...ideasFor(p)])].slice(0, 3);
   const rows = useMemo(() => group(chat ?? []), [chat]);
   const lastOrder = rows.findLast((r) => r.order)?.order;
   // Ideas help at the start, and right after a report when the student is deciding what next.
