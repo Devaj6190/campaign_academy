@@ -9,7 +9,7 @@ import { resolve, type Effect } from "../engine/resolve";
 import { runOffline } from "./offline";
 import { RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
-import { bumpMorale, nextId, pushChat, useStaff, type FeedItem } from "./store";
+import { bumpMorale, nextId, pushChat, useStaff, type ChatItem, type FeedItem } from "./store";
 import { PLACES, short, shortPlace, type Snapshot } from "./world";
 
 // Drives one instruction from the browser: sends it, reads the event stream, and applies each event to the campaign.
@@ -134,6 +134,11 @@ export function sendStaff(cd: number) {
   useGame.setState({ view: "war", person: "fd" });
 }
 
+type Thoughts = Extract<ChatItem, { k: "thoughts" }>;
+function patchThoughts(director: string, runId: number, fn: (t: Thoughts) => Thoughts) {
+  useStaff.setState((s) => ({ chat: { ...s.chat, [director]: (s.chat[director] ?? []).map((c) => (c.k === "thoughts" && c.run === runId ? fn(c) : c)) } }));
+}
+
 function handle(director: string, runId: number, e: RunEvent) {
   const patchRun = (fn: (r: NonNullable<ReturnType<typeof current>>) => void) =>
     useStaff.setState((s) => ({ runs: { ...s.runs, [director]: (s.runs[director] ?? []).map((r) => (r.id === runId ? (fn(r), { ...r }) : r)) } }));
@@ -145,7 +150,10 @@ function handle(director: string, runId: number, e: RunEvent) {
       setBusy(director, "work");
       break;
     case "say":
-      pushChat(director, { k: "them", text: e.text });
+      pushChat(director, { k: "them", text: e.text, run: runId });
+      break;
+    case "thought":
+      patchThoughts(director, runId, (t) => ({ ...t, items: [...t.items, { who: e.who, text: e.text }] }));
       break;
     case "plan":
       patchRun((r) => { r.items = e.items; });
@@ -170,7 +178,7 @@ function handle(director: string, runId: number, e: RunEvent) {
       }
       const where = e.effect.district ? ` in ${shortPlace(e.effect.district)}` : "";
       useStaff.setState((s) => ({ job: { ...s.job, [e.effect.by]: `${e.effect.action in ACTIONS ? ACTIONS[e.effect.action as keyof typeof ACTIONS].doing : e.effect.label}${where}` } }));
-      pushChat(director, { k: "receipt", effect: e.effect, by: e.effect.by });
+      pushChat(director, { k: "receipt", effect: e.effect, by: e.effect.by, run: runId });
       if (e.effect.by !== director) pushChat(e.effect.by, { k: "receipt", effect: e.effect, by: e.effect.by });
       feed(e.effect.by, e.effect.summary, e.effect.raised > e.effect.cost ? "pos" : undefined);
       break;
@@ -184,16 +192,16 @@ function handle(director: string, runId: number, e: RunEvent) {
       if (e.summary) pushChat(e.to, { k: "them", text: e.summary });
       break;
     case "report":
-      pushChat(director, { k: "report", text: e.text, ask: e.ask, state: e.ask ? "open" : "approved", spent: e.spent, raised: e.raised });
+      pushChat(director, { k: "report", text: e.text, ask: e.ask, state: e.ask ? "open" : "approved", spent: e.spent, raised: e.raised, run: runId });
       if (current()?.follow) break; // an approved ask continues an order that was already graded
-      pushChat(director, { k: "coach", clarity: e.clarity, fit: e.fit, missing: e.missing, text: e.coaching });
+      pushChat(director, { k: "coach", clarity: e.clarity, fit: e.fit, missing: e.missing, text: e.coaching, run: runId });
       // Clear orders to the right person lift morale; vague ones and misfits wear people down.
       bumpMorale(director, e.clarity >= 3 ? 3 : e.clarity <= 1 ? -3 : 0);
       if (e.fit < 1) for (const j of current()?.jobs ?? []) bumpMorale(j.to, -2);
       feed(director, `${cap(first(director))} reported back${e.ask ? ` and wants $${e.ask.amount.toLocaleString("en-US")} more` : ""}.`, e.ask ? "warm" : undefined);
       break;
     case "error":
-      pushChat(director, { k: "note", text: e.text });
+      pushChat(director, { k: "note", text: e.text, run: runId });
       break;
     case "done":
       patchRun((r) => { r.status = "done"; r.items = r.items.map((i) => ({ ...i, status: "completed" })); });
@@ -209,7 +217,8 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
   }
   const runId = Date.now() % 1e9;
   const history: Line[] = (s.chat[id] ?? []).flatMap((c) => (c.k === "me" || c.k === "them" ? [{ who: c.k, text: c.text }] : c.k === "report" ? [{ who: "them" as const, text: c.text }] : []));
-  pushChat(id, { k: "me", text });
+  pushChat(id, { k: "me", text, run: runId });
+  pushChat(id, { k: "thoughts", run: runId, items: [], live: true });
   useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, origin: followOf ?? text, follow: !!followOf, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
   setBusy(id, "down");
   feed("you", `You → ${first(id)}: ${text}`);
@@ -251,6 +260,7 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
       }
     }
     useStaff.setState((s) => ({ runs: { ...s.runs, [id]: (s.runs[id] ?? []).map((r) => (r.id === runId ? { ...r, status: "done" as const, jobs: r.jobs.map((j) => ({ ...j, done: true })) } : r)) } }));
+    patchThoughts(id, runId, (t) => ({ ...t, live: false }));
     setBusy(id);
     useStaff.setState((st) => { const active = { ...st.active }; delete active[id]; return { active }; });
   }

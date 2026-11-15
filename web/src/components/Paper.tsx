@@ -1,14 +1,15 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ChevronDown, Megaphone, MessageSquare, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Megaphone, MessageSquare, X } from "lucide-react";
 import { useState } from "react";
 import { DAILY, appearancesToday } from "@/lib/staff/run";
 import { currentCase, longDate, shortDate, useCase } from "@/lib/cases/store";
 import type { Case } from "@/lib/cases/types";
 import { surnameOf, type Edition, type NewsItem } from "@/lib/paper/edition";
-import { respond, usePaper } from "@/lib/paper/run";
+import { draftStances, respond, usePaper } from "@/lib/paper/run";
+import { FACTIONS_2013 } from "@/lib/cases/mayor2013-factions";
 import { cn } from "@/lib/util";
-import { Cite } from "@/views/CaseView";
+import { Chip, Cite } from "@/views/CaseView";
 import { Button, Dialog, Label, Meter, Popover, Tag } from "./ui";
 
 // The morning paper: one page per morning, every edition kept. What it reports from the record is the case's own
@@ -68,7 +69,7 @@ function Page({ close }: { close: () => void }) {
       {!e.polled && <p className="mt-8 border-t border-line pt-6 text-[12.5px] text-muted">No new poll this morning. The Ledger polls about once a week; earlier polls are in the archive.</p>}
       {e.polled && <div className="mt-8 grid grid-cols-2 gap-8 border-t border-line pt-6">
         <div>
-          <div className="flex items-center gap-2"><Label>The poll</Label><Tag kind="sim" /></div>
+          <div className="flex items-center gap-2"><Label>The poll</Label></div>
           <div className="mt-3 space-y-2.5">
             {e.poll.map((x) => (
               <div key={x.id} className="flex items-center gap-3 text-[13px]">
@@ -80,7 +81,7 @@ function Page({ close }: { close: () => void }) {
           </div>
         </div>
         <div>
-          <div className="flex items-center gap-2"><Label>Where you stand</Label><Tag kind="sim" /></div>
+          <div className="flex items-center gap-2"><Label>Where you stand</Label></div>
           <div className="mt-3 space-y-2 text-[13px]">
             <div className="flex gap-2.5"><ArrowUp className="mt-0.5 size-3.5 shrink-0 text-warm" /><span className="text-soft">Strongest with {e.strong.map((x) => `${x.name} (${x.v}%)`).join(", ")}</span></div>
             <div className="flex gap-2.5"><ArrowDown className="mt-0.5 size-3.5 shrink-0 text-cool" /><span className="text-soft">Weakest with {e.weak.map((x) => `${x.name} (${x.v}%)`).join(", ")}</span></div>
@@ -89,7 +90,7 @@ function Page({ close }: { close: () => void }) {
       </div>}
 
       <section className="mt-8 border-t border-line pt-6">
-        <div className="flex items-center gap-2"><Label>Voices of the city</Label><Tag kind="sim" /></div>
+        <div className="flex items-center gap-2"><Label>Voices of the city</Label></div>
         <div className="mt-3 grid grid-cols-2 gap-8">
           {e.voices.map((v) => (
             <article key={v.group}>
@@ -98,10 +99,9 @@ function Page({ close }: { close: () => void }) {
             </article>
           ))}
         </div>
-        <p className="mt-3 text-[12px] text-muted">Letters are written for this exercise from what each group is likely to value. They are not real letters.</p>
+        <p className="mt-3 text-[12px] text-muted">Your campaign, your rivals, the poll and these letters come from the simulation, not the 2013 record. Letters are written from what each group is likely to value.</p>
       </section>
 
-      <div className="mt-8 flex justify-end"><Button variant="primary" onClick={close}>{latest ? "Start the day" : "Close"}</Button></div>
     </div>
   );
 }
@@ -129,6 +129,7 @@ function Archive({ editions, current }: { editions: Edition[]; current: Edition 
 
 function Lead({ c, e, latest, close }: { c: Case; e: Edition; latest: boolean; close: () => void }) {
   const [note, setNote] = useState("");
+  const [answering, setAnswering] = useState(false);
   const [head, body] = e.lead ? split(e.lead.text) : ["The race for mayor opens", ""];
   const left = DAILY - appearancesToday();
   const full = c.candidates.find((x) => x.id === c.follow)?.name;
@@ -143,21 +144,56 @@ function Lead({ c, e, latest, close }: { c: Case; e: Edition; latest: boolean; c
           <p className="mt-2 text-[12px] text-muted">
             {e.lead.outlet ? `${e.lead.outlet}, ` : ""}{longDate(e.lead.date)}{e.lead.sources.map((id) => <Cite key={id} c={c} id={id} />)} · paraphrased, not the article&rsquo;s own words
           </p>
-          {latest && !e.decision && (
+          {latest && !e.decision && !answering && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="primary" disabled={left <= 0} title={left <= 0 ? "No appearances left today" : undefined} onClick={() => setNote(respond(e, "respond"))}>
-                <Megaphone className="size-3.5" />{you} responds · {Math.max(0, left)}/{DAILY} left
+              <Button size="sm" variant="primary" disabled={left <= 0} title={left <= 0 ? "He has no time left today. Hand it to Comms." : undefined} onClick={() => { setAnswering(true); void draftStances(e); }}>
+                <Megaphone className="size-3.5" />Answer the story
               </Button>
               <Button size="sm" onClick={() => { respond(e, "staff"); close(); }}><MessageSquare className="size-3.5" />Hand it to Comms</Button>
               <Button size="sm" variant="ghost" onClick={() => setNote(respond(e, "pass"))}><X className="size-3.5" />Let it pass</Button>
             </div>
           )}
+          {latest && !e.decision && answering && <Answer e={e} you={you} onCancel={() => setAnswering(false)} onDone={setNote} />}
           {(note || e.answer) && <p className="mt-3 text-[12px] text-muted">{e.answer ?? note}</p>}
         </>
       ) : (
         <p className="mt-3 max-w-[62ch] text-[14px] leading-relaxed text-soft">{c.briefing.slice(1, 3).map((x) => x.text).join(" ")}{c.briefing.slice(1, 3).flatMap((x) => x.sources).map((id) => <Cite key={id} c={c} id={id} />)}</p>
       )}
     </section>
+  );
+}
+
+/** Three ways to answer the lead, drafted by the comms shop. Pick one and put it out. */
+function Answer({ e, you, onCancel, onDone }: { e: Edition; you: string; onCancel: () => void; onDone: (note: string) => void }) {
+  const [pick, setPick] = useState<number | null>(null);
+  const name = (id: string) => FACTIONS_2013.find((f) => f.id === id)?.name ?? id;
+  const stance = pick === null ? null : e.stances?.[pick];
+  return (
+    <div className="mt-4 rounded-xl border border-line-strong bg-raised/60 p-4">
+      <Label>How should {you} answer it?</Label>
+      {!e.stances ? (
+        <p className="mt-3 text-[13px] text-muted">The communications shop is drafting three ways to answer&hellip;</p>
+      ) : (
+        <div className="mt-3 space-y-2" role="radiogroup">
+          {e.stances.map((s, i) => {
+            const on = pick === i;
+            return (
+              <button key={s.label} role="radio" aria-checked={on} onClick={() => setPick(i)} className={cn("block w-full rounded-lg border p-3 text-left transition-colors", on ? "border-gold bg-hover" : "border-line bg-raised hover:border-line-strong")}>
+                <div className="flex items-center gap-2 text-[14px] font-medium">{on && <Check className="size-3.5 text-gold-bright" />}{s.label}</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {s.helps.map((g) => <Chip key={g} up>{name(g)}</Chip>)}
+                  {s.annoys.map((g) => <Chip key={g} up={false}>{name(g)}</Chip>)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="mt-4 flex items-center gap-2">
+        <Button size="sm" variant="primary" disabled={!stance} onClick={() => onDone(respond(e, "respond", { stance: stance! }))}>Put it out</Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>Back</Button>
+      </div>
+    </div>
   );
 }
 
@@ -175,7 +211,7 @@ function Item({ c, x }: { c: Case; x: NewsItem }) {
 function Sim({ label, s }: { label: string; s: { headline: string; body: string } }) {
   return (
     <article>
-      <div className="flex items-center gap-2"><Label>{label}</Label><Tag kind="sim" /></div>
+      <Label>{label}</Label>
       <h3 className="mt-2 font-serif text-[19px] leading-snug">{s.headline}</h3>
       <p className="mt-1.5 text-[13px] leading-relaxed text-soft">{s.body}</p>
     </article>

@@ -1,3 +1,4 @@
+import { numbersIn } from "../paper/edition";
 import { mayor2013 } from "./mayor2013";
 import { missingSources, realPath, simulate, type Case } from "./types";
 
@@ -13,6 +14,18 @@ export function checkCase(c: Case): string[] {
   const sim = simulate(c, realPath(c)).poll[c.follow];
   if (Math.abs(sim - real) > 2) problems.push(`the real campaign's choices simulate to ${sim.toFixed(1)}%, but the certified result was ${real}%`);
   if (simulate(c, realPath(c)).budget < 0) problems.push("the real campaign's choices overspend the simulated budget");
+  // A short version may not carry a number its full sentence does not.
+  const walk = (x: unknown): void => {
+    if (!x || typeof x !== "object") return;
+    const o = x as Record<string, unknown>;
+    if (typeof o.short === "string") {
+      const full = numbersIn(String(o.text ?? o.says ?? o.summary ?? ""));
+      const extra = numbersIn(o.short).filter((n) => !full.includes(n));
+      if (extra.length) problems.push(`a short version has a number its sentence does not (${extra.join(", ")}): ${o.short}`);
+    }
+    Object.values(o).forEach(walk);
+  };
+  walk(c);
   return problems;
 }
 

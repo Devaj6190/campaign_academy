@@ -49,15 +49,15 @@ export function Profile() {
             <div className="mt-9 grid grid-cols-3 divide-x divide-line rounded-xl border border-line bg-surface">
               {stats.map(([k, v, sub]) => (
                 <div key={k} className="px-5 py-4">
-                  <Label>{k}</Label>
-                  <div className="tnum mt-1.5 font-mono text-[22px] font-medium tracking-tight">{v}</div>
-                  <div className="text-[11.5px] text-faint">{sub}</div>
+                  <Label className="text-[13px]">{k}</Label>
+                  <div className="tnum mt-2 font-mono text-[36px] leading-none font-medium tracking-tight">{v}</div>
+                  <div className="mt-2 text-[13px] text-muted">{sub}</div>
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-[11.5px] text-faint">Money follows your decisions so far and is simulated. Everything else on this page is from the record.</p>
+            <p className="mt-2 text-[13px] text-muted">Money is simulated. The rest of this page is from the record.</p>
 
-            <div className="mt-8"><Claims c={c} items={me.about} /></div>
+            <div className="mt-8"><Claims big c={c} items={me.about} /></div>
 
             <div className="mt-10"><PlatformSection c={c} step={step} picks={picks} /></div>
             <div className="mt-10"><PlankDesk /></div>

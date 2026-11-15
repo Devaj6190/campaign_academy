@@ -6,13 +6,20 @@ import type { Candidate, Profile } from "./roster";
 // Staff-only state. The shared world (cash, sentiment, the roster itself) stays in the main game store;
 // this holds what only the war room needs: conversations, live runs, morale and the people you hired.
 
-export type ChatItem =
+/** `run`: the instruction an item belongs to, in the instructed person's own chat. The war room groups by it. */
+export type ChatItem = (
   | { k: "me"; text: string }
   | { k: "them"; text: string; suggest?: string }
   | { k: "receipt"; effect: Effect; by: string }
   | { k: "report"; text: string; ask: Ask | null; state: "open" | "approved" | "declined"; spent: number; raised: number }
   | { k: "coach"; clarity: number; fit: number; missing: string[]; text: string }
-  | { k: "note"; text: string };
+  | { k: "note"; text: string }
+  // One instruction's thinking, director and staff in order. Kept in the chat so it is never dropped, and never
+  // sent back to the agents as history. `live` until the run ends.
+  | { k: "thoughts"; run: number; items: Thought[]; live: boolean }
+) & { run?: number };
+
+export type Thought = { who: string; text: string };
 
 export type Job = { to: string; job: string; done: boolean; summary?: string };
 /** origin: the order this run carries out (its own text, or the order an approved ask continues). */

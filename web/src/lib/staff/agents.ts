@@ -4,7 +4,7 @@ import { createDeepAgent, registerHarnessProfile, type SubAgent } from "deepagen
 import { z } from "zod";
 import { ACTION_IDS, ACTIONS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
-import type { RunCtx } from "./protocol";
+import { THOUGHT_MAX, type RunCtx } from "./protocol";
 import { humanize, PLACES, short, type Snapshot } from "./world";
 
 // Real staff. Each director is a deep agent: it plans with write_todos and hands jobs to its people through the
@@ -51,11 +51,16 @@ export const catalog = (w: Snapshot) => ACTION_IDS.map((id) => `- ${id}: ${ACTIO
 
 function actionTool(ctx: RunCtx, by: string) {
   return tool(
-    async ({ action, district, faction }) => ctx.act(by, action, { district: district ? Number(district) : undefined, faction: faction ?? undefined }).text,
+    async ({ why, action, district, faction }) => {
+      ctx.think(by, humanize(why, ctx.req.snapshot.factions));
+      return ctx.act(by, action, { district: district ? Number(district) : undefined, faction: faction ?? undefined }).text;
+    },
     {
       name: "take_action",
       description: "Carry out one campaign action in the real world. The result tells you exactly what happened and what it cost. Only report results you got from this tool.",
+      // `why` comes first so it is written before the choice it explains, not as a justification after it.
       schema: z.object({
+        why: z.string().describe(`Fill this in first. One or two sentences, under ${THOUGHT_MAX} characters, that your boss the campaigner will read: why this action, this place and this group, given the job and the numbers. Name places and groups in words, not ids.`),
         action: z.enum(ACTION_IDS),
         district: z.enum(DISTRICT_IDS).nullable().describe("Community district number, when the action needs a place"),
         faction: z.enum(ctx.req.snapshot.factions.map((f) => f.id) as [string, ...string[]]).nullable().describe("Voter group id, when the action targets a group"),
@@ -98,7 +103,7 @@ ${world(w)}`,
       name: "send_report",
       description: "Report back to the campaigner. Call this exactly once, as your very last step.",
       schema: z.object({
-        reply: z.string().describe("Under 60 words, in your voice: what got done, what it cost, what changed. Facts from tool results only."),
+        reply: z.string().describe("Under 35 words, in your voice: what this adds up to and what you would do next. The campaigner already sees a receipt for every action with its cost and effect, so do not repeat those figures. Facts from tool results only."),
         ask_amount: z.number().nullable().describe("Dollars of extra budget you want approved, or null"),
         ask_reason: z.string().nullable().describe("What the extra money is for, as a short phrase starting with \"to\" or \"for\" (it follows the words \"wants $X more\"), or null"),
         coaching: z.string().describe("One honest sentence of feedback on the campaigner's instruction: was it clear (what, where, who, by when) and did it go to the right person?"),
@@ -116,8 +121,8 @@ Voice: ${prof.voice}
 Strengths: ${me.good ?? prof.skills.join(", ")}. Weaknesses: ${me.weak ?? "none noted"}. Let both show in your choices.
 
 How you work:
-1. Start with write_todos: two to four concrete jobs.
-2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass union households in Jackson Heights"). Then brief them precisely: what, where (district number), who (voter group id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
+1. Start with write_todos: two to four concrete jobs. In the same message, before the call, write one or two sentences of plain text (under ${THOUGHT_MAX} characters) on why you are splitting the work this way. The campaigner reads it as your thinking, so make it the real reason, with places and groups in words.
+2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass union households in Jackson Heights"). On the second line write "Why:" and one sentence (under ${THOUGHT_MAX} characters, places and groups in words) on why this job and why this person. Then brief them precisely: what, where (district number), who (voter group id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
 3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. Never plan past it. If the job needs more, ask in your report.
 4. If the instruction is vague, make a sensible call and say what you assumed. If it is the wrong job for your department, do your best and say who should have had it.
 5. Finish with send_report exactly once. Report only what tool results told you; never invent numbers. In the report, name places and voter groups in words; never print a district number or a group id.
@@ -143,6 +148,13 @@ ${world(w)}`,
       const msgs = (update as { messages?: unknown[] } | null)?.messages;
       if (!Array.isArray(msgs)) continue;
       for (const m of msgs as { id?: string; tool_calls?: { id?: string; name: string; args: Record<string, unknown> }[]; tool_call_id?: string; content?: unknown }[]) {
+        // The director's words alongside its tool calls are its thinking: why this plan, why these hand-offs.
+        // They used to open the chat as a `say`; now they lead the run's thoughts instead, so nothing shows twice.
+        const said = textOf(m.content);
+        if (!m.tool_call_id && said && m.tool_calls?.length && !seen.has(`said:${said}`)) {
+          seen.add(`said:${said}`);
+          ctx.think(me.id, humanize(said, w.factions));
+        }
         for (const tc of m.tool_calls ?? []) {
           const key = tc.id ?? JSON.stringify(tc);
           if (seen.has(key)) continue;
@@ -154,8 +166,11 @@ ${world(w)}`,
             const to = names.get(String(tc.args.subagent_type));
             if (to) {
               pending.set(key, to);
-              // The first line of the brief is its title; ids that slip through become names.
-              const title = String(tc.args.description ?? "").trim().split("\n")[0].replace(/^(title|job)\s*:\s*/i, "").replace(/^["'*#\s]+|["'*\s.]+$/g, "");
+              // The first line of the brief is its title, and its "Why:" line the hand-off's reason; ids that slip through become names.
+              const lines = String(tc.args.description ?? "").trim().split("\n");
+              const title = lines[0].replace(/^(title|job)\s*:\s*/i, "").replace(/^["'*#\s]+|["'*\s.]+$/g, "");
+              const why = lines.find((l) => /^\W*why\W*:/i.test(l.trim()));
+              if (why) ctx.think(me.id, humanize(why, w.factions));
               emit({ t: "delegate", to, job: humanize(title, w.factions).slice(0, 90) });
             }
           }
@@ -164,12 +179,6 @@ ${world(w)}`,
           const to = pending.get(m.tool_call_id)!;
           pending.delete(m.tool_call_id);
           emit({ t: "job-done", to, summary: textOf(m.content).slice(0, 280) });
-        }
-        // The director's own words before it starts delegating.
-        const said = textOf(m.content);
-        if (!m.tool_call_id && !seen.has("said") && said && m.tool_calls?.length) {
-          seen.add("said");
-          emit({ t: "say", text: said.slice(0, 240) });
         }
       }
     }

@@ -9,6 +9,7 @@ import { useStaff } from "../staff/store";
 import { useGame } from "../store";
 import { buildEdition, factsOf, surnameOf, type Edition, type Story } from "./edition";
 import type { WriteResult } from "./newsroom";
+import { rulesStances, STANCE, type Stance, type StanceResult } from "./stances";
 
 // Puts each morning's edition out and keeps every one in the archive. The template goes out at once; the newsroom's
 // copy of the simulated stories replaces it when it arrives.
@@ -66,6 +67,22 @@ async function rewrite(ed: Edition) {
   }
 }
 
+/** Ask the comms shop for three ways to answer this edition's lead, once. The rules answer when there is no key. */
+export async function draftStances(e: Edition) {
+  if (!e.lead || e.stances) return;
+  const { c } = worldNow();
+  const me = c.candidates.find((x) => x.id === c.follow);
+  try {
+    const res = await fetch("/api/paper/stances", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ story: e.lead.text, candidate: me?.name ?? "the candidate", record: me?.about.map((x) => x.text) ?? [] }) });
+    const out = (await res.json()) as StanceResult;
+    if (!out.stances?.length) throw new Error("no stances");
+    patch(e.id, (x) => ({ ...x, stances: out.stances }));
+  } catch (err) {
+    console.warn("[paper] stances unavailable, rules instead:", err);
+    patch(e.id, (x) => ({ ...x, stances: rulesStances({ story: e.lead!.text, candidate: me?.name ?? "the candidate", record: [] }).stances }));
+  }
+}
+
 /** A group's name mid-sentence: boroughs, races and religions keep their capitals ("Queens", "Black voters"); the rest do not. */
 const groupName = (id: string, name: string) => (["Borough", "Race", "Religion"].includes(FACTIONS_2013.find((f) => f.id === id)?.kind ?? "") ? name : name.toLowerCase());
 
@@ -73,7 +90,7 @@ const groupName = (id: string, name: string) => (["Borough", "Race", "Religion"]
 const COMMS = "com";
 
 /** The front page can be answered once: the candidate speaks, Comms handles it, or the campaign lets it pass. */
-export function respond(e: Edition, choice: "respond" | "staff" | "pass"): string {
+export function respond(e: Edition, choice: "respond" | "staff" | "pass", pick?: { stance: Stance }): string {
   if (!e.lead || e.decision) return "";
   const { c } = worldNow();
   const you = c.candidates.find((x) => x.id === c.follow)?.name ?? "The candidate";
@@ -82,12 +99,22 @@ export function respond(e: Edition, choice: "respond" | "staff" | "pass"): strin
   let answer: string;
 
   if (choice === "respond") {
-    if (appearancesToday() >= DAILY) return `${you} has already made ${DAILY} appearances today. Hand it to Comms instead.`;
-    const fx = resolve(snapshot(), "candidate", "rapid_response", { faction: target?.id }, { quality: 1, seed: e.id * 977 + appearancesToday(), load: 1 });
+    if (appearancesToday() >= DAILY) return `${you} has no time left today. Hand it to Comms instead.`;
+    if (!pick) return "Choose how to answer first.";
+    // The stance decides who it reaches: its first group takes the main effect.
+    const { stance } = pick;
+    const group = stance.helps[0];
+    const fx = resolve(snapshot(), "candidate", "rapid_response", { faction: group }, { quality: 1, seed: e.id * 977 + appearancesToday(), load: 1 });
     if (fx.cost > worldNow().w.budget) return "The campaign does not have the money for that.";
-    apply({ ...fx, summary: `${you} answered the morning paper's lead ("${story}"): ${fx.summary}` });
-    feed("candidate", `The candidate answered the Ledger's front page: ${fx.summary}`);
-    answer = `${you} answered it in person.`;
+    // The engine sizes the answer in that group; the stance spreads a share of it to the other groups it reaches and
+    // takes a larger share from the groups it puts off.
+    const main = fx.factions[group] ?? 0;
+    const factions = { ...fx.factions };
+    for (const h of stance.helps) if (h !== group) factions[h] = (factions[h] ?? 0) + Math.round(main * STANCE.helps * 10) / 10;
+    for (const a of stance.annoys) if (a !== group) factions[a] = (factions[a] ?? 0) - Math.round(main * STANCE.annoys * 10) / 10;
+    apply({ ...fx, factions, summary: `${you} answered the morning paper's lead ("${story}"): ${stance.says}` }, STANCE.citywide);
+    feed("candidate", `The candidate answered the Ledger's front page: ${stance.label}.`);
+    answer = `${you} answered it: ${stance.label.charAt(0).toLowerCase()}${stance.label.slice(1)}.`;
   } else if (choice === "staff") {
     const order = `Respond to this morning's front page: "${story}". ${target ? `Make sure ${groupName(target.id, target.name)} hear our side.` : ""}`.trim();
     useStaff.setState((s) => ({ draft: { ...s.draft, [COMMS]: order } }));

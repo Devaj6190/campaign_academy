@@ -52,10 +52,11 @@ export function Avatar({ name, size = 40, className }: { name?: string; size?: n
   );
 }
 
-export const Section = ({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) => (
+/** `big` gives the heading the size used on the screens that have had the text pass; the body is laid out the same. */
+export const Section = ({ title, right, big, children }: { title: string; right?: ReactNode; big?: boolean; children: ReactNode }) => (
   <section className="px-5 pt-5 pb-3 first:pt-0">
-    <div className="plate -mx-5 mb-3.5 flex h-8 items-center gap-2.5 px-5">
-      <Label className="flex-1 text-gold-bright">{title}</Label>
+    <div className={cn("plate -mx-5 mb-3.5 flex items-center gap-2.5 px-5", big ? "h-12" : "h-8")}>
+      <Label className={cn("flex-1 text-gold-bright", big && "text-[20px] leading-tight font-semibold")}>{title}</Label>
       {right}
     </div>
     {children}
