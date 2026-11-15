@@ -1,304 +1,47 @@
 import { create } from "zustand";
-import { FACTIONS, GAINS, LOSSES, STAFF, STRONG, WEAK, type Faction, type Flow, type Staff, type View } from "./data";
-import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
-import { supportIn } from "./cases/store";
-import { DISTRICTS } from "./geo";
-import { shares } from "./demographics";
-import { hash } from "./util";
-import { effectOf, type Effect } from "./engine/resolve";
-import { knockOns } from "./relations";
-import { calibrate, pollOf, type Rival } from "./engine/poll";
-import { RIVALS } from "./engine/rivals";
-import { tacticOutcome, type Deliverer } from "./engine/tactic";
-import type { ElectionResult } from "./engine/election";
+import { STAFF, type Staff, type View } from "./data";
 
-// One shared world state. Every screen is a view of this, so an action on one shows up on the others.
-// Behaviour is canned for now: the places marked "agent" and "model" are where real calls go.
+// Interface state: which tab is open, what is selected, the staff roster and who is busy.
+// The campaign itself (money, poll, voter groups, the date, the work done) is NOT here. It lives in the case store,
+// lib/cases/store.ts, and every screen reads it from there.
 
-export const DAY_START = 360; // 06:00
-export const DAY_END = 1320; // 22:00
-export const SPEEDS = [0.5, 1, 2, 4];
-
-type Line = { who: "me" | "them" | "note"; text: string };
-type Overlay = "paper" | "manifesto" | "calendar" | "tactic" | "election" | null;
 export type Toast = { id: number; staff: string; text: string };
-export type Draft = { text: string; up: string[]; down: string[] };
-
-/** One change to the world, stamped with when it happened. Every view that explains "why" reads this. */
-/** knock: how other groups moved because of this one (relations.ts), credited to the group that caused it. */
-export type LedgerEntry = { id: number; day: number; min: number; source: "staff" | "candidate" | "manifesto" | "tactic" | "rival" | "debate"; effect: Effect; knock: Record<string, { delta: number; from: string }> };
-
-export type RivalState = { cash: number; strength: Record<number, number>; memory: string[]; plan: { day: number; status: "idle" | "planning" | "ready" | "landed"; moves: Effect[]; memo?: string; mode?: "live" | "rules" } };
 
 type State = {
   view: View;
-  day: number;
-  min: number;
-  speed: number;
-  cash: number;
-  poll: { cole: number; hale: number; brandt: number };
-  losses: Flow[];
-  gains: Flow[];
-  tasks: { id: number; text: string; done: boolean }[];
-  calendar: Record<number, string[]>;
-  manifesto: string[];
-  factions: Faction[];
-  staff: Staff[];
-  sent: Record<number, number>;
-  filter: string; // "all" or a faction id
+  /** What the Map colours by: "all" for the campaign's support, or the id of a case voter group to show where it lives. */
+  filter: string;
   district: number | null;
-  faction: string | null;
+  /** The post selected in the War room. */
   person: string | null;
-  logs: Record<string, Line[]>;
-  plans: Record<string, PlanTask[]>; // per direct report: tasks split into jobs for their people
+  staff: Staff[];
   busy: Record<string, "down" | "up" | "work">;
   unread: Record<string, boolean>;
-  overlay: Overlay;
+  /** Unprompted staff remarks on screen (lib/staff/speak). */
   toasts: Toast[];
-  tacticResult: "backfired" | "worked" | null;
-  ledger: LedgerEntry[];
-  /** Hale and Brandt: money, how strong they are in each district (feeds the poll), memory, tonight's plan. */
-  rivals: Record<Rival, RivalState>;
-  /** What the morning paper reports about the night before. */
-  news: { day: number; opposition: string[]; debate?: string };
-  /** Cole's poll at the end of each day, for trends and debates. */
-  pollHistory: number[];
-  /** Election night: the result and how many districts have reported so far. */
-  election: { result: ElectionResult; shown: number; done?: boolean } | null;
-  /** The one write path for cash, district support, faction feeling and the poll (contract on #1). */
-  applyEffect: (e: Effect, source: LedgerEntry["source"]) => void;
 
   go: (v: View) => void;
-  tick: () => void;
-  setSpeed: (s: number) => void;
-  allocate: (kind: "losses" | "gains", i: number, delta: number) => void;
-  toggleTask: (id: number) => void;
-  addTask: (text: string) => void;
-  select: (p: Partial<Pick<State, "district" | "faction" | "person" | "filter">>) => void;
-  open: (o: Overlay) => void;
-  instruct: (id: string, text: string) => void;
-  hire: (id: string, pick: number) => void;
-  act: (kind: string, cost: number, bump: number, raise?: number) => void;
-  commitPlank: (d: Draft) => void;
-  runTactic: (by?: Deliverer) => void;
-  speak: () => void;
+  select: (p: Partial<Pick<State, "district" | "person" | "filter">>) => void;
   dismiss: (id: number) => void;
-  jumpToEvening: () => void;
-};
-
-let uid = 10;
-const net = (s: Pick<State, "gains" | "losses">) => s.gains.reduce((a, c) => a + c.v, 0) - s.losses.reduce((a, c) => a + c.v, 0);
-export const netPerDay = net;
-
-const sent: Record<number, number> = {};
-for (const d of DISTRICTS) sent[d.cd] = STRONG.includes(d.cd) ? 62 + hash(d.cd) * 12 : WEAK.includes(d.cd) ? 22 + hash(d.cd) * 12 : 38 + hash(d.cd) * 18;
-// Day 1 is half the README's story (above) and half real data: how each district's mix of voter groups
-// (census shares) feels about Cole. Both halves are spread over the same range so neither drowns the other.
-{
-  const lean: Record<number, number> = {};
-  for (const d of DISTRICTS) {
-    const s = shares(d.cd);
-    if (!s) continue;
-    let w = 0, v = 0;
-    for (const f of FACTIONS) { w += s[f.id] ?? 0; v += (s[f.id] ?? 0) * f.feel; }
-    lean[d.cd] = v / w;
-  }
-  const vals = Object.values(lean);
-  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-  const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length) || 1;
-  for (const [cd, v] of Object.entries(lean)) sent[+cd] = 0.5 * sent[+cd] + 0.5 * Math.max(15, Math.min(85, 48 + ((v - mean) / sd) * 13));
-}
-
-// What each person does when their boss hands them a piece of work. Placeholder until the agents write their own plans.
-const JOBS: Record<string, [string, string]> = {
-  sch: ["Clear the calendar and book it", "Moves existing holds and confirms the slot with everyone involved."],
-  oq: ["Run canvass shifts in Queens", "Three shifts through the tenant networks, starting with the strongest blocks."],
-  ob: ["Recruit block captains in Brooklyn", "One captain per building before the weekend."],
-  vc: ["Staff the volunteer shifts", "Fills sign-ups and runs the door-knocking training."],
-  ct: ["Build the donor call sheet", "Top fifty names, ordered by how recently they gave."],
-  ev: ["Book the venue", "Finds a room that fills and keeps staging costs down."],
-  pr: ["Brief reporters", "Pitches the story to the three desks most likely to run it."],
-  dg: ["Send the email and social push", "Drafts, tests two subject lines and sends tonight."],
-};
-
-function planFor(staff: Staff[], id: string, title: string, statuses: PlanStatus[]): PlanTask {
-  const me = staff.find((p) => p.id === id)!;
-  const subs = staff.filter((p) => p.boss === id && p.name);
-  const jobs = subs.length
-    ? subs.map((p) => ({ id: p.id, title: JOBS[p.id]?.[0] ?? "Carry out their part", description: JOBS[p.id]?.[1] ?? "", assigned: [p.name!] }))
-    : [
-        { id: "a", title: "Draft the plan", description: "No staff under this post yet, so the director does it personally.", assigned: [me.name!] },
-        { id: "b", title: "Carry it out", description: "", assigned: [me.name!] },
-      ];
-  const subtasks = jobs.map((j, i) => ({ ...j, status: statuses[i % statuses.length] }));
-  return { id: `${id}-${uid++}`, title, status: subtasks.every((x) => x.status === "completed") ? "completed" : "in-progress", subtasks };
-}
-
-/** Sentiment for one district under the current filter. Simulated. */
-export const sentimentOf = (s: Pick<State, "sent" | "filter" | "factions">, cd: number) => {
-  // With no group filter the map shows the case: the student's support here, in percent.
-  if (s.filter === "all") return supportIn(cd) ?? s.sent[cd];
-  // Support among one group here = how that group feels citywide, shifted by this district's lean.
-  const f = s.factions.find((x) => x.id === s.filter)!;
-  return Math.max(5, Math.min(95, f.feel + (s.sent[cd] - 50) * 0.6));
+  instruct: (id: string, text: string) => void;
 };
 
 // Dev handle for driving the UI from the console: window.game.setState({ view: "map" })
 if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") queueMicrotask(() => ((window as unknown as { game: unknown }).game = useGame));
 
-// A game day is one real minute at 1x: 06:00 to 22:00 in 240 ticks of 250 ms.
-const MIN_PER_TICK = 4;
-const NOON = 720;
-// Tune the poll so day 1 reads as the README describes (Hale 38, Cole 31, Brandt 14, undecided 17).
-calibrate(sent);
-
-const START_RIVALS: Record<Rival, RivalState> = {
-  hale: { cash: RIVALS.hale.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
-  brandt: { cash: RIVALS.brandt.cash, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
-};
-
-export const useGame = create<State>((set, get) => ({
+export const useGame = create<State>((set) => ({
   view: "case",
-  day: 1,
-  min: DAY_START,
-  speed: 1,
-  cash: 412000,
-  poll: pollOf({ sent, day: 1, rivals: START_RIVALS }),
-  losses: LOSSES,
-  gains: GAINS,
-  tasks: [
-    { id: 1, text: "Take the manifesto to five planks", done: false },
-    { id: 2, text: "Hire a Policy Director", done: false },
-    { id: 3, text: "Rally in the Bronx", done: false },
-    { id: 4, text: "Two hours of call time", done: false },
-  ],
-  calendar: { 1: ["Campaign handover"], 3: ["Union endorsement meeting"], 7: ["First debate"], 14: ["Fundraising deadline"], 21: ["Second debate"], 30: ["Election day"] },
-  manifesto: ["Build housing near every subway station.", "Extend small-business rent relief citywide.", "Keep police headcount level; add mental-health response teams."],
-  factions: FACTIONS,
-  staff: STAFF,
-  sent,
   filter: "all",
   district: null,
-  faction: null,
   person: null,
-  logs: {},
-  // Everyone starts mid-task, so the war room has work in flight on day one.
-  plans: Object.fromEntries(STAFF.filter((p) => !p.boss && p.name).map((p) => [p.id, [planFor(STAFF, p.id, p.doing!, ["completed", "in-progress", "pending"])]])),
+  staff: STAFF,
   busy: {},
   unread: {},
-  overlay: null,
   toasts: [],
-  tacticResult: null,
-  ledger: [],
-  rivals: START_RIVALS,
-  news: { day: 1, opposition: [] },
-  pollHistory: [],
-  election: null,
-
-  applyEffect: (e, source) =>
-    set((g) => {
-      const sent = { ...g.sent };
-      for (const [cd, d] of Object.entries(e.sent)) sent[+cd] = Math.max(5, Math.min(95, (sent[+cd] ?? 50) + d));
-      // Momentum is citywide buzz: it nudges every district a little (it can be negative after a rival's move).
-      if (e.momentum) for (const cd of Object.keys(sent)) if (+cd % 100 <= 18) sent[+cd] = Math.max(5, Math.min(95, sent[+cd] + 0.8 * e.momentum));
-      // Groups move together: winning one group warms its allies and cools its rivals (once, capped).
-      const knock = knockOns(e.factions);
-      const factions = g.factions.map((f) => {
-        const d = (e.factions[f.id] ?? 0) + (knock[f.id]?.delta ?? 0);
-        return d ? { ...f, feel: Math.max(5, Math.min(95, f.feel + d)) } : f;
-      });
-      const booked = Math.min(30, g.day + 1); // events go on tomorrow's calendar
-      const calendar = e.calendar ? { ...g.calendar, [booked]: [...(g.calendar[booked] ?? []), e.calendar] } : g.calendar;
-      // A rival's move is paid by the rival and makes them stronger where it landed.
-      let rivals = g.rivals;
-      let cash = g.cash - e.cost + e.raised;
-      if (e.rival) {
-        const r = g.rivals[e.rival.who];
-        const strength = { ...r.strength };
-        for (const [cd, d] of Object.entries(e.rival.strength)) strength[+cd] = Math.min(150, (strength[+cd] ?? 0) + d);
-        rivals = { ...g.rivals, [e.rival.who]: { ...r, cash: r.cash - e.cost + e.raised, strength } };
-        cash = g.cash;
-      }
-      // The poll is not set by hand: it is what the districts now add up to.
-      const poll = pollOf({ sent, day: g.day, rivals });
-      const entry: LedgerEntry = { id: uid++, day: g.day, min: g.min, source, effect: e, knock };
-      return { cash, sent, factions, calendar, rivals, poll, ledger: [...g.ledger, entry].slice(-5000) };
-    }),
 
   go: (view) => set({ view }),
-  setSpeed: (speed) => set({ speed }),
-  open: (overlay) => set({ overlay, tacticResult: null }),
   select: (p) => set(p),
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-  jumpToEvening: () => set({ min: DAY_END - 100 }),
-
-  tick: () => {
-    const s = get();
-    // Election night: results come in a few districts at a time, then the result card.
-    if (s.election) {
-      if (s.election.shown >= s.election.result.order.length) return s.election.done ? undefined : set({ overlay: "election", election: { ...s.election, done: true } });
-      return set({ election: { ...s.election, shown: s.election.shown + 2 } });
-    }
-    const min = s.min + MIN_PER_TICK * s.speed;
-    // At noon the rivals start planning tonight's moves in the background.
-    if (s.min < NOON && min >= NOON) void import("./engine/schedule").then((m) => m.planRivals());
-    if (min < DAY_END) return set({ min });
-    if (s.day >= 30) {
-      if (s.min >= DAY_END) return;
-      set({ min: DAY_END });
-      void import("./engine/election").then(({ electionResult }) => set({ view: "map", district: null, overlay: null, election: { result: electionResult(get()), shown: 0 } }));
-      return;
-    }
-    // Day rolls over: money settles, the rivals' overnight moves land, debates are judged, and the paper arrives.
-    set({
-      day: s.day + 1,
-      min: DAY_START,
-      cash: s.cash + net(s),
-      tasks: s.tasks.filter((t) => !t.done),
-      pollHistory: [...s.pollHistory, s.poll.cole],
-      news: { day: s.day + 1, opposition: [] },
-      overlay: s.view === "case" ? s.overlay : "paper",
-    });
-    void import("./engine/schedule").then((m) => m.overnight(s.day));
-  },
-
-  allocate: (kind, i, delta) =>
-    set((s) => ({ [kind]: s[kind].map((c, j) => (j === i ? { ...c, v: Math.max(0, c.v + delta), items: c.items.map(([n, v], x) => [n, x === 0 ? Math.max(0, v + delta) : v] as [string, number]) } : c)) }) as Partial<State>),
-
-  toggleTask: (id) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) })),
-  addTask: (text) => set((s) => ({ tasks: [...s.tasks, { id: uid++, text, done: false }], calendar: { ...s.calendar, [s.day]: [...(s.calendar[s.day] ?? []), text] } })),
-
-  // Staff are real agents (src/lib/staff). Loaded on demand to keep this store free of agent code.
+  // Staff are real agents (lib/staff). Loaded on demand to keep this store free of agent code.
   instruct: (id, text) => void import("./staff/run").then((m) => m.instruct(id, text)),
-
-  hire: (id, pick) =>
-    set((s) => ({
-      staff: s.staff.map((p) => (p.id === id ? { ...p, name: pick === 0 ? "Helen Voss" : "Kai Lindqvist", good: pick === 0 ? "Careful, experienced" : "Brilliant", weak: pick === 0 ? "Expensive" : "Abrasive", doing: "Settling in" } : p)),
-      losses: s.losses.map((c, i) => (i === 0 ? { ...c, v: c.v + (pick === 0 ? 900 : 600) } : c)),
-    })),
-
-  act: (kind, cost, bump, raise = 0) => {
-    const s = get();
-    const d = DISTRICTS.find((x) => x.cd === s.district);
-    if (!d) return;
-    set({ cash: s.cash - cost + raise, sent: { ...s.sent, [d.cd]: Math.min(95, s.sent[d.cd] + bump) } });
-    s.addTask(`${kind} · ${d.name}`);
-  },
-
-  // A plank is permanent and moves the groups it pleases and angers, through the ledger like everything else.
-  commitPlank: (d) => {
-    set((s) => ({ manifesto: [...s.manifesto, d.text] }));
-    const factions = Object.fromEntries([...d.up.map((id) => [id, 6]), ...d.down.map((id) => [id, -8])]);
-    get().applyEffect(effectOf({ by: "manifesto", action: "plank", label: "Manifesto plank", summary: d.text, factions }), "manifesto");
-  },
-
-  // The contrast ad: honest but risky. The risk is computed from the situation and shown first (engine/tactic.ts).
-  runTactic: (by = "com") => {
-    const { backfired, effect } = tacticOutcome(get(), by);
-    set({ tacticResult: backfired ? "backfired" : "worked" });
-    get().applyEffect(effect, "tactic");
-  },
-
-  // Staff speak up when something in the world deserves it (src/lib/staff/speak.ts).
-  speak: () => void import("./staff/speak").then((m) => m.speakUp()),
 }));

@@ -5,10 +5,11 @@ import { DoorOpen, HandCoins, Megaphone, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button, Dock, DockButton, Inspector, Label, Meter, Section, Tag, ViewHeader } from "@/components/ui";
 import { night, tally, useNight } from "@/lib/cases/night";
-import { longDate, mapValue, useCaseNow } from "@/lib/cases/store";
+import { FACTIONS_2013 } from "@/lib/cases/mayor2013-factions";
+import { censusShare, cityShare, longDate, mapValue, supportIn, useCaseNow } from "@/lib/cases/store";
 import { DISTRICTS, FETCHED, districtBy } from "@/lib/geo";
 import { APPEARANCES, DAILY, appear, appearancesToday, preview, sendStaff } from "@/lib/staff/run";
-import { sentimentOf, useGame } from "@/lib/store";
+import { useGame } from "@/lib/store";
 import { cn, heat, tone } from "@/lib/util";
 import type { Layer, RealRow, Tip } from "./map/MapCanvas";
 
@@ -25,7 +26,8 @@ const MapCanvas = dynamic(() => import("./map/MapCanvas").then((m) => m.MapCanva
 });
 
 export function MapView() {
-  const world = useGame();
+  const district = useGame((s) => s.district);
+  const filter = useGame((s) => s.filter);
   const select = useGame((s) => s.select);
   const [tip, setTip] = useState<Tip | null>(null);
   // The real result is only offered once the student has finished the case, so it can't spoil a decision.
@@ -44,7 +46,10 @@ export function MapView() {
     const t = setInterval(() => useNight.setState((x) => ({ shown: x.shown + 1 })), 350);
     return () => clearInterval(t);
   }, [counting]);
-  const sel = districtBy(world.district);
+  const sel = districtBy(district);
+  // The voter group filter: the case's groups that the census can place on the map.
+  const placed = theCase.groups.filter((g) => g.census);
+  const group = layer === "campaign" ? placed.find((g) => g.id === filter) : undefined;
   const hovered = districtBy(tip?.cd ?? null);
   // The candidate in person: a few appearances a day in the selected district (lib/staff/run). Simulated.
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -56,14 +61,23 @@ export function MapView() {
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader
           title={isNight ? "Election night" : "New York City"}
-          sub={isNight ? "Your result in the 65 Assembly Districts: each one's certified 2013 result, moved by your citywide finish. Colour shows your share." : real ? "The certified result in the 65 Assembly Districts. Colour shows de Blasio's share of the vote in each one." : "59 community districts on the real street map. Colour shows where your campaign is stronger or weaker than its citywide standing."}
+          sub={isNight ? "Your result in the 65 Assembly Districts: each one's certified 2013 result, moved by your citywide finish. Colour shows your share." : real ? "The certified result in the 65 Assembly Districts. Colour shows de Blasio's share of the vote in each one." : group ? `Where ${group.name} live. Colour shows each district's share of residents in this group, against the group's share of the whole city (census).` : "59 community districts on the real street map. Colour shows where your campaign is stronger or weaker than its citywide standing."}
           right={
             <div className="flex shrink-0 items-center gap-5">
               <div className="hidden items-center gap-2 text-[11px] text-muted @[700px]:flex">
-                {real || isNight ? "25%" : "Below your average"}
+                {real || isNight ? "25%" : group ? "Fewer live here" : "Below your average"}
                 <i className="h-1 w-24 rounded-full" style={{ background: `linear-gradient(90deg, ${heat(20)}, ${heat(47)}, ${heat(75)})` }} />
-                {real || isNight ? "55%" : "Above"}
+                {real || isNight ? "55%" : group ? "More" : "Above"}
               </div>
+              {layer === "campaign" && (
+                <div role="group" aria-label="Colour the map by" className="flex h-8 overflow-hidden rounded-md border border-line-strong text-[12.5px]">
+                  {[["all", "Your support"], ...placed.map((g) => [g.id, g.name])].map(([id, label]) => (
+                    <button key={id} aria-pressed={(group?.id ?? "all") === id} onClick={() => select({ filter: id, district: null })} className={cn("px-3 whitespace-nowrap transition-colors", (group?.id ?? "all") === id ? "bg-hover text-gold-bright" : "bg-raised text-muted hover:text-fg")}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {realLabel && (
                 <div className="flex h-8 overflow-hidden rounded-md border border-line-strong text-[12.5px]">
                   {([["campaign", "Your campaign"], ["night", "Your election night"], ["real", realLabel]] as const).map(([v, label]) => (
@@ -88,7 +102,7 @@ export function MapView() {
         {tip && hovered && !hovered.park && (
           <div className="pointer-events-none fixed z-50 rounded-md border border-line-strong bg-raised px-2.5 py-1.5 text-[12px] shadow-xl" style={{ left: tip.x + 14, top: tip.y + 14 }}>
             {hovered.name}
-            <span className="tnum ml-2 font-mono text-muted">{Math.round(sentimentOf(world, hovered.cd))}%</span>
+            <span className="tnum ml-2 font-mono text-muted">{group ? `${Math.round(censusShare(hovered.cd, group.census!))}% of residents` : `${Math.round(supportIn(hovered.cd) ?? 0)}%`}</span>
           </div>
         )}
         {tip?.real && (() => {
@@ -128,7 +142,7 @@ export function MapView() {
         )}
       </section>
 
-      <Inspector>{isNight && n ? <NightPanel n={n} shown={shown} /> : sel && layer === "campaign" ? <DistrictPanel cd={sel.cd} /> : <CityPanel real={real} />}</Inspector>
+      <Inspector>{isNight && n ? <NightPanel n={n} shown={shown} /> : sel && layer === "campaign" ? <DistrictPanel cd={sel.cd} /> : group ? <GroupPanel id={group.id} /> : <CityPanel real={real} />}</Inspector>
     </div>
   );
 }
@@ -173,10 +187,50 @@ function NightPanel({ n, shown }: { n: ReturnType<typeof night>; shown: number }
   );
 }
 
-function CityPanel({ real }: { real: boolean }) {
-  const world = useGame();
+/** One voter group on the map: how large it is, where you stand with it, and where it lives. */
+function GroupPanel({ id }: { id: string }) {
+  const { c, w } = useCaseNow();
   const select = useGame((s) => s.select);
-  const ranked = DISTRICTS.filter((d) => !d.park).map((d) => ({ d, v: sentimentOf(world, d.cd) })).sort((a, b) => b.v - a.v);
+  const g = c.groups.find((x) => x.id === id)!;
+  const poll = FACTIONS_2013.find((f) => f.tracks === id);
+  const city = cityShare(g.census!);
+  const top = DISTRICTS.filter((d) => !d.park && d.demo).map((d) => ({ d, v: censusShare(d.cd, g.census!) })).sort((a, b) => b.v - a.v).slice(0, 8);
+  return (
+    <>
+      <div className="border-b border-line px-5 py-5">
+        <Label>Voter group</Label>
+        <h2 className="mt-1.5 text-[17px] leading-snug font-medium tracking-tight">{g.name}</h2>
+      </div>
+      <Section title="Your support with them" right={<Tag kind="sim" />}>
+        <div className="flex items-baseline gap-2">
+          <span className="tnum font-mono text-[30px] leading-none font-medium tracking-tight text-gold-bright">{Math.round(w.groups[id] ?? 0)}%</span>
+          <span className="text-[12px] text-muted">against {Math.round(w.poll[c.follow] ?? 0)}% citywide</span>
+        </div>
+      </Section>
+      <Section title="How many there are" right={<Tag kind="real" />}>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12.5px]">
+          {poll && <div><dt className="text-[11px] text-muted">Of likely primary voters</dt><dd className="tnum font-mono text-soft">{poll.share}%</dd></div>}
+          <div><dt className="text-[11px] text-muted">Of city residents</dt><dd className="tnum font-mono text-soft">{Math.round(city)}%</dd></div>
+        </dl>
+        <p className="mt-2 text-[11px] text-faint">Likely voters: Marist poll, September 2013. Residents: census estimates via NYC Planning, current figures, not 2013.</p>
+      </Section>
+      <Section title="Where they live" right={<Tag kind="real" />}>
+        {top.map(({ d, v }) => (
+          <button key={d.cd} onClick={() => select({ district: d.cd })} className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-hover">
+            <span className="min-w-0 flex-1 truncate text-[13px] text-soft">{d.name}</span>
+            <span className="tnum font-mono text-[12px] text-muted">{Math.round(v)}%</span>
+          </button>
+        ))}
+        <p className="mt-2 text-[11px] text-faint">Share of each district&rsquo;s residents in this group. Click a district to see your support there.</p>
+      </Section>
+    </>
+  );
+}
+
+function CityPanel({ real }: { real: boolean }) {
+  useCaseNow(); // re-rank when the case moves
+  const select = useGame((s) => s.select);
+  const ranked = DISTRICTS.filter((d) => !d.park).map((d) => ({ d, v: supportIn(d.cd) ?? 0 })).sort((a, b) => b.v - a.v);
   const list = (rows: typeof ranked) =>
     rows.map(({ d, v }) => (
       <button key={d.cd} onClick={() => select({ district: d.cd })} className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-hover">
@@ -211,10 +265,9 @@ function CityPanel({ real }: { real: boolean }) {
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
 function DistrictPanel({ cd }: { cd: number }) {
-  const world = useGame();
   const { c, w } = useCaseNow();
   const d = districtBy(cd)!;
-  const v = Math.round(sentimentOf(world, cd));
+  const v = Math.round(supportIn(cd) ?? 0);
   const max = d.issues[0]?.[1] ?? 1;
   const demo = d.demo;
   const race = demo ? ([["Hispanic", demo.race.hispanic, "#f0a23b"], ["Black", demo.race.black, "#b4b4bd"], ["White", demo.race.white, "#5b8def"], ["Asian", demo.race.asian, "#5fd08a"]] as const) : [];

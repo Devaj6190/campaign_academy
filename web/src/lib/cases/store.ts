@@ -155,6 +155,18 @@ export const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-G
 /** "$4.3M" or "$850k". */
 export const shortMoney = (n: number) => (Math.abs(n) >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n ? `$${Math.round(n / 1000)}k` : "$0");
 
+export type Census = NonNullable<Case["groups"][number]["census"]>;
+
+/** The share of a district's residents in one census group, in percent. Real, from the census. */
+export const censusShare = (cd: number, census: Census) => districtBy(cd)?.demo?.race[census] ?? 0;
+
+/** The same share for the whole city, weighted by population. */
+export function cityShare(census: Census): number {
+  let sum = 0, people = 0;
+  for (const d of DISTRICTS) if (d.demo && !d.park) { sum += d.demo.race[census] * d.demo.pop; people += d.demo.pop; }
+  return people ? sum / people : 0;
+}
+
 /** A district's share of the city's residents, 0 to 1: how far a change there moves the citywide figure. */
 export function popShare(cd: number): number {
   let people = 0;
