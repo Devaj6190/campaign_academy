@@ -16,27 +16,38 @@ export type Step = { by: string; action: ActionId; district?: number; faction?: 
 export type Proposal = { title: string; why: string; steps: Step[]; cost: number; order: string };
 /** An option as a director drafts it: steps may lack a place, a group or a person, which propose() fills in. */
 export type Draft = { title: string; why?: string; steps: (Omit<Step, "by"> & { by?: string })[] };
-const AMOUNT = String.raw`\$?\s?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s?(k|m|thousand|million)?\b`;
-const LIMIT_BEFORE = new RegExp(String.raw`\b(?:under|below|within|at most|up to|no more than|not more than|less than|max(?:imum)?(?: of)?|cap(?:ped)?(?: (?:of|at))?|limit(?: of)?|budget(?: (?:of|is|:))?|spend(?:ing)?(?: (?:only|just|about|around))?)\s+${AMOUNT}`, "gi");
-const LIMIT_AFTER = new RegExp(String.raw`${AMOUNT}\s+(?:budget|max(?:imum)?|cap|limit|or less|at most|tops)\b`, "gi");
+// Money, and only money: a $ sign, a k or m stuck to the number, "thousand" or "million", or "dollars" after it.
+// A bare number is a count ("up to 2,000 doors", "voters under 45"), never a budget.
+const MONEY = /\$\s?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:\s?(k|m|thousand|million)\b)?|\b(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:(k|m)\b|\s(thousand|million)\b|\s(?=dollars\b))/gi;
+// Words just before an amount that make it a limit on what the order may spend.
+const LIMIT = /(?:under|below|within|at most|up to|(?:no |not )?more than|less than|max(?:imum)?(?: of)?|cap(?:ped)?(?: it)?(?: at| of| to)?|limit(?: it)?(?: of| to| at)?|budget(?: of| is| at)?:?|keep it(?: to| under| below| within)?|spend(?:ing)?(?: only| just| about| around| up to| no more than| at most)?|with(?: a budget of| a)?|for)\s*$/i;
+// Just after an amount: it is the budget ("a $5k budget").
+const LIMIT_AFTER = /^\s*(?:budget|max(?:imum)?|cap|limit|or less|at most|tops)\b/i;
+// "Do not spend $30,000 on TV" forbids a spend; it does not set a budget.
+const FORBID = /\b(?:do not|don't|dont|never|not)\s+spend\s*$/i;
+// After an amount: it is for one part of the job ("…on TV", "…for flyers"), not the whole order.
+const PART = /^\s*(?:on|for|to)\s+\w/i;
 
 /**
- * The spending limit an order states in its own words ("under $15,000", "at most 20k", "spend $30,000", "a $5k
- * budget"), in dollars, or null when it states none. Only an amount tied to a limit word counts: "tax incomes over
- * $500,000" and "raise $100k" are not budgets. The smallest stated limit wins.
+ * The spending limit an order states in its own words, in dollars, or null when it states none ("under $15,000",
+ * "Don't spend more than $10,000", "Budget: $20,000", "Keep it to $10k", "Cap it at $10,000", "with $15k").
+ * Only an amount tied to a limit word counts: "tax incomes over $500,000" and "raise $100k" are not budgets, and
+ * "do not spend $30,000" forbids rather than sets one. An overall limit wins; with none, the amounts for parts of the
+ * job are added ("$50,000 on TV, with up to $2,000 for flyers" is $52,000).
  */
 export function budgetIn(text: string): number | null {
-  const found: number[] = [];
-  for (const re of [LIMIT_BEFORE, LIMIT_AFTER]) {
-    for (const m of text.matchAll(re)) {
-      // A bare small number is a count, not money ("at most 3 events"): it needs a $ sign, a unit, or four digits.
-      const raw = m[1].replace(/,/g, ""), unit = (m[2] ?? "").toLowerCase();
-      if (!m[0].includes("$") && !unit && raw.replace(/\..*/, "").length < 4) continue;
-      const n = Number(raw) * (unit === "k" || unit === "thousand" ? 1e3 : unit === "m" || unit === "million" ? 1e6 : 1);
-      if (Number.isFinite(n) && n > 0) found.push(Math.round(n));
-    }
+  const whole: number[] = [], parts: number[] = [];
+  for (const m of text.matchAll(MONEY)) {
+    const raw = (m[1] ?? m[3]).replace(/,/g, ""), unit = (m[2] ?? m[4] ?? m[5] ?? "").toLowerCase();
+    const n = Number(raw) * (unit === "k" || unit === "thousand" ? 1e3 : unit === "m" || unit === "million" ? 1e6 : 1);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    const before = text.slice(Math.max(0, m.index - 48), m.index), after = text.slice(m.index + m[0].length, m.index + m[0].length + 30);
+    const limit = LIMIT.test(before) || LIMIT_AFTER.test(after);
+    if (!limit || (FORBID.test(before) && !/more than\s*$/i.test(before))) continue;
+    (PART.test(after) && !LIMIT_AFTER.test(after) ? parts : whole).push(Math.round(n));
   }
-  return found.length ? Math.min(...found) : null;
+  if (whole.length) return Math.min(...whole);
+  return parts.length ? parts.reduce((a, b) => a + b, 0) : null;
 }
 
 /** How long a thought may be: one or two sentences. Asked of the model in words, and enforced when emitted. */
