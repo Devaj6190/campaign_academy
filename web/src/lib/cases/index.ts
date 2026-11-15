@@ -19,7 +19,7 @@ export function checkCase(c: Case): string[] {
     if (!x || typeof x !== "object") return;
     const o = x as Record<string, unknown>;
     if (typeof o.short === "string") {
-      const full = numbersIn(String(o.text ?? o.says ?? ""));
+      const full = numbersIn(String(o.text ?? o.says ?? o.summary ?? ""));
       const extra = numbersIn(o.short).filter((n) => !full.includes(n));
       if (extra.length) problems.push(`a short version has a number its sentence does not (${extra.join(", ")}): ${o.short}`);
     }

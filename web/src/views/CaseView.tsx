@@ -91,7 +91,7 @@ function WorldStrip({ c, w, final }: { c: Case; w: World; final?: boolean }) {
 }
 
 /** Swaps a block between its short version and the original wording. */
-const More = ({ on, set }: { on: boolean; set: (on: boolean) => void }) => (
+export const More = ({ on, set }: { on: boolean; set: (on: boolean) => void }) => (
   <button onClick={() => set(!on)} aria-expanded={on} className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-gold transition-colors hover:text-gold-bright">
     <ChevronDown className={cn("size-3.5 transition-transform", on && "rotate-180")} />
     {on ? "Show the short version" : "Read more"}

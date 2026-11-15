@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { longDate, shortDate, shortMoney, staffMoney, useCase, useCaseNow } from "@/lib/cases/store";
 import { effectOf, type Case } from "@/lib/cases/types";
-import { Cite } from "@/views/CaseView";
+import { Cite, More } from "@/views/CaseView";
 import type { View } from "@/lib/data";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
@@ -184,7 +184,7 @@ const RIVAL_HIT = 0.1;
 /** The most items listed under one rival. */
 const RIVAL_ITEMS = 3;
 
-type RivalItem = { key: string; date: string; text: string; source?: string; eventful: boolean };
+type RivalItem = { key: string; date: string; text: string; /** The press item's short version, shown until "Read more". */ short?: string; source?: string; eventful: boolean };
 
 // What each rival has been doing, newest first. Two layers, as everywhere: the record (the case's press items that
 // name the rival, held back until the day after they ran, as in the paper) and the simulation (the moves the rival
@@ -195,7 +195,7 @@ function useRivals() {
   const work = useCase((s) => s.work);
   const rivals = c.candidates.filter((x) => x.id !== c.follow).map((x) => {
     const surname = x.name.split(" ").pop()!;
-    const record: RivalItem[] = c.press.filter((p) => p.date < today && p.summary.includes(surname)).map((p) => ({ key: `p:${p.date}:${p.source}`, date: p.date, text: p.summary, source: p.source, eventful: true }));
+    const record: RivalItem[] = c.press.filter((p) => p.date < today && p.summary.includes(surname)).map((p) => ({ key: `p:${p.date}:${p.source}`, date: p.date, text: p.summary, short: p.short, source: p.source, eventful: true }));
     const moves: RivalItem[] = work.filter((k) => k.by === x.id && k.note).map((k) => ({ key: `w:${k.id}`, date: k.date, text: k.note!.replace(`${x.name}: `, "").replace(/^./, (ch) => ch.toUpperCase()), eventful: -(k.poll[c.follow] ?? 0) >= RIVAL_HIT }));
     return { ...x, items: [...record, ...moves].sort((a, b) => b.date.localeCompare(a.date)) };
   });
@@ -215,7 +215,7 @@ function Standing() {
   const top = all.slice(0, 3).some((x) => x.mine) ? all.slice(0, 3) : [...all.slice(0, 2), all.find((x) => x.mine)!];
   return (
     <div className="h-9">
-      <Popover align="end" className="w-[380px]" trigger={(o) => (
+      <Popover align="end" className="w-[440px]" trigger={(o) => (
         <button aria-label={glow ? "Your rivals: something new" : "Your rivals"} className={cn("flex h-full items-center rounded-md px-2.5 transition-colors min-[1440px]:-mx-2.5", o && "bg-gold/10", glow && "signal")} title="Poll standing on your path through the case (simulated). Hover for what your rivals are doing.">
           {/* Below 1440px there is no room for the poll strip; the list still opens from this mark. */}
           <Swords className="size-4 text-gold min-[1440px]:hidden" />
@@ -239,28 +239,32 @@ function Standing() {
 function RivalsPanel({ c, rivals, onOpen }: { c: Case; rivals: ReturnType<typeof useRivals>["rivals"]; onOpen: () => void }) {
   // Opening the list is reading it: the strip stops glowing.
   useEffect(onOpen, [onOpen]);
+  // The text pass (docs/ui-text-pass.md): short versions on screen, the original wording behind "Read more".
+  const [full, setFull] = useState(false);
+  const shown = rivals.map((o) => ({ ...o, items: o.items.slice(0, RIVAL_ITEMS) }));
   return (
     <div className="max-h-[72vh] overflow-y-auto p-4">
-      <Label>What your rivals are doing</Label>
+      <Label className="text-[20px] leading-tight font-semibold text-gold-bright">What your rivals are doing</Label>
       <div className="mt-3 space-y-2">
-        {rivals.map((o) => (
-          <div key={o.id} className="rounded-lg border border-line bg-raised p-3">
-            <div className="text-[13px] font-medium">{o.name}</div>
-            <div className="text-[11.5px] text-muted">{o.standing}</div>
+        {shown.map((o) => (
+          <div key={o.id} className="rounded-lg border border-line bg-raised p-3.5">
+            <div className="font-display text-[18px] leading-tight font-medium">{o.name}</div>
+            <div className="mt-0.5 text-[13px] text-muted">{o.standing}</div>
             {o.items.length ? (
-              <ul className="mt-2 space-y-2 border-t border-line pt-2">
-                {o.items.slice(0, RIVAL_ITEMS).map((i) => (
-                  <li key={i.key} className="text-[12px] leading-snug text-soft">
-                    <div className="mb-0.5 flex items-center gap-2"><span className="tnum font-mono text-[10.5px] text-muted">{shortDate(i.date)}</span><Tag kind={i.source ? "real" : "sim"} /></div>
-                    {i.text}{i.source && <Cite c={c} id={i.source} />}
+              <ul className="mt-2.5 space-y-3 border-t border-line pt-2.5">
+                {o.items.map((i) => (
+                  <li key={i.key} className="text-[16px] leading-snug text-soft">
+                    <div className="mb-1 flex items-center gap-2"><span className="tnum font-mono text-[13px] text-muted">{shortDate(i.date)}</span><Tag kind={i.source ? "real" : "sim"} /></div>
+                    {full ? i.text : (i.short ?? i.text)}{i.source && <Cite c={c} id={i.source} />}
                   </li>
                 ))}
               </ul>
-            ) : <p className="mt-2 border-t border-line pt-2 text-[12px] text-faint">Nothing reported yet.</p>}
+            ) : <p className="mt-2.5 border-t border-line pt-2.5 text-[14px] text-muted">Nothing reported yet.</p>}
           </div>
         ))}
       </div>
-      <p className="mt-3 border-t border-line pt-3 text-[12px] text-muted">The candidates are real. Items marked simulated are the moves each rival campaign makes in answer to yours.</p>
+      {shown.some((o) => o.items.some((i) => i.short)) && <More on={full} set={setFull} />}
+      <p className="mt-3 border-t border-line pt-3 text-[13px] text-muted">{full ? "The candidates are real. Items marked simulated are the moves each rival campaign makes in answer to yours." : "The candidates are real. Simulated items are each rival's moves against yours."}</p>
     </div>
   );
 }

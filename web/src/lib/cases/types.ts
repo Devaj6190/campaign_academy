@@ -109,7 +109,7 @@ export type Plank = {
  * `outside` marks an event from beyond the city. It is never shown as a label; it only keeps the item off the lead.
  * `estimate` marks a tie to the race that is our inference, not the source's: shown as an estimate, never moves numbers.
  */
-export type Press = { date: string; outlet: string; summary: string; source: string; impact?: number; outside?: boolean; estimate?: boolean };
+export type Press = { date: string; outlet: string; summary: string; /** As `Claim.short`, for `summary`. */ short?: string; source: string; impact?: number; outside?: boolean; estimate?: boolean };
 
 /** One point on the money timeline, from a public filing. */
 export type Filing = { date: string; candidate: string; raised: number; spent: number; cash: number; source: string; estimate?: boolean };
