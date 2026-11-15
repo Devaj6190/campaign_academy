@@ -38,8 +38,8 @@ flowchart LR
 2. **Decision point.** A real moment the campaign faced. What the world did since your last decision is real: rivals enter, scandals break, courts rule.
 3. **Your advisers.** The campaign's staff argue for different options.
 4. **You decide.** Each option shows a small preview of what it will move, up or down, and nothing more.
-5. **Your campaign changes.** Money, poll standing and support among voter groups move, and the next decision starts from where you left things.
-6. **Election night.** Your simulated result against the threshold you needed, then the certified real result and, decision by decision, what the real campaign did and what followed.
+5. **Your campaign changes.** Money, poll standing and support among voter groups move, and you see what the real campaign did at that point. The next decision starts from where you left things.
+6. **Election night.** Your simulated result against the threshold you needed, then the certified real result and, decision by decision, how the real campaign's choices turned out.
 
 ---
 
@@ -61,7 +61,7 @@ The simulation is fitted so that making the real campaign's own choices finishes
 - **Every statement of fact has a source.** Anything estimated is labelled as an estimate.
 - **The tool never recommends.** Advice comes from the advisers, in their own voices. The tool does not say which option was best, before or after.
 - **Previews show direction, not size.** You choose on judgment, then see what moved.
-- **The real campaign's choice stays hidden until the end.** You are not told what they did while you are still deciding.
+- **The real campaign's choice is shown only after you decide.** Once you have chosen, you see what they did at that point. How it turned out for them is held to the end, so later events are not spoiled.
 - **The real choice is not always the right one.** Luck and rivals' mistakes are part of the record and are shown as such.
 - **Cases are chosen for the lesson.** Not for who won or what they believed. Party primaries are preferred because the contest is inside one party.
 
@@ -99,7 +99,7 @@ A case is a data file. Adding a case means researching and writing one more file
 | Screen | Shows |
 |---|---|
 | **Case** | The briefing, each decision, your campaign's current state, election night and the debrief |
-| **Profile** | The real candidate and race at the briefing date: record, platform, opponents |
+| **Profile** | The real candidate and race as of the student's date: record, platform (each plank dated and cited; one that answered a decision appears only after the student makes it), the rivals' platforms, opponents |
 | **Map** | The city of that year: demographics and past results by district, and how your standing moves across it |
 | **Voter groups** | Who lived where, and your support in each group as your decisions move it |
 | **War room** | The campaign's staff as advisers you can question |

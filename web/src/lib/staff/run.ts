@@ -1,10 +1,11 @@
 "use client";
 
 import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
+import { platformAt } from "../cases/platform";
 import { factionWork, popShare, supportIn, useCase, worldNow } from "../cases/store";
 import { useGame } from "../store";
-import { ACTIONS } from "../engine/catalog";
-import type { Effect } from "../engine/resolve";
+import { ACTIONS, type ActionId } from "../engine/catalog";
+import { resolve, type Effect } from "../engine/resolve";
 import { runOffline } from "./offline";
 import { RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
@@ -48,7 +49,7 @@ export function snapshot(): Snapshot {
     sent: Object.fromEntries(PLACES.map((p) => [p.cd, supportIn(p.cd) ?? mine])),
     factions: FACTIONS_2013.map((f) => ({ id: f.id, name: f.name, feel: factionNow(f, w.groups, mine, c.start.poll[c.follow] ?? 0, boost), size: f.share, values: [], dislikes: [] })),
     staff: g.staff,
-    manifesto: c.platform.map((p) => p.text),
+    manifesto: platformAt(c, k.at, k.picks).map((p) => p.text),
     hires: s.hires,
     morale: s.morale,
     scale: { money: SCALE.money, local: SCALE.local * room, group: SCALE.group * room },
@@ -97,6 +98,37 @@ function apply(e: Effect) {
     citywide += (d * f.share) / 100;
   }
   useCase.getState().addWork({ by: e.by, label: e.label, cost: e.cost, raised: e.raised, poll: { [c.follow]: citywide }, groups, factions, districts: e.sent });
+}
+
+// --- The candidate in person, from the map ---
+
+/** What the candidate can do in a district himself. He has a few appearances a day; staff can do more. */
+export const APPEARANCES: { id: ActionId; label: string; note: string }[] = [
+  { id: "canvass", label: "Knock doors", note: "moves this district" },
+  { id: "rally", label: "Hold a rally", note: "moves this district more" },
+  { id: "house_party", label: "House party", note: "raises money" },
+];
+export const DAILY = 2;
+
+export const appearancesToday = () => { const { work, date } = useCase.getState(); return work.filter((x) => x.by === "candidate" && x.date === date).length; };
+
+/** What an appearance would cost and do, without doing it. */
+export const preview = (cd: number, id: ActionId) => resolve(snapshot(), "candidate", id, { district: cd }, { quality: 1, seed: cd * 7 + appearancesToday(), load: 1 });
+
+/** The candidate does it. Refused when he is out of appearances for the day or the money is not there. */
+export function appear(cd: number, id: ActionId): { ok: boolean; text: string } {
+  if (appearancesToday() >= DAILY) return { ok: false, text: "No appearances left today. Send staff, or let the clock run to tomorrow." };
+  const e = preview(cd, id);
+  if (e.cost > worldNow().w.budget) return { ok: false, text: "The campaign does not have the money for that." };
+  apply(e);
+  feed("candidate", `The candidate: ${e.summary}`, e.raised > e.cost ? "pos" : undefined);
+  return { ok: true, text: e.summary };
+}
+
+/** Hand a district to the Field Director: a draft order waits in their box in the War room. */
+export function sendStaff(cd: number) {
+  useStaff.setState((s) => ({ draft: { ...s.draft, fd: `Canvass ${shortPlace(cd)} this week and tell me what you find` } }));
+  useGame.setState({ view: "war", person: "fd" });
 }
 
 function handle(director: string, runId: number, e: RunEvent) {

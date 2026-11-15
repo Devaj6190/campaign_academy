@@ -90,10 +90,10 @@ function useLedger() {
     if (v) rows.push({ label: d.title, v });
   }
   const sum = (xs: Entry[]) => xs.reduce((a, r) => a + r.v, 0);
-  // Staff work between decisions. What the staff raise pays for staff work and stops there (see staffMoney).
+  // Staff jobs and the candidate's own appearances between decisions. What they raise pays for that work and stops there (see staffMoney).
   const staff = staffMoney(useCase((s) => s.work));
-  if (staff.spent) rows.push({ label: "Staff work", v: -staff.spent });
-  if (staff.raised) rows.push({ label: "Raised by your staff", v: staff.raised });
+  if (staff.spent) rows.push({ label: "Work between decisions", v: -staff.spent });
+  if (staff.raised) rows.push({ label: "Raised between decisions", v: staff.raised });
   if (upTo >= n && c.close.shift.budget) {
     // The closing stretch is paid only as far as the money lasts.
     const cost = -c.close.shift.budget;

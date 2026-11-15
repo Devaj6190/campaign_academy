@@ -1,10 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
-import { Inspector, Label, Meter, Section, Tag, ViewHeader } from "@/components/ui";
+import { DoorOpen, HandCoins, Megaphone, UserRound } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Dock, DockButton, Inspector, Label, Meter, Section, Tag, ViewHeader } from "@/components/ui";
 import { mapValue, useCaseNow } from "@/lib/cases/store";
 import { DISTRICTS, FETCHED, districtBy } from "@/lib/geo";
+import { APPEARANCES, DAILY, appear, appearancesToday, preview, sendStaff } from "@/lib/staff/run";
 import { sentimentOf, useGame } from "@/lib/store";
 import { cn, heat, tone } from "@/lib/util";
 import type { RealRow, Tip } from "./map/MapCanvas";
@@ -12,6 +14,8 @@ import type { RealRow, Tip } from "./map/MapCanvas";
 // ponytail: the one case with a baked result layer (mayor2013-ad.json); make this a field on the case when a second has one.
 const REAL_RESULT: Record<string, string> = { "nyc-2013-dem-mayor": "Real result 2013" };
 const RIVALS = ["deblasio", "thompson", "quinn", "liu", "weiner"] as const satisfies readonly (keyof RealRow)[];
+
+const ICONS: Record<string, ReactNode> = { canvass: <DoorOpen />, rally: <Megaphone />, house_party: <HandCoins /> };
 
 // The map itself touches the browser (WebGL), so it only renders on the client.
 const MapCanvas = dynamic(() => import("./map/MapCanvas").then((m) => m.MapCanvas), {
@@ -30,6 +34,10 @@ export function MapView() {
   const real = wantReal && !!realLabel;
   const sel = districtBy(world.district);
   const hovered = districtBy(tip?.cd ?? null);
+  // The candidate in person: a few appearances a day in the selected district (lib/staff/run). Simulated.
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const left = DAILY - appearancesToday();
+  const act = (id: (typeof APPEARANCES)[number]["id"]) => { if (sel) setNotice(appear(sel.cd, id)); };
 
   return (
     <div className="flex h-full">
@@ -80,6 +88,24 @@ export function MapView() {
                 <span className="tnum font-mono text-muted">{((tip.real![id] / tip.real!.total) * 100).toFixed(1)}%</span>
               </div>
             ))}
+          </div>
+        )}
+        {!real && (
+          <Dock label={sel && !sel.park ? `${sel.name} · ${left} of ${DAILY} appearances left today` : "Select a district to act there"}>
+            {sel && !sel.park && (
+              <>
+                {APPEARANCES.map((a, i) => {
+                  const e = preview(sel.cd, a.id);
+                  return <DockButton key={a.id} primary={i === 0} icon={ICONS[a.id]} label={a.label} sub={`$${e.cost.toLocaleString("en-US")} · ${a.note}`} disabled={left <= 0} onClick={() => act(a.id)} />;
+                })}
+                <DockButton icon={<UserRound />} label="Send staff" sub="order to the Field Director" onClick={() => sendStaff(sel.cd)} />
+              </>
+            )}
+          </Dock>
+        )}
+        {notice && !real && (
+          <div role="status" className={cn("pointer-events-none absolute bottom-24 left-1/2 z-30 max-w-[460px] -translate-x-1/2 rounded-lg border bg-raised px-3.5 py-2 text-[12.5px] shadow-xl", notice.ok ? "border-line-strong text-soft" : "border-neg/40 text-neg")}>
+            {notice.text}
           </div>
         )}
       </section>

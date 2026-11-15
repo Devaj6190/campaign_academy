@@ -8,6 +8,7 @@ import { changeAt, currentCase, useCase, worldAt } from "@/lib/cases/store";
 import type { Advice, Case, Claim, Decision, Judgment, Shift, Skill, World } from "@/lib/cases/types";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
+import { PlatformPanel } from "./Platform";
 
 // A case, played: briefing, then each decision point, then the debrief.
 // At a decision the student sees the record of that date, hears their advisers, and chooses. The choice changes
@@ -199,6 +200,7 @@ export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: num
           <span><span className="text-fg">{d.constraints.daysLeft}</span> days to the primary</span>
           {d.constraints.notes?.map((t) => <span key={t}>{t}</span>)}
         </div>
+        <div className="mt-4"><PlatformPanel c={c} step={index + 1} picks={picks} decision={d.id} /></div>
       </Section>
 
       {!!d.advice.length && (

@@ -59,9 +59,28 @@ Research pass of 2026-11-14. Web sources only, each opened in this pass unless m
 | 3 | A "clean break" from the Bloomberg years, framed as a "tale of two cities" divided by income. | VERIFIED [tpm-brand] [dna-launch] | 65% of likely Democratic primary voters wanted a new direction from Bloomberg (Aug. 28) [q-0828]. Katrina vanden Heuvel in The Nation praised the agenda [nation-0813]. | Bloomberg called the campaign "racist" in a September 2013 interview, as reported by TPM [tpm-brand]. |
 | 4 | Keep community hospitals open, in particular Long Island College Hospital in Brooklyn, which SUNY was considering selling. | VERIFIED [dna-arrest] [bkpaper-lich] | 1199 SEIU (which had endorsed him) and the New York State Nurses Association organised the protests [dna-arrest] [npq-lich]. | SUNY, which planned the sale [dna-arrest]. Criticism of his protest as a stunt: SNIPPET only. |
 | 5 | Paid sick leave: he pressed Quinn to allow a vote on a paid sick days bill. | VERIFIED [wnyc-lucky] | Activists who held events with him in January 2013 [wnyc-lucky]. | The Council's March 2013 compromise was credited to Quinn rather than to him [wnyc-lucky]. Business opposition: UNVERIFIED. |
-| 6 | Affordable housing: create or preserve 200,000 units, with mandatory inclusionary zoning. | **SNIPPET** (The Real Deal and others; pages not opened) | SNIPPET: reported as mostly well received by the industry. | SNIPPET: developers worried about a mandatory requirement; the Manhattan Institute argued against it. |
+| 6 | Affordable housing: create or preserve 200,000 units, about $1 billion of city pension money for building them, and a tighter 80/20 programme. On record by 2013-07-02. | VERIFIED [trd-0702] (read by the research pass; The Real Deal refuses automated re-fetching) | Brad Lander, Council member, praised the vision of more equal development [nextcity-0903] (2013-09-03). | Joe Lhota called mandatory inclusionary zoning unconstitutional, but in the October 2013 general-election debate, after this case ends [trd-1016]: not used. |
 
-Plank 6 should not ship until a readable source is found.
+Mandatory inclusionary zoning is first on readable record in September 2013 [nextcity-0903], with no unit number, so it is folded into the housing plank's discussion rather than shipped as a plank.
+
+### Dates and spoilers (case file)
+
+Each plank in `mayor2013.ts` has `asOf` (first on record) and, where it was the campaign's answer to a decision, `decision`. Profile and the decision panel only show what was on record by the student's date, and a decision-linked plank only after the student has made that decision (`lib/cases/platform.ts`). Reactions carry their own dates.
+
+### The rivals' platforms (case file)
+
+| Candidate | Plank | On record | Sources |
+|---|---|---|---|
+| Quinn | 40,000 middle-class apartments over ten years | 2013-02-11 | VERIFIED [dna-quinn-0211] |
+| Quinn | Tech agenda: CUNY campus at the Brooklyn Navy Yard, Long Island City tech cluster, citywide broadband by 2018 | 2013-05-29 | VERIFIED [dna-quinn-0529] |
+| Quinn | Drop the appeal of the stop-and-frisk ruling | 2013-08-12 | VERIFIED [dna-0812] |
+| Thompson | Keep stop-and-frisk but limit it, add 2,000 officers (the source also says he opposed an outside inspector general; the case's decision 6 situation says the opposite, so the clause is left out pending a check) | 2013-07-29 | VERIFIED [jw-thompson-0807] [dna-thompson-0729] |
+| Thompson | Driver-friendly transport plan | 2013-08-16 | VERIFIED [sb-thompson-0816] |
+| Liu | Abolish stop-and-frisk | 2013-08-07 | VERIFIED [jw-thompson-0807] |
+| Liu | Legalise and tax marijuana to cut CUNY tuition | 2013-08-14 | VERIFIED [cbs-liu-0814] [tnr-liu-0814] |
+| Weiner | City-run health plan modelled on single payer | 2013-07-03 | VERIFIED [cap-weiner-0703] |
+
+UNVERIFIED and not used: Thompson's 120,000-unit housing plan and his school-closings pause (search snippets only), the PBA's reaction to Thompson (page did not load), Weiner's "Keys to the City" booklet date, and the billdeblasio.com policy book (archive unreachable).
 
 ## 4. Decision points
 
