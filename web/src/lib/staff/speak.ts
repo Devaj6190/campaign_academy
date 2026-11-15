@@ -1,5 +1,6 @@
 "use client";
 
+import { isLoading } from "../loading";
 import { finished, waiting } from "../cases/clock";
 import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
 import { factionWork, shortMoney, supportIn, useCase, worldNow } from "../cases/store";
@@ -174,7 +175,7 @@ export function watch() {
     // A restarted case starts the staff's read of the numbers over.
     if (s.at < p.at || s.date < p.date) seen = null;
     const made = Object.keys(s.picks).find((id) => !(id in p.picks));
-    if (!made) return;
+    if (!made || isLoading()) return; // a loaded campaign's decisions were made before
     const { c } = worldNow();
     const d = c.decisions.find((x) => x.id === made);
     const o = d?.options.find((x) => x.id === s.picks[made].option);
@@ -193,7 +194,7 @@ export function watch() {
     if (stopped) return;
     editions = usePaper.getState().editions.length;
     offPaper = usePaper.subscribe((s) => {
-      if (s.editions.length <= editions) { editions = s.editions.length; return; }
+      if (s.editions.length <= editions || isLoading()) { editions = s.editions.length; return; }
       editions = s.editions.length;
       const lead = s.editions.at(-1)?.lead;
       if (!lead || useStaff.getState().spoken[`news-${lead.key}`] !== undefined) return;

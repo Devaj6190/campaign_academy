@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "node scripts/copy-map-worker.mjs",
+    "postinstall": "node scripts/copy-map-worker.mjs && node scripts/esm-scopes.mjs",
     "check:engine": "node scripts/check-engine.mjs",
     "refit:case": "node scripts/refit-case.mjs",
     "check:staff": "node scripts/check-staff.mjs",
