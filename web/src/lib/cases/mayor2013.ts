@@ -45,6 +45,7 @@ const sources: Source[] = [
   src("newsone-0826", "Bill Thompson Attacks Rival In New Ad", "NewsOne", "2013-08-26", "https://newsone.com/2698746/bill-thompson-stop-and-frisk-2/", "reporting"),
   src("spb-hyers", "Summary of a Washington Post profile of Bill Hyers", "SaintPetersBlog", undefined, "https://saintpetersblog.com/must-read-profile-of-charlie-crists-new-campaign-manager", "reporting"),
   src("gg-walzak", "In Communications Move, de Blasio Chooses Campaign Over City Hall", "Gotham Gazette", "2016-10-24", "https://www.gothamgazette.com/city/6589-in-communications-move-de-blasio-chooses-campaign-over-city-hall", "reporting"),
+  src("huff-digital", "Bill de Blasio Is Starting To Look A Lot Like Someone Else We Know", "HuffPost", "2013-09-25", "https://www.huffpost.com/entry/bill-de-blasio-digital-campaign_n_3963606", "reporting"),
   src("gqr", "Congratulations to Bill de Blasio", "Greenberg Quinlan Rosner", "2013-09-16", "https://www.gqrr.com/news/congratulations-to-bill-de-blasio-2", "campaign"),
   // Outside events a published source ties to this race (research pass, 15 November 2026; each page loaded and read).
   src("wfuv-0425", "Democrats in Mayor Race Spar Over Issues of Public Safety", "WFUV", "2013-04-25", "https://wfuv.org/content/democrats-mayor-race-spar-over-issues-public-safety", "reporting"),
