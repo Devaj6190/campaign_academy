@@ -246,6 +246,9 @@ export const mayor2013: Case = {
         { id: "boroughs", label: "The outer-borough candidate", detail: "Neighbourhood services and equal treatment of the five boroughs come first.", preview: { up: ["Hispanic voters", "Union households"], down: ["Poll standing", "White voters"] }, effect: { poll: { deblasio: -1 }, groups: { hispanic: 2, union: 1, white: -1 } } },
         { id: "prek", label: "One signature policy", detail: "Run on schools and pre-kindergarten and leave the incumbent's record alone.", preview: { up: ["Poll standing", "White voters"], down: [] }, effect: { poll: { deblasio: 1 }, groups: { white: 2 } } },
       ],
+      advice: [
+        { name: "John Del Cecato", role: "Media consultant", argues: "break", sources: ["tpm-brand"], says: "Proposed the tale of two cities as the frame, to make you the clear progressive while rivals compete for the same middle-class ground." },
+      ],
       taken: "break",
       did: [
         sh("Del Cecato proposed the tale of two cities, to make de Blasio the clear progressive.", c("Early in 2013 media consultant John Del Cecato met Bill and Chirlane de Blasio to build the message and proposed the tale of two cities. The aim was to make de Blasio the clear progressive and to differ from rivals' middle-class framing.", "tpm-brand")),
@@ -285,6 +288,9 @@ export const mayor2013: Case = {
         { id: "hold", label: "Leave him alone and stay on plan", detail: "Keep the campaign aimed at the incumbent's record and the front-runner. Spend nothing extra now.", preview: { up: [], down: [] }, effect: {} },
         { id: "shift", label: "Change the message", detail: "Compete for the same outer-borough, middle-class voters he is talking to.", preview: { up: ["White voters"], down: ["Poll standing", "Black voters", "Hispanic voters"] }, effect: { poll: { deblasio: -1 }, groups: { white: 1, black: -2, hispanic: -1 } } },
         { id: "early", label: "Spend early on name recognition", detail: "Start paid advertising months ahead of plan so voters know who you are before the summer.", preview: { up: ["Poll standing"], down: [TV] }, effect: { poll: { deblasio: 3 }, budget: -700_000 } },
+      ],
+      advice: [
+        { name: "Bill Hyers", role: "Campaign manager", argues: "hold", sources: ["spb-hyers", "gg-walzak"], says: "When the candidate, trailing, considered speeding up and spending more to raise his name recognition, he recommended staying with the plan." },
       ],
       taken: "hold",
       did: [
@@ -376,6 +382,9 @@ export const mayor2013: Case = {
         { id: "family", label: "A family member introduces you", detail: "Your teenage son speaks, naming the break from the incumbent, the tax plan and stop-and-frisk.", preview: { up: ["Poll standing", "Black voters", "White voters", "Hispanic voters"], down: [TV] }, effect: { poll: { deblasio: 6 }, groups: { black: 8, white: 12, hispanic: 8 }, budget: -1_100_000 }, synergy: { with: "positioning:break", effect: { poll: { deblasio: 3 }, groups: { black: 2, hispanic: 1 } } } },
         { id: "contrast", label: "A contrast with the front-runner", detail: "Open on term limits and her record alongside the incumbent.", preview: { up: ["Poll standing", "White voters"], down: [TV] }, effect: { poll: { deblasio: 5, quinn: -2 }, groups: { white: 4 }, budget: -1_100_000 } },
         { id: "wait", label: "Hold all television for the last two weeks", detail: "Stay dark now and concentrate the buy at the end.", preview: { up: [], down: ["Poll standing"] }, effect: { poll: { deblasio: -2 } } },
+      ],
+      advice: [
+        { name: "John Del Cecato", role: "Media consultant", argues: "family", sources: ["tpm-brand"], says: "Had the idea after the candidate's son drew press attention at the launch, and persuaded the candidate to pay for the ad and run it." },
       ],
       taken: "family",
       did: [

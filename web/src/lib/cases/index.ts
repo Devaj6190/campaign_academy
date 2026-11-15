@@ -13,6 +13,8 @@ export const CASES: Case[] = [mayor2013];
 export function checkCase(c: Case): string[] {
   const problems = missingSources(c).map((id) => `cites a source that is not listed: ${id}`);
   if (simulate(c, realPath(c)).budget < 0) problems.push("the real campaign's choices overspend the simulated budget");
+  // The evals (#28) score an agent against what each sourced adviser argued, so that has to be one of the options.
+  for (const d of c.decisions) for (const a of d.advice ?? []) if (!d.options.some((o) => o.id === a.argues)) problems.push(`${d.id}: ${a.name} argues "${a.argues}", which is not an option`);
   // A short version may not carry a number its full sentence does not.
   const walk = (x: unknown): void => {
     if (!x || typeof x !== "object") return;

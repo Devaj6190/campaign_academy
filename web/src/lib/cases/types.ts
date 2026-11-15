@@ -51,6 +51,13 @@ export type Option = {
   synergy?: { with: string; effect: Shift };
 };
 
+/**
+ * What a real adviser argued at a decision, as the record documents it, with `sources` saying where. Backend only: the
+ * evals (#28) give an agent that person's role and score it against `argues`. Never shown on screen and never sent to
+ * an agent: each of these argued for the real campaign's choice, so it is part of the record, like `taken`.
+ */
+export type Advice = { name: string; role: string; argues: string; says: string; sources: string[] };
+
 export type Decision = {
   id: string;
   /** ISO date of the moment, or the start of the phase it belongs to. */
@@ -63,6 +70,8 @@ export type Decision = {
   situation: Claim[];
   constraints: { daysLeft: number; cashOnHand?: number; notes?: string[] };
   options: Option[];
+  /** Sourced advisers for the evals (#28). Backend only; see `Advice`. */
+  advice?: Advice[];
   // --- the record, shown at the debrief ---
   /** The option closest to what the campaign did. Null when they did something not on the list. */
   taken: string | null;
@@ -155,7 +164,7 @@ export function missingSources(c: Case): string[] {
     ...c.platform.flatMap((p) => [p, ...(p.likedBy ? [p.likedBy] : []), ...(p.dislikedBy ? [p.dislikedBy] : []), ...(p.reactions ?? [])]),
     ...c.start.basis,
     ...c.close.notes,
-    ...c.decisions.flatMap((d) => [...(d.since?.notes ?? []), ...d.situation, ...d.did, ...d.followed, ...d.saidAfter]),
+    ...c.decisions.flatMap((d) => [...(d.since?.notes ?? []), ...d.situation, ...d.did, ...d.followed, ...d.saidAfter, ...(d.advice ?? [])]),
     { sources: c.resultSources },
     ...c.press.map((p) => ({ sources: [p.source] })),
     ...c.finance.map((f) => ({ sources: [f.source] })),

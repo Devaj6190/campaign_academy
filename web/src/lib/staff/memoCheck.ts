@@ -10,7 +10,8 @@ import { LEAD_DAYS, memoDay, setMemoWriter, useMemos, watchMemos } from "./memos
 // code builds each request; only the writer is swapped in. Each assertion can fail:
 // 1. Every decision has its two memos by the time the campaign reaches it.
 // 2. Each was written from the campaign as it stood within LEAD_DAYS of the decision's date, not months before.
-// 3. No request carries any part of the record: what the real campaign did, what followed, what was said after.
+// 3. No request carries any part of the record: what the real campaign did, what followed, what was said after,
+//    and what its sourced advisers argued.
 // 4. A memo reads the campaign as the card shows it on arrival (the stretch's news in), not as it stood days before.
 // 5. The assigned options do not lean toward the record: at most a third of memos land on the real choice.
 // 6. Each adviser gives a headline (at most 12 words) and a short case (at most 60).
@@ -44,7 +45,7 @@ export async function checkMemos(write: (r: MemoRequest) => Promise<Memo>) {
         const on = dateIn(r.campaign);
         if (!on || on < memoDay(d.date) || on > d.date) problems.push(`${d.id}: ${r.director.id}'s memo was written from the campaign on ${on || "an unknown day"}, not within ${LEAD_DAYS} days of ${d.date}`);
         const body = JSON.stringify(r);
-        const record = [...d.did, ...d.followed, ...d.saidAfter].map((x) => x.text).filter((t) => t.length >= 25);
+        const record = [...d.did, ...d.followed, ...d.saidAfter].map((x) => x.text).concat((d.advice ?? []).map((a) => a.says)).filter((t) => t.length >= 25);
         const leak = record.find((t) => body.includes(t));
         if (leak) problems.push(`${d.id}: ${r.director.id}'s request carries the record: "${leak.slice(0, 60)}…"`);
         // 4. The memo reads the campaign the card shows on arrival: the same poll for the candidate.
