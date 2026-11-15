@@ -75,8 +75,8 @@ export async function writeMemos(index: number) {
       against: first ? { option: first.option, who: firstBy?.onRecord || !firstBy?.name || firstBy.name === firstBy.role ? `the ${firstBy?.role ?? "other director"}` : firstBy.name } : undefined,
     };
     memos.push(await writer(req));
-    // A restart while writing: these belong to a campaign that no longer exists.
-    if (!useMemos.getState().byDecision[d.id]) return;
+    // A restart or a loaded save while writing: these belong to a campaign that no longer exists.
+    if (useMemos.getState().byDecision[d.id]?.status !== "writing") return;
     put(d.id, { status: memos.length < 2 ? "writing" : "ready", memos: [...memos] });
   }
   put(d.id, { status: "ready", memos });
