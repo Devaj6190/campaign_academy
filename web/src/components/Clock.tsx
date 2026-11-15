@@ -7,22 +7,33 @@ import { currentCase, longDate, useCase } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 import { DecisionStep } from "@/views/CaseView";
-import { usePaper } from "./Paper";
+import { announce, usePaper } from "@/lib/paper/run";
 import { Dialog, Label } from "./ui";
 
 // The clock's controls for the top bar, the timer behind them, and the card that opens when a decision arrives.
 
-/** What follows a step of the clock: the paper on a morning with news, election night on the map when the campaign is over. */
+/** What follows a step of the clock: the paper's notice on a morning with news, election night on the map when the campaign is over. */
 function land(r: ReturnType<typeof tick>) {
-  if (r === "event") usePaper.getState().set(true);
+  if (r === "event") announce();
   if (r === "arrived" && finished()) useGame.setState({ view: "map", district: null });
 }
 
-/** Keeps the days passing while the clock is running. Time waits while the paper is open. Mount once. */
+/** Keeps the days passing while the clock is running. Time waits while the paper is open or its notice is unanswered. Mount once. */
 export function useTicker() {
+  // Staff also react to events as they happen: a decision just made, a lead story just published.
+  useEffect(() => {
+    // The import may resolve after an unmount (React mounts twice in development): only watch if still mounted.
+    let off: (() => void) | undefined;
+    let live = true;
+    let offMemos: (() => void) | undefined;
+    void import("@/lib/staff/speak").then((m) => { if (live) off = m.watch(); });
+    // Staff memos for the next case decision are written as its stretch begins, so the decision never waits on them.
+    void import("@/lib/staff/memos").then((m) => { if (live) offMemos = m.watchMemos(); });
+    return () => { live = false; off?.(); offMemos?.(); };
+  }, []);
   const running = useCase((s) => s.running);
   const speed = useCase((s) => s.speed);
-  const paper = usePaper((s) => s.open);
+  const paper = usePaper((s) => s.open || s.unread);
   useEffect(() => {
     if (!running || paper) return;
     // Each day that passes, the staff get the chance to speak up; speakUp decides whether anyone has something to say.
@@ -39,11 +50,19 @@ export function ClockControls() {
   const speed = useCase((s) => s.speed);
   useCase((s) => s.at);
   useCase((s) => s.picks);
+  const unread = usePaper((s) => s.unread);
   if (finished()) return null;
   if (waiting())
     return (
       <button onClick={() => useCase.setState({ card: true })} className="btn-gold h-7 rounded-full px-3 text-[12px] whitespace-nowrap" title="The clock is stopped until you decide">
         Decision waiting
+      </button>
+    );
+  // The same on a news morning: a running clock waits for the paper's notice, so the button says so and opens the paper.
+  if (running && unread)
+    return (
+      <button onClick={() => usePaper.getState().set(true)} className="btn-gold h-7 rounded-full px-3 text-[12px] whitespace-nowrap" title="The clock waits until you read the paper or put it aside">
+        Paper waiting
       </button>
     );
   const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];

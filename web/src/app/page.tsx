@@ -1,11 +1,13 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import { useEffect } from "react";
 import { DecisionCard, useTicker } from "@/components/Clock";
-import { Paper } from "@/components/Paper";
+import { Paper, PaperNotice } from "@/components/Paper";
 import { Sidebar } from "@/components/Sidebar";
 import { Toasts } from "@/components/Toasts";
 import { TopBar } from "@/components/TopBar";
+import { startSaving } from "@/lib/save";
 import { useGame } from "@/lib/store";
 import { CaseView } from "@/views/CaseView";
 import { MapView } from "@/views/MapView";
@@ -20,6 +22,8 @@ const VIEWS = { case: CaseView, profile: Profile, war: WarRoom, map: MapView, fa
 export default function Home() {
   const view = useGame((s) => s.view);
   const View = VIEWS[view];
+  // The saved campaign loads before the clock and the staff watchers start (they mount in useTicker), then keeps saving.
+  useEffect(() => startSaving(), []);
   useTicker();
 
   return (
@@ -36,6 +40,7 @@ export default function Home() {
         </main>
       </div>
       <Paper />
+      <PaperNotice />
       <DecisionCard />
       <Toasts />
     </div>

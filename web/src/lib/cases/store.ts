@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import { DISTRICTS, districtBy } from "../geo";
+import type { BookingKind } from "../engine/catalog";
 import { CASES } from "./index";
 import { effectOf, simulate, type Case, type Decision, type Shift, type World } from "./types";
 
 // Where the student is in a case, what they chose, and the work done between decisions. The case file is never
 // written; the student's world is always derived from their picks by `simulate`, with the work layer on top.
 
-export type Pick = { option: string; why: string };
+export type Pick = { option: string };
 
 /**
  * One piece of work done between decisions: a staff job, or a rival's move. Simulated. `poll` is citywide points
@@ -29,6 +30,9 @@ export type Work = {
   districts: Record<number, number>;
 };
 
+/** One appearance on the candidate's calendar. `done` says what happened when the day came. */
+export type Booking = { id: number; date: string; cd: number; kind: BookingKind; faction?: string; by: string; done?: string };
+
 type CaseState = {
   caseId: string;
   /** The step on screen in the Case tab: 0 is the briefing, 1..n are the decision points, n+1 is the debrief. */
@@ -43,13 +47,16 @@ type CaseState = {
   card: boolean;
   picks: Record<string, Pick>;
   work: Work[];
+  /** The candidate's calendar (lib/staff/run runBookings does them on their day). */
+  bookings: Booking[];
+  book: (b: Omit<Booking, "id">) => void;
   go: (step: number) => void;
   decide: (decision: string, pick: Pick) => void;
   addWork: (w: Omit<Work, "id" | "date">) => void;
   restart: () => void;
 };
 
-const fresh = () => ({ step: 0, at: 0, date: CASES[0].briefingDate, running: false, card: false, picks: {}, work: [] });
+const fresh = () => ({ step: 0, at: 0, date: CASES[0].briefingDate, running: false, card: false, picks: {}, work: [], bookings: [] });
 
 export const useCase = create<CaseState>((set) => ({
   caseId: CASES[0].id,
@@ -58,6 +65,7 @@ export const useCase = create<CaseState>((set) => ({
   go: (step) => set({ step }),
   decide: (decision, pick) => set((s) => ({ picks: { ...s.picks, [decision]: pick } })),
   addWork: (w) => set((s) => ({ work: [...s.work, { ...w, id: s.work.length + 1, date: s.date }] })),
+  book: (b) => set((s) => ({ bookings: [...s.bookings, { ...b, id: s.bookings.length + 1 }] })),
   restart: () => set(fresh()),
 }));
 
@@ -107,9 +115,13 @@ export function changeAt(c: Case, picks: Record<string, Pick>, d: Decision): Shi
   return out;
 }
 
-/** The live world: on arrival at the step the campaign has reached, plus that decision if made, plus all work so far. */
-export function worldNow(): { c: Case; w: World } {
-  const { caseId, picks, at } = useCase.getState();
+/**
+ * The live world: on arrival at the step the campaign has reached, plus that decision if made, plus all work so far.
+ * `step`: read it as of arriving at that step instead (the staff memos are written for the decision's day).
+ */
+export function worldNow(step?: number): { c: Case; w: World } {
+  const { caseId, picks } = useCase.getState();
+  const at = step ?? useCase.getState().at;
   const c = currentCase(caseId);
   const i = Math.min(Math.max(at - 1, 0), c.decisions.length);
   const w = simulate(withWork(c), options(picks), i);
@@ -118,6 +130,25 @@ export function worldNow(): { c: Case; w: World } {
   const ch = changeAt(c, picks, d);
   const plus = (base: Record<string, number>, x?: Record<string, number>) => Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v + (x?.[k] ?? 0)]));
   return { c, w: { budget: w.budget + (ch.budget ?? 0), poll: plus(w.poll, ch.poll), groups: plus(w.groups, ch.groups) } };
+}
+
+/**
+ * Every candidate's poll on each day from the briefing to today, on the student's path: the same calculation as
+ * worldNow(), with only the work done by that day and only the decisions reached by then. Read-only; for the chart.
+ */
+export function pollHistory(): { date: string; poll: Record<string, number> }[] {
+  const { caseId, picks, date: today } = useCase.getState();
+  const c = currentCase(caseId);
+  const out: { date: string; poll: Record<string, number> }[] = [];
+  for (let t = Date.parse(c.briefingDate); t <= Date.parse(today); t += 86_400_000) {
+    const date = new Date(t).toISOString().slice(0, 10);
+    const i = Math.max(0, c.decisions.filter((d) => d.date <= date).length - 1);
+    const w = simulate(withWork(c, date), options(picks), i);
+    const d = c.decisions[i];
+    const ch = d && picks[d.id] ? changeAt(c, picks, d) : null;
+    out.push({ date, poll: Object.fromEntries(Object.entries(w.poll).map(([k, v]) => [k, v + (ch?.poll?.[k] ?? 0)])) });
+  }
+  return out;
 }
 
 /** The live campaign: its world, the step and date it has reached and the days left. Re-renders the caller. */
@@ -180,8 +211,12 @@ export function popShare(cd: number): number {
  * tracked groups count at the citywide figure.
  */
 export function supportIn(cd: number): number | null {
-  if (!districtBy(cd)?.demo) return null;
   const { c, w } = worldNow();
+  return supportUnder(cd, c, w);
+}
+
+function supportUnder(cd: number, c: Case, w: World): number | null {
+  if (!districtBy(cd)?.demo) return null;
   const raw = (id: number) => {
     const race = districtBy(id)!.demo!.race;
     let sum = 0, covered = 0;
@@ -198,4 +233,34 @@ export function supportIn(cd: number): number | null {
   const mean = people ? total / people : 0;
   const local = useCase.getState().work.reduce((a, x) => a + (x.districts[cd] ?? 0), 0);
   return Math.max(0, Math.min(100, raw(cd) * (mean ? (w.poll[c.follow] ?? mean) / mean : 1) + local));
+}
+
+/** The map filter that colours districts by what one decision moved. */
+export const decisionFilter = (id: string) => `decision:${id}`;
+
+/** The decision a map filter names, once the student has made it: what they chose and what it changed. Simulated. */
+export function decisionOf(filter: string): { d: Decision; label: string; change: Shift } | null {
+  if (!filter.startsWith("decision:")) return null;
+  const { caseId, picks } = useCase.getState(), c = currentCase(caseId);
+  const d = c.decisions.find((x) => x.id === filter.slice("decision:".length));
+  if (!d || !picks[d.id]) return null;
+  return { d, label: d.options.find((o) => o.id === picks[d.id].option)?.label ?? "", change: changeAt(c, picks, d) };
+}
+
+/** The latest decision the student has made, if any. */
+export function lastDecided(): Decision | undefined {
+  const { caseId, picks } = useCase.getState();
+  return [...currentCase(caseId).decisions].reverse().find((d) => picks[d.id]);
+}
+
+/**
+ * How far a decision moved the student's support in each district, in points, by district number: support as it
+ * stands, less support with that decision's change taken back out. A district moves when the decision moved a voter
+ * group that lives there, or the citywide figure. Simulated.
+ */
+export function movedBy(change: Shift): Record<number, number> {
+  const { c, w } = worldNow();
+  const less = (base: Record<string, number>, x?: Record<string, number>) => Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v - (x?.[k] ?? 0)]));
+  const before: World = { ...w, poll: less(w.poll, change.poll), groups: less(w.groups, change.groups) };
+  return Object.fromEntries(DISTRICTS.filter((d) => d.demo && !d.park).map((d) => [d.cd, (supportUnder(d.cd, c, w) ?? 0) - (supportUnder(d.cd, c, before) ?? 0)]));
 }

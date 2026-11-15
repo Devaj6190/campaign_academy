@@ -1,17 +1,21 @@
 "use client";
 
+import { motion } from "motion/react";
 import { ArrowDown, ArrowRight, ArrowUp, Check, ChevronDown, ExternalLink, Map as MapIcon, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { Button, Label, Meter, Section } from "@/components/ui";
+import { Avatar, Button, Label, Meter, Section } from "@/components/ui";
 import { run } from "@/lib/cases/clock";
-import { changeAt, currentCase, useCase, worldAt } from "@/lib/cases/store";
-import type { Advice, Case, Claim, Decision, Judgment, Shift, Skill, World } from "@/lib/cases/types";
+import { changeAt, currentCase, decisionFilter, useCase, worldAt } from "@/lib/cases/store";
+import type { Case, Claim, Decision, Judgment, Shift, Skill, World } from "@/lib/cases/types";
+import type { Memo } from "@/lib/staff/memo";
+import { useMemos, writers } from "@/lib/staff/memos";
+import type { Staff } from "@/lib/data";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 import { PlatformPanel } from "./Platform";
 
 // A case, played: briefing, then each decision point, then the debrief.
-// At a decision the student sees the record of that date, hears their advisers, and chooses. The choice changes
+// At a decision the student sees the record of that date, hears their advisers (two of their own staff), and chooses. The choice changes
 // their simulated campaign and the race plays on from there. The clock (lib/cases/clock) carries the campaign from
 // one decision to the next; a step opens here only once the campaign has reached it.
 
@@ -205,23 +209,7 @@ export const Chip = ({ up, children }: { up: boolean; children: string }) => (
   </span>
 );
 
-/** `full` shows the adviser's argument in its original wording instead of the short version. */
-export function AdviceCard({ c, a, option, full }: { c: Case; a: Advice; option?: string; full?: boolean }) {
-  return (
-    <div className="rounded-lg border border-line bg-raised p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[16px] font-medium text-gold-bright">{a.name ?? a.role}</span>
-        <span className="shrink-0 text-[13px] text-muted">{a.basis === "on-record" ? "On the record" : "Predicted"}</span>
-      </div>
-      {a.name && <div className="text-[13px] text-muted">{a.role}</div>}
-      <div className="mt-3 text-[13px] text-muted">Argues for</div>
-      <div className="font-display text-[18px] leading-snug font-medium text-fg">{option}</div>
-      <p className="mt-2 text-[16px] leading-relaxed text-soft">{full ? a.says : (a.short ?? a.says)}{a.sources.map((id) => <Cite key={id} c={c} id={id} />)}</p>
-    </div>
-  );
-}
-
-function Changes({ c, s }: { c: Case; s: Shift }) {
+export function Changes({ c, s }: { c: Case; s: Shift }) {
   const rows: [string, string, boolean][] = [];
   if (s.budget) rows.push(["Money left to spend", usd(s.budget), s.budget > 0]);
   for (const [id, v] of Object.entries(s.poll ?? {})) if (v) rows.push([id === c.follow ? "Your poll standing" : `${c.candidates.find((x) => x.id === id)?.name ?? id} in the polls`, `${pts(v)} points`, id === c.follow ? v > 0 : v < 0]);
@@ -236,7 +224,137 @@ function Changes({ c, s }: { c: Case; s: Shift }) {
   );
 }
 
-/** One decision: the record, the advisers, the choice. Shown in the Case tab and as the card that opens when the clock reaches it. */
+/**
+ * What the decision did, as bars moving from where things stood on arrival to where they stand after it: the
+ * student's poll, each voter group the case tracks, and the money. They animate once, right after the student decides;
+ * on any later visit they simply show the result.
+ */
+function Moved({ c, before, s, fresh }: { c: Case; before: World; s: Shift; fresh: boolean }) {
+  const rows: { label: string; from: number; to: number; max: number; money?: boolean }[] = [];
+  const you = before.poll[c.follow] ?? 0;
+  rows.push({ label: "Your poll standing", from: you, to: you + (s.poll?.[c.follow] ?? 0), max: 50 });
+  for (const g of c.groups) {
+    const from = before.groups[g.id] ?? 0, d = s.groups?.[g.id] ?? 0;
+    if (d) rows.push({ label: g.name, from, to: from + d, max: 50 });
+  }
+  if (s.budget) rows.push({ label: "Money left to spend", from: before.budget, to: before.budget + s.budget, max: c.start.budget, money: true });
+  const fmt = (r: (typeof rows)[number], v: number) => (r.money ? `$${(v / 1e6).toFixed(2)}M` : `${v.toFixed(1)}%`);
+  const ease = [0.22, 1, 0.36, 1] as const;
+  return (
+    <ul className="mb-5 space-y-3">
+      {rows.map((r, i) => {
+        const up = r.to >= r.from, w = (v: number) => `${Math.max(0, Math.min(100, (v / r.max) * 100))}%`;
+        return (
+          <li key={r.label}>
+            <div className="flex items-baseline justify-between text-[14px]">
+              <span className="text-soft">{r.label}</span>
+              <span className="tnum font-mono text-[13px] text-muted">
+                {fmt(r, r.from)} → <span className={up ? "text-pos" : "text-neg"}>{fmt(r, r.to)}</span>
+              </span>
+            </div>
+            <div className="relative mt-1.5 h-[6px] overflow-hidden rounded-full bg-white/[0.07]">
+              {/* Where it stood, faint; where it stands now, moving there. */}
+              <span className="absolute inset-y-0 left-0 rounded-full bg-white/15" style={{ width: w(r.from) }} />
+              <motion.span
+                className={cn("absolute inset-y-0 left-0 rounded-full", up ? "bg-warm" : "bg-neg")}
+                initial={fresh ? { width: w(r.from) } : false}
+                animate={{ width: w(r.to) }}
+                transition={{ duration: 1.1, delay: fresh ? 0.25 + i * 0.12 : 0, ease }}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** The money a figure stands for, short: "$1.2M", "$150k". */
+const short$ = (n: number) => (Math.abs(n) >= 1e6 ? `$${(n / 1e6).toFixed(2).replace(/\.?0+$/, "")}M` : `$${Math.round(n / 1000)}k`);
+/** The chip that only says an option costs money: the price on the card says it better. */
+const MONEY_CHIP = "Money left to spend";
+
+/** How a post is named: a post held by a real person in the record speaks as the post, never as that person. */
+const voiceOf = (p: Staff | undefined, id: string) => (!p ? { name: id, mark: id } : p.onRecord || !p.name || p.name === p.role ? { name: `The ${p.role}`, mark: p.role } : { name: p.name, mark: p.name });
+
+/**
+ * The decision's advisers: two of the student's own directors, each recommending an option from this campaign as it
+ * stands (lib/staff/memos.ts). Simulated views of the posts, never the tool's advice. Clicking one picks its option.
+ */
+function Advisers({ d, label, chosen, onPick }: { d: Decision; label: (id: string) => string | undefined; chosen?: string; onPick?: (id: string) => void }) {
+  const entry = useMemos((s) => s.byDecision[d.id]);
+  const staff = useGame((s) => s.staff);
+  if (!entry) return null;
+  const waiting = entry.status === "writing" ? writers(d).slice(entry.memos.length) : [];
+  return (
+    <Section big title="Your advisers">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {entry.memos.map((m) => {
+          const p = staff.find((x) => x.id === m.director), v = voiceOf(p, m.director), on = chosen === m.option;
+          return (
+            <button
+              key={m.director}
+              onClick={() => onPick?.(m.option)}
+              disabled={!onPick}
+              className={cn("group flex flex-col rounded-xl border p-4 text-left transition-colors", on ? "border-gold bg-hover" : "border-line bg-raised enabled:hover:border-line-strong")}
+            >
+              <div className="flex items-center gap-3">
+                <Avatar name={v.mark} size={36} />
+                <div className="min-w-0">
+                  <div className="truncate text-[14px] font-medium text-fg">{v.name}</div>
+                  {p && v.name !== `The ${p.role}` && <div className="truncate text-[12px] text-faint">{p.role}</div>}
+                </div>
+              </div>
+              <div className="mt-3.5 text-[11px] font-medium tracking-wide text-muted uppercase">Recommends</div>
+              <div className="text-[14px] leading-snug font-medium text-gold-bright">{label(m.option)}</div>
+              {m.headline && <p className="mt-3 font-serif text-[21px] leading-[1.2] tracking-tight text-fg">{m.headline}</p>}
+              <p className="mt-2 text-[14px] leading-relaxed text-soft">{m.text}</p>
+            </button>
+          );
+        })}
+        {waiting.map((p) => (
+          <div key={p.id} className="flex flex-col rounded-xl border border-dashed border-line p-4">
+            <div className="flex items-center gap-3">
+              <Avatar name={voiceOf(p, p.id).mark} size={36} className="opacity-60" />
+              <div className="text-[14px] text-muted">{voiceOf(p, p.id).name} is writing…</div>
+            </div>
+            <div className="mt-4 space-y-2" aria-hidden>
+              <div className="h-3 w-2/5 animate-pulse rounded bg-white/[0.06]" />
+              <div className="h-5 w-4/5 animate-pulse rounded bg-white/[0.08]" />
+              <div className="h-3 w-full animate-pulse rounded bg-white/[0.05]" />
+              <div className="h-3 w-3/4 animate-pulse rounded bg-white/[0.05]" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2.5 text-[12px] text-muted">Simulated: your own staff, reading this campaign. Not what anyone said in 2013.{waiting.length ? " You can decide without waiting." : ""}</p>
+    </Section>
+  );
+}
+
+/** Who recommends an option, as small marks on its card. */
+function Backers({ memos, option }: { memos: Memo[]; option: string }) {
+  const staff = useGame((s) => s.staff);
+  const mine = memos.filter((m) => m.option === option);
+  if (!mine.length) return null;
+  return (
+    <div className="mt-2.5 flex flex-wrap gap-1.5">
+      {mine.map((m) => {
+        const v = voiceOf(staff.find((x) => x.id === m.director), m.director);
+        return (
+          <span key={m.director} className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/[0.06] py-0.5 pr-2.5 pl-0.5 text-[11.5px] text-gold">
+            <Avatar name={v.mark} size={18} />
+            {v.name} recommends
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/** One decision: what happened, the situation, the advisers, the choice. Shown in the Case tab and as the card that opens when the clock reaches it. */
+const NONE: Memo[] = [];
+
 export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: number }) {
   const { decide, picks, at, running } = useCase();
   const live = index === at - 1;
@@ -244,36 +362,44 @@ export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: num
   const decided = !!pick;
   const w = worldAt(c, picks, index);
   const [option, setOption] = useState(pick?.option ?? "");
-  const [why, setWhy] = useState(pick?.why ?? "");
   const last = index === c.decisions.length - 1;
   const label = (id: string) => d.options.find((o) => o.id === id)?.label;
-  const [advice, setAdvice] = useState(false);
+  const memos = useMemos((s) => s.byDecision[d.id]?.memos ?? NONE);
+  // Set when the student decides here, so what the decision did animates once, then and only then.
+  const [fresh, setFresh] = useState(false);
+  const costOf = (id?: string) => -(d.options.find((o) => o.id === id)?.effect.budget ?? 0);
+  const affordable = (id: string) => w.budget - costOf(id) >= 0;
+  const choose = decided ? undefined : (id: string) => { if (affordable(id)) setOption(id); };
+  const chosen = pick?.option ?? option;
 
   return (
     <>
-      {d.since && <Section big title="Since your last decision"><Claims big c={c} items={d.since.notes} /></Section>}
       <Section big title={`${day(d.date)} · ${SKILLS[d.skill]}`}>
         <h2 className="mb-4 font-serif text-[34px] leading-[1.1] tracking-tight">{d.title}</h2>
+        {d.since && (
+          <div className="mb-4 rounded-lg border border-line bg-raised/60 px-4 py-3">
+            <Label>Since your last decision</Label>
+            <div className="mt-2"><Claims c={c} items={d.since.notes} /></div>
+          </div>
+        )}
         <Claims big c={c} items={d.situation} />
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-[14px] text-muted">
           <span><span className="text-fg">{d.constraints.daysLeft}</span> days to the primary</span>
+          <span><span className="text-fg">{usd(w.budget)}</span> left to spend</span>
           {d.constraints.notes?.map((t) => <span key={t}>{t}</span>)}
         </div>
         <div className="mt-4"><PlatformPanel c={c} step={index + 1} picks={picks} decision={d.id} /></div>
       </Section>
 
-      {!!d.advice.length && (
-        <Section big title="Your advisers">
-          <div className="grid gap-2.5 sm:grid-cols-2">{d.advice.map((a) => <AdviceCard key={a.role + a.argues} c={c} a={a} option={label(a.argues)} full={advice} />)}</div>
-          {d.advice.some((a) => a.short) && <More on={advice} set={setAdvice} />}
-        </Section>
-      )}
+      <Advisers d={d} label={label} chosen={chosen} onPick={choose} />
 
       <Section big title={decided ? "Your decision" : "What do you do?"}>
         <div className="space-y-2" role="radiogroup">
           {d.options.map((o) => {
-            const on = (pick?.option ?? option) === o.id; // the pick wins: this step can be on screen twice (tab and card)
-            const short = !decided && w.budget + (o.effect.budget ?? 0) < 0;
+            const on = chosen === o.id; // the pick wins: this step can be on screen twice (tab and card)
+            const cost = costOf(o.id);
+            const short = !decided && !affordable(o.id);
+            const down = o.preview.down.filter((t) => t !== MONEY_CHIP);
             return (
               <button
                 key={o.id}
@@ -281,40 +407,53 @@ export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: num
                 aria-checked={on}
                 disabled={decided || short}
                 onClick={() => setOption(o.id)}
-                className={cn("block w-full rounded-lg border p-3 text-left transition-colors", on ? "border-gold bg-hover" : "border-line bg-raised hover:border-line-strong", (decided || short) && !on && "opacity-50")}
+                className={cn("block w-full rounded-xl border p-4 text-left transition-colors", on ? "border-gold bg-hover" : "border-line bg-raised hover:border-line-strong", (decided || short) && !on && "opacity-50")}
               >
-                <div className="flex items-center gap-2 text-[14px] font-medium">{on && <Check className="size-3.5 text-gold-bright" />}{o.label}</div>
-                <p className="mt-0.5 text-[12.5px] text-muted">{o.detail}</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-2 text-[15px] font-medium">{on && <Check className="size-4 shrink-0 text-gold-bright" />}{o.label}</div>
+                  <div className="shrink-0 text-right">
+                    <div className={cn("tnum font-mono text-[14px]", cost > 0 ? "text-fg" : "text-pos")}>{cost > 0 ? usd(cost) : "Free"}</div>
+                    {!decided && cost > 0 && !short && <div className="tnum text-[11px] text-faint">leaves {short$(w.budget - cost)}</div>}
+                  </div>
+                </div>
+                <p className="mt-1 text-[13px] text-muted">{o.detail}</p>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
                   {o.preview.up.map((t) => <Chip key={t} up>{t}</Chip>)}
-                  {o.preview.down.map((t) => <Chip key={t} up={false}>{t}</Chip>)}
-                  {!o.preview.up.length && !o.preview.down.length && <span className="text-[11px] text-faint">No immediate change</span>}
+                  {down.map((t) => <Chip key={t} up={false}>{t}</Chip>)}
+                  {!o.preview.up.length && !down.length && <span className="text-[11px] text-faint">No immediate change</span>}
                   {short && <span className="text-[11px] text-neg">You no longer have the money for this</span>}
                 </div>
+                <Backers memos={memos} option={o.id} />
               </button>
             );
           })}
         </div>
-        {!decided && (
-          <>
-            <textarea
-              value={why}
-              onChange={(e) => setWhy(e.target.value)}
-              rows={2}
-              placeholder="Why? One or two sentences on what in the situation drives your choice."
-              className="mt-3 w-full resize-none rounded-lg border border-line-strong bg-raised p-3 text-[13.5px] outline-none placeholder:text-faint focus:border-gold"
-            />
-            <Button variant="primary" className="mt-3" disabled={!option || why.trim().length < 10} onClick={() => decide(d.id, { option, why: why.trim() })}>Decide</Button>
-          </>
-        )}
-        {decided && <p className="mt-3 text-[13px] text-muted">Your reasoning: {pick.why}</p>}
       </Section>
+
+      {!decided && (
+        // Pinned to the bottom of whatever scrolls (the Case tab, or the decision card): the choice and the button stay in reach.
+        <div className="sticky bottom-0 z-10 flex items-center gap-4 rounded-b-xl border-t border-line-strong bg-surface/95 px-5 py-3 backdrop-blur">
+          <div className="min-w-0 flex-1">
+            {option ? (
+              <>
+                <div className="text-[11px] font-medium tracking-wide text-muted uppercase">Your choice</div>
+                <div className="truncate text-[14px] font-medium text-fg">{label(option)}</div>
+              </>
+            ) : (
+              <div className="text-[13px] text-muted">Choose an option, or follow one of your advisers.</div>
+            )}
+          </div>
+          {option && <div className="tnum shrink-0 font-mono text-[13px] text-soft">{costOf(option) > 0 ? usd(costOf(option)) : "Free"}</div>}
+          <Button variant="primary" disabled={!option} onClick={() => { setFresh(true); decide(d.id, { option }); }}>Decide</Button>
+        </div>
+      )}
 
       {decided && (
         <>
           <Section big title="What changed">
+            <Moved c={c} before={w} s={changeAt(c, picks, d)} fresh={fresh} />
             <Changes c={c} s={changeAt(c, picks, d)} />
-            <Button className="mt-4" onClick={() => { useCase.setState({ card: false }); useGame.getState().go("map"); }}><MapIcon className="size-3.5" /> See it on the map</Button>
+            <Button className="mt-4" onClick={() => { useCase.setState({ card: false }); useGame.getState().select({ filter: decisionFilter(d.id), district: null }); useGame.getState().go("map"); }}><MapIcon className="size-3.5" /> See it on the map</Button>
           </Section>
           <Section big title="What the real campaign did">
             <p className="text-[13px] text-muted">{d.taken === null ? "Not one of your options" : d.taken === pick.option ? "The same call you made" : "A different call"}</p>
@@ -375,7 +514,7 @@ function Debrief({ c }: { c: Case }) {
               <div key={d.id} className="rounded-lg border border-line bg-raised p-4">
                 <div className="flex justify-between gap-3 text-[14px]"><span className="font-medium">{i + 1}. {d.title}</span><span className="shrink-0 text-[11.5px] text-gold">{SKILLS[d.skill]}</span></div>
                 <div className="mt-2 grid gap-1 text-[13px] text-muted">
-                  <div>You: <span className="text-soft">{you?.label ?? "No decision"}</span>{picks[d.id]?.why && <span> · {picks[d.id].why}</span>}</div>
+                  <div>You: <span className="text-soft">{you?.label ?? "No decision"}</span></div>
                   <div>The real campaign: <span className="text-soft">{they?.label ?? "Something not on the list"}</span>{you && they && you.id === they.id && <span className="text-pos"> · the same call</span>}</div>
                 </div>
                 <div className="mt-3 space-y-3 border-t border-line pt-3">

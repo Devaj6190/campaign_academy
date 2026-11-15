@@ -52,12 +52,11 @@ export type Option = {
 };
 
 /**
- * One adviser's argument for one option, from what was known at the decision date. The tool itself never advises.
- * `on-record`: the person is documented as holding this position, and `sources` say where.
- * `predicted`: written for this exercise from the person's role and documented record. Not a quotation.
- * A real name appears only where the record names that person in that role.
+ * What a real adviser argued at a decision, as the record documents it, with `sources` saying where. Backend only: the
+ * evals (#28) give an agent that person's role and score it against `argues`. Never shown on screen and never sent to
+ * an agent: each of these argued for the real campaign's choice, so it is part of the record, like `taken`.
  */
-export type Advice = { name?: string; role: string; argues: string; says: string; /** As `Claim.short`, for `says`. */ short?: string; basis: "on-record" | "predicted"; sources: string[] };
+export type Advice = { name: string; role: string; argues: string; says: string; sources: string[] };
 
 export type Decision = {
   id: string;
@@ -71,7 +70,8 @@ export type Decision = {
   situation: Claim[];
   constraints: { daysLeft: number; cashOnHand?: number; notes?: string[] };
   options: Option[];
-  advice: Advice[];
+  /** Sourced advisers for the evals (#28). Backend only; see `Advice`. */
+  advice?: Advice[];
   // --- the record, shown at the debrief ---
   /** The option closest to what the campaign did. Null when they did something not on the list. */
   taken: string | null;
@@ -164,7 +164,7 @@ export function missingSources(c: Case): string[] {
     ...c.platform.flatMap((p) => [p, ...(p.likedBy ? [p.likedBy] : []), ...(p.dislikedBy ? [p.dislikedBy] : []), ...(p.reactions ?? [])]),
     ...c.start.basis,
     ...c.close.notes,
-    ...c.decisions.flatMap((d) => [...(d.since?.notes ?? []), ...d.situation, ...d.did, ...d.followed, ...d.saidAfter, ...d.advice.filter((a) => a.basis === "on-record")]),
+    ...c.decisions.flatMap((d) => [...(d.since?.notes ?? []), ...d.situation, ...d.did, ...d.followed, ...d.saidAfter, ...(d.advice ?? [])]),
     { sources: c.resultSources },
     ...c.press.map((p) => ({ sources: [p.source] })),
     ...c.finance.map((f) => ({ sources: [f.source] })),

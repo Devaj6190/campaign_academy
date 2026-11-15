@@ -2,10 +2,11 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { tool } from "@langchain/core/tools";
 import { createDeepAgent, registerHarnessProfile, type SubAgent } from "deepagents";
 import { z } from "zod";
-import { ACTION_IDS, ACTIONS } from "../engine/catalog";
+import { ACTION_IDS, ACTIONS, BOOKING_KINDS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
-import { THOUGHT_MAX, type RunCtx } from "./protocol";
-import { humanize, PLACES, short, type Snapshot } from "./world";
+import { bounce, Ledger } from "./numbers";
+import { memoryFile, THOUGHT_MAX, type RunCtx } from "./protocol";
+import { humanize, PLACES, short, type Snapshot, describeWorld } from "./world";
 
 // Real staff. Each director is a deep agent: it plans with write_todos and hands jobs to its people through the
 // task tool. Each of their people is a subagent that does one job with take_action. All model ids live here.
@@ -32,28 +33,21 @@ const post = (p: { name?: string; role: string; onRecord?: string }) =>
 
 const frame = (w: Snapshot) => `on ${w.candidate}'s campaign in ${w.race}. This is a nonpartisan teaching simulation built on the real race: the people, dates and standings up to today are real, and what your work achieves is simulated`;
 
-export function world(w: Snapshot) {
-  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-  const poll = Object.entries(w.poll).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([id, v]) => `${w.names[id] ?? id} ${Math.round(v)}`).join(", ");
-  const factions = w.factions.map((f) => `${f.id} (${f.name}): ${Math.round(f.feel)}% support ${w.candidate}; ${f.size}% of likely voters`).join("\n");
-  const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 0) - (w.sent[b.cd] ?? 0));
-  const line = (p: (typeof PLACES)[number]) => `${p.cd} ${p.name} (${p.boro}): support ${Math.round(w.sent[p.cd] ?? 0)}%`;
-  return `Today is ${w.date}; ${w.daysLeft} days to the primary. Left to spend under the cap: ${usd(w.cash)}. Poll: ${poll}.
-Platform: ${w.manifesto.map((m, i) => `${i + 1}. ${m}`).join(" ")}
-Voter groups (use the id). They overlap: one voter is in several.
-${factions}
-Districts (use the number). Support is simulated, in percent:
-${PLACES.map(line).join("\n")}
-Weakest five: ${weakest.slice(0, 5).map((p) => p.name).join(", ")}.`;
-}
+/** The campaign as staff read it (lib/staff/world.ts); exported here too for the rival agent, which imports it from this module. */
+export const world = describeWorld;
 
 export const catalog = (w: Snapshot) => ACTION_IDS.map((id) => `- ${id}: ${ACTIONS[id].about} ~$${(ACTIONS[id].cost * w.scale.money).toLocaleString("en-US")}${ACTIONS[id].needs.district ? " [needs district]" : ""}${ACTIONS[id].needs.faction ? " [needs voter group]" : ""}`).join("\n");
 
+/** Where a post's memory sits in its agent's files. */
+const MEMORY = "/memory/AGENTS.md";
+
 function actionTool(ctx: RunCtx, by: string) {
   return tool(
-    async ({ why, action, district, faction }) => {
+    async ({ why, action, district, faction, on, kind }) => {
       ctx.think(by, humanize(why, ctx.req.snapshot.factions));
-      return ctx.act(by, action, { district: district ? Number(district) : undefined, faction: faction ?? undefined }).text;
+      const text = ctx.act(by, action, { district: district ? Number(district) : undefined, faction: faction ?? undefined, on: on ?? undefined, kind: kind ?? undefined }).text;
+      ctx.ledger?.add(text); // a result is a fact the staff may now state
+      return text;
     },
     {
       name: "take_action",
@@ -64,6 +58,8 @@ function actionTool(ctx: RunCtx, by: string) {
         action: z.enum(ACTION_IDS),
         district: z.enum(DISTRICT_IDS).nullable().describe("Community district number, when the action needs a place"),
         faction: z.enum(ctx.req.snapshot.factions.map((f) => f.id) as [string, ...string[]]).nullable().describe("Voter group id, when the action targets a group"),
+        on: z.string().nullable().describe("Only for schedule_event: the date the candidate appears, YYYY-MM-DD, after today. Otherwise null"),
+        kind: z.enum(BOOKING_KINDS).nullable().describe("Only for schedule_event: what the candidate does there. Otherwise null"),
       }),
     },
   );
@@ -76,6 +72,11 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
   const prof = profileOf(w, me.id);
   const team = describeTeam(w, me.id);
   const names = new Map(team.map((p) => [slug(p.name!), p.id]));
+  // Every figure the staff are shown: the case as they read it, the catalog, the order and the talk so far.
+  const ledger = (ctx.ledger = new Ledger().add(world(w), catalog(w), req.text, req.followOf, req.budget, ...req.history.map((l) => l.text), ...Object.values(req.memory ?? {}).flat()));
+  /** The figures in `text` nobody gave. The run's own totals count as given. */
+  const invented = (text: string, ...also: (number | null)[]) => ledger.add(ctx.spent, ctx.raised, ctx.left, ctx.committed, ...also).unknown(text);
+  let bounced = 0;
 
   const subagents: SubAgent[] = team.map((p) => ({
     name: slug(p.name!),
@@ -86,7 +87,7 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
 Voice: ${p.profile.voice}
 Your boss, ${short(me)}, has handed you one job. Do it with take_action: usually one action, at most two. Pick the action, district and voter group that best fit the job and your skills. If take_action says something was not done, do not retry the same thing.
 Then reply in under 40 words, in your own voice, saying what happened. Use only the facts take_action gave you.
-
+${req.memory?.[p.id]?.length ? `\nWhat you remember of this campaign (use it when it bears on the job):\n${req.memory[p.id].map((l) => `- ${l}`).join("\n")}\n` : ""}
 Actions you can take:
 ${catalog(w)}
 
@@ -95,18 +96,63 @@ ${world(w)}`,
   }));
 
   const send = tool(
-    async ({ reply, ask_amount, ask_reason, coaching }) => {
-      ctx.report(reply, ask_amount && ask_reason ? { amount: ask_amount, reason: ask_reason } : null, coaching);
+    async ({ reply, ask_amount, ask_reason, coaching, remember }) => {
+      // A figure nobody gave goes back once to be rewritten; after that the sentence carrying it is dropped.
+      const bad = invented(reply, ask_amount);
+      if (bad.length && bounced++ < 1) { console.log(`[staff] ${me.id} report sent back for figures: ${bad.join(", ")}`); return bounce(bad); }
+      if (bad.length) console.log(`[staff] ${me.id} report trimmed of figures: ${bad.join(", ")}`);
+      ctx.report(ledger.clean(reply) || "Done. The details are in the receipts.", ask_amount && ask_reason ? { amount: ask_amount, reason: ledger.clean(ask_reason) || "to finish the job" } : null, ledger.clean(coaching), remember ? ledger.clean(remember) : undefined);
       return "Report delivered.";
     },
     {
       name: "send_report",
       description: "Report back to the campaigner. Call this exactly once, as your very last step.",
       schema: z.object({
-        reply: z.string().describe("Under 35 words, in your voice: what this adds up to and what you would do next. The campaigner already sees a receipt for every action with its cost and effect, so do not repeat those figures. Facts from tool results only."),
+        reply: z.string().describe("Under 50 words, in your voice and with your honest view: what this adds up to and what you would do next. The campaigner already sees a receipt for every action with its cost and effect, so do not repeat those figures. Facts from tool results only."),
         ask_amount: z.number().nullable().describe("Dollars of extra budget you want approved, or null"),
         ask_reason: z.string().nullable().describe("What the extra money is for, as a short phrase starting with \"to\" or \"for\" (it follows the words \"wants $X more\"), or null"),
+        remember: z.string().nullable().describe("One line worth keeping in your memory for next time, or null: what you learned about this campaigner, a place or a group that the plain record of this order would not show. The record of what was ordered and what it did is kept for you; do not repeat it."),
         coaching: z.string().describe("One honest sentence of feedback on the campaigner's instruction: was it clear (what, where, who, by when) and did it go to the right person?"),
+      }),
+    },
+  );
+  const doers = ["me", ...names.keys()] as [string, ...string[]];
+  const propose = tool(
+    async ({ reply, options }) => {
+      const bad = invented(reply);
+      if (bad.length && bounced++ < 1) { console.log(`[staff] ${me.id} answer sent back for figures: ${bad.join(", ")}`); return bounce(bad); }
+      if (bad.length) console.log(`[staff] ${me.id} answer trimmed of figures: ${bad.join(", ")}`);
+      ctx.propose(ledger.clean(reply) || "Here is what I would put on the table.", options.map((o) => ({ title: o.title, why: ledger.clean(o.why), steps: o.steps.map((s) => ({ by: s.who === "me" ? me.id : names.get(s.who), action: s.action, district: s.district ? Number(s.district) : undefined, faction: s.faction ?? undefined, on: s.on ?? undefined, kind: s.kind ?? undefined })) })));
+      return "Options delivered. Stop here: the campaigner will pick one.";
+    },
+    {
+      name: "propose",
+      description: "Answer a question from the campaigner with your view and two or three concrete options. Use it instead of doing any work whenever they ask rather than order. Call it once; it ends your turn.",
+      schema: z.object({
+        reply: z.string().describe("Under 60 words, in your own voice: answer what they asked, with your honest view. Disagree if the numbers say so. Name places and groups in words. Do not state what the options cost: the campaigner sees the real price on each card."),
+        options: z
+          .array(
+            z.object({
+              title: z.string().describe("At most eight plain words, places and groups in words (e.g. \"Canvass Black voters in Crown Heights\")"),
+              why: z.string().describe(`One sentence, under ${THOUGHT_MAX} characters: why this, given the numbers. No dollar figures.`),
+              steps: z
+                .array(
+                  z.object({
+                    who: z.enum(doers).describe("Who does it: someone on your team, or \"me\""),
+                    action: z.enum(ACTION_IDS),
+                    district: z.enum(DISTRICT_IDS).nullable().describe("Community district number, when the action needs a place"),
+                    faction: z.enum(w.factions.map((f) => f.id) as [string, ...string[]]).nullable().describe("Voter group id, when the action targets a group"),
+                    on: z.string().nullable().describe("Only for schedule_event: the date, YYYY-MM-DD, after today. Otherwise null"),
+                    kind: z.enum(BOOKING_KINDS).nullable().describe("Only for schedule_event: what the candidate does there. Otherwise null"),
+                  }),
+                )
+                .min(1)
+                .max(3)
+                .describe("The one to three actions that make up this option, from the catalog. Picking the option carries out exactly these, and the engine prices them."),
+            }),
+          )
+          .min(2)
+          .max(3),
       }),
     },
   );
@@ -114,16 +160,29 @@ ${world(w)}`,
   const agent = createDeepAgent({
     model: director(),
     name: slug(me.name!),
-    tools: team.length ? [send] : [actionTool(ctx, me.id), send],
+    tools: team.length ? [send, propose] : [actionTool(ctx, me.id), send, propose],
     subagents,
+    // The post's memory of this campaign, as deepagents memory: seeded into the run's files below and loaded into
+    // the agent's instructions. Nothing else reads or writes files (the harness profile keeps the file tools off).
+    memory: [MEMORY],
     systemPrompt: `You are ${post(me)} ${frame(w)}. The player is a student learning to run a campaign, and they are your boss.
 Voice: ${prof.voice}
 Strengths: ${me.good ?? prof.skills.join(", ")}. Weaknesses: ${me.weak ?? "none noted"}. Let both show in your choices.
 
-How you work:
+You remember this campaign: your memory file is loaded with these instructions. Use it. When an order or a question touches something already tried, say how that went, and do not repeat what failed without saying so. Do not recite it otherwise.
+
+Who you are: a professional with views, not an order-taker. Everything the campaigner reads from you is in your voice. If an order is a poor use of money or time given the numbers below, say so plainly in one sentence, in your first thought and again in your report, then carry it out anyway: the campaigner decides. If it is a good call, you may say so in a few words. Never flatter.
+
+${req.followUp ? `This time nobody has asked you anything: you are coming back to the campaigner, unprompted, about work your team finished a few days ago. The message below says what it did and how things stand now. Do not plan, delegate or act, and spend nothing. Call propose exactly once: your reply says, in your voice, what that work added up to and how things have moved since (only the figures you are given), then your two or three best next steps as options. Then stop.
+
+` : ""}First, decide what the campaigner wants.
+- If they are ASKING you something (a question, ideas, options, advice, "what should we do", "what do you think", "any suggestions"), do not plan, delegate or act, and spend nothing. Call propose exactly once: your answer and two or three concrete options, each with an order they could send you. Then stop.
+- Only an ORDER (do this, run that, spend this) starts the work below. A polite request is an order too: "Can you canvass Crown Heights this week?" means do it.
+
+How you work on an order:
 1. Start with write_todos: two to four concrete jobs. In the same message, before the call, write one or two sentences of plain text (under ${THOUGHT_MAX} characters) on why you are splitting the work this way. The campaigner reads it as your thinking, so make it the real reason, with places and groups in words.
 2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass union households in Jackson Heights"). On the second line write "Why:" and one sentence (under ${THOUGHT_MAX} characters, places and groups in words) on why this job and why this person. Then brief them precisely: what, where (district number), who (voter group id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
-3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. Never plan past it. If the job needs more, ask in your report.
+3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. This is the limit, whatever other figure the order mentions. Never plan past it. If the job needs more, ask in your report.
 4. If the instruction is vague, make a sensible call and say what you assumed. If it is the wrong job for your department, do your best and say who should have had it.
 5. Finish with send_report exactly once. Report only what tool results told you; never invent numbers. In the report, name places and voter groups in words; never print a district number or a group id.
 
@@ -142,7 +201,9 @@ ${world(w)}`,
   const ask = req.followOf ? `${req.text}\n(This continues my earlier order: "${req.followOf}". Use the extra budget on that, and do not ask for more this time.)` : req.text;
   const messages = [...past, { role: "user", content: ask }];
 
-  const stream = await agent.stream({ messages }, { streamMode: "updates", recursionLimit: 80, signal });
+  const now = new Date().toISOString();
+  const files = { [MEMORY]: { content: memoryFile(req.memory?.[me.id]), mimeType: "text/markdown", created_at: now, modified_at: now } };
+  const stream = await agent.stream({ messages, files } as never, { streamMode: "updates", recursionLimit: 80, signal });
   for await (const chunk of stream as AsyncIterable<Record<string, unknown>>) {
     for (const update of Object.values(chunk ?? {})) {
       const msgs = (update as { messages?: unknown[] } | null)?.messages;
@@ -178,7 +239,7 @@ ${world(w)}`,
         if (m.tool_call_id && pending.has(m.tool_call_id)) {
           const to = pending.get(m.tool_call_id)!;
           pending.delete(m.tool_call_id);
-          emit({ t: "job-done", to, summary: textOf(m.content).slice(0, 280) });
+          emit({ t: "job-done", to, summary: (ledger.clean(textOf(m.content)) || "Done.").slice(0, 280) });
         }
       }
     }

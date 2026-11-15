@@ -243,13 +243,11 @@ export const mayor2013: Case = {
       options: [
         { id: "break", label: "A sharp break from the last twelve years", detail: "Income inequality is the central theme. You are the clear alternative to the incumbent's record.", preview: { up: ["Black voters", "Hispanic voters"], down: [] }, effect: { groups: { black: 2, hispanic: 2, white: 1 } } },
         { id: "manager", label: "An experienced manager", detail: "Keep what worked, fix what did not. Aimed at the middle class.", preview: { up: ["Poll standing", "White voters"], down: ["Black voters"] }, effect: { poll: { deblasio: 1 }, groups: { white: 2, black: -1 } } },
-        { id: "boroughs", label: "The outer-borough candidate", detail: "Neighbourhood services and equal treatment of the five boroughs come first.", preview: { up: ["Hispanic voters", "Union households"], down: ["White voters"] }, effect: { groups: { hispanic: 2, union: 1, white: -1 } } },
+        { id: "boroughs", label: "The outer-borough candidate", detail: "Neighbourhood services and equal treatment of the five boroughs come first.", preview: { up: ["Hispanic voters", "Union households"], down: ["Poll standing", "White voters"] }, effect: { poll: { deblasio: -1 }, groups: { hispanic: 2, union: 1, white: -1 } } },
         { id: "prek", label: "One signature policy", detail: "Run on schools and pre-kindergarten and leave the incumbent's record alone.", preview: { up: ["Poll standing", "White voters"], down: [] }, effect: { poll: { deblasio: 1 }, groups: { white: 2 } } },
       ],
       advice: [
-        { name: "John Del Cecato", role: "Media consultant", argues: "break", basis: "on-record", sources: ["tpm-brand"], short: "Proposed the tale of two cities, to make you the clear progressive.", says: "Proposed the tale of two cities as the frame, to make you the clear progressive while rivals compete for the same middle-class ground." },
-        { role: "Finance director", argues: "manager", basis: "predicted", sources: [], short: "Donors and editorial boards reward a steady hand.", says: "Donors and editorial boards reward a steady hand. A manager's pitch keeps doors open that a break from the mayor closes." },
-        { role: "Field director", argues: "boroughs", basis: "predicted", sources: [], short: "Borough fairness is a message volunteers can carry door to door.", says: "You live in Brooklyn and the front-runner is from Manhattan. Borough fairness is a message volunteers can carry door to door." },
+        { name: "John Del Cecato", role: "Media consultant", argues: "break", sources: ["tpm-brand"], says: "Proposed the tale of two cities as the frame, to make you the clear progressive while rivals compete for the same middle-class ground." },
       ],
       taken: "break",
       did: [
@@ -277,7 +275,7 @@ export const mayor2013: Case = {
           sh("You raised $240,000. Thompson raised $600,000 and Quinn $510,000.", c("You raised $240,000 in the last filing period. Thompson raised $600,000 and Quinn $510,000.", "dna-0514")),
           sh("A forum turns on Police Commissioner Kelly. Quinn would keep him; you would not.", c("After the Boston Marathon bombing, a forum turned on whether to keep Police Commissioner Ray Kelly. Quinn would keep him; you would not.", "wfuv-0425")),
         ],
-        shift: { poll: { deblasio: -2, quinn: -10, thompson: -1, liu: -3, weiner: 15 } },
+        shift: { poll: { deblasio: -2.3, quinn: -10.5, thompson: -1.4, liu: -3.3, weiner: 15 } },
       },
       situation: [
         sh("Coverage says Weiner's middle-class talk is crowding out your message.", c("Coverage says the new entrant's talk of middle-class struggles is crowding out your message.", "wnyc-lucky")),
@@ -286,15 +284,13 @@ export const mayor2013: Case = {
       ],
       constraints: { daysLeft: 111 },
       options: [
-        { id: "attack", label: "Go after him directly", detail: "Try to disqualify the new entrant before he settles in.", preview: { up: ["Poll standing"], down: [TV] }, effect: { poll: { deblasio: 1 }, budget: -150_000 } },
+        { id: "attack", label: "Go after him directly", detail: "Try to disqualify the new entrant before he settles in.", preview: { up: [], down: ["Poll standing", TV] }, effect: { poll: { deblasio: -2, weiner: 1 }, budget: -150_000 } },
         { id: "hold", label: "Leave him alone and stay on plan", detail: "Keep the campaign aimed at the incumbent's record and the front-runner. Spend nothing extra now.", preview: { up: [], down: [] }, effect: {} },
-        { id: "shift", label: "Change the message", detail: "Compete for the same outer-borough, middle-class voters he is talking to.", preview: { up: ["Poll standing", "White voters"], down: ["Black voters", "Hispanic voters"] }, effect: { poll: { deblasio: 1 }, groups: { white: 1, black: -2, hispanic: -1 } } },
+        { id: "shift", label: "Change the message", detail: "Compete for the same outer-borough, middle-class voters he is talking to.", preview: { up: ["White voters"], down: ["Poll standing", "Black voters", "Hispanic voters"] }, effect: { poll: { deblasio: -1 }, groups: { white: 1, black: -2, hispanic: -1 } } },
         { id: "early", label: "Spend early on name recognition", detail: "Start paid advertising months ahead of plan so voters know who you are before the summer.", preview: { up: ["Poll standing"], down: [TV] }, effect: { poll: { deblasio: 3 }, budget: -700_000 } },
       ],
       advice: [
-        { name: "Bill Hyers", role: "Campaign manager", argues: "hold", basis: "on-record", sources: ["spb-hyers", "gg-walzak"], short: "Recommended staying with the plan when the candidate considered spending more.", says: "When the candidate, trailing, considered speeding up and spending more to raise his name recognition, he recommended staying with the plan." },
-        { role: "Communications aide", argues: "attack", basis: "predicted", sources: [], short: "A direct contrast gets you into every story written about him.", says: "He is taking your oxygen every day. A direct contrast gets you into every story written about him." },
-        { role: "Pollster", argues: "early", basis: "predicted", sources: [], short: "You cannot win over voters who do not know your name.", says: "Nearly half of Democrats cannot rate you. You cannot win an argument with voters who do not know your name." },
+        { name: "Bill Hyers", role: "Campaign manager", argues: "hold", sources: ["spb-hyers", "gg-walzak"], says: "When the candidate, trailing, considered speeding up and spending more to raise his name recognition, he recommended staying with the plan." },
       ],
       taken: "hold",
       did: [
@@ -316,7 +312,7 @@ export const mayor2013: Case = {
       date: "2013-07-10",
       title: "A hospital is closing and there is a protest today",
       skill: "policy",
-      since: { notes: [c("Thompson has won the teachers' union endorsement and risen to 16 percent. Weiner now leads some polls.", "q-0626", "m-0725")], shift: { poll: { weiner: 10, quinn: -3, thompson: 1, liu: 1 } } },
+      since: { notes: [c("Thompson has won the teachers' union endorsement and risen to 16 percent. Weiner now leads some polls.", "q-0626", "m-0725")], shift: { poll: { weiner: 9.7, quinn: -3.5, thompson: 0.6, liu: 0.7, deblasio: -0.3 } } },
       situation: [
         sh("The state university may sell Long Island College Hospital. A judge has ordered it kept running.", c("The state university is considering selling Long Island College Hospital in Brooklyn and has diverted ambulances from it. A judge has ordered the hospital kept running.", "dna-arrest", "bkpaper-lich")),
         sh("Organised with 1199 SEIU, which endorsed you, and the nurses, who have endorsed nobody.", c("The protest is organised with 1199 SEIU, which has endorsed you, and the state nurses' association, which has not endorsed anyone yet.", "dna-arrest", "npq-lich")),
@@ -327,13 +323,8 @@ export const mayor2013: Case = {
       options: [
         { id: "speak", label: "Attend, speak, and leave when ordered", detail: "Show up for the cause and step back when police tell the crowd to disperse.", preview: { up: ["Union households"], down: [] }, effect: { poll: { deblasio: 1 }, groups: { union: 3 } } },
         { id: "arrest", label: "Join the civil disobedience and accept arrest", detail: "Stay with the hospital workers when the order comes.", preview: { up: ["Poll standing", "Union households", "Black voters"], down: ["White voters"] }, effect: { poll: { deblasio: 3 }, groups: { union: 8, black: 2, white: -1 } } },
-        { id: "courts", label: "Stay off the street and use your office", detail: "Pursue the hospital through the courts and the Public Advocate's powers.", preview: { up: ["White voters", "Union households"], down: [] }, effect: { groups: { white: 1, union: 2 } } },
-        { id: "statement", label: "Send a statement of support", detail: "Keep the day for other campaigning.", preview: { up: ["White voters"], down: ["Union households"] }, effect: { groups: { white: 1, union: -2 } } },
-      ],
-      advice: [
-        { role: "Labor liaison", argues: "arrest", basis: "predicted", sources: [], short: "The union will remember who stood with them and who stepped back.", says: "The union that endorsed you is putting its own members on the line today. They will remember who stood with them and who stepped back." },
-        { role: "Campaign counsel", argues: "courts", basis: "predicted", sources: [], short: "A court order keeps the hospital open; a photograph does not.", says: "You hold an office with standing to sue. A court order keeps the hospital open; a photograph does not." },
-        { role: "Communications aide", argues: "speak", basis: "predicted", sources: [], short: "A mayoral candidate in handcuffs is a story you do not control.", says: "Be there and be heard, but a mayoral candidate in handcuffs is a story you do not control." },
+        { id: "courts", label: "Stay off the street and use your office", detail: "Pursue the hospital through the courts and the Public Advocate's powers.", preview: { up: ["White voters", "Union households"], down: ["Poll standing"] }, effect: { poll: { deblasio: -1 }, groups: { white: 1, union: 2 } } },
+        { id: "statement", label: "Send a statement of support", detail: "Keep the day for other campaigning.", preview: { up: ["White voters"], down: ["Poll standing", "Union households"] }, effect: { poll: { deblasio: -2 }, groups: { white: 1, union: -2 } } },
       ],
       taken: "arrest",
       did: [sh("De Blasio was one of fifteen arrested. Liu and Weiner stepped back and were not.", c("De Blasio was one of fifteen people arrested outside the state university chancellor's office in Manhattan, with a Council member, two nurses' union leaders and nine hospital employees. The charge was disorderly conduct and all were released within hours. Liu and Weiner moved back into the crowd and were not arrested.", "bkpaper-lich", "dna-arrest", "npq-lich"))],
@@ -357,11 +348,6 @@ export const mayor2013: Case = {
         { id: "mail", label: "Lead with targeted mail", detail: "Mail the groups most likely to back you, and keep a smaller television buy for the last two weeks.", preview: { up: ["Poll standing", "Black voters", "Hispanic voters"], down: [TV] }, effect: { poll: { deblasio: 2 }, groups: { black: 2, hispanic: 2 }, budget: -500_000 } },
         { id: "tvnow", label: "Start television now at low weight", detail: "Lift your name recognition in July, at the cost of a thinner August.", preview: { up: ["Poll standing"], down: [TV] }, effect: { poll: { deblasio: 4 }, budget: -900_000 } },
       ],
-      advice: [
-        { name: "Bill Hyers", role: "Campaign manager", argues: "alltv", basis: "predicted", sources: ["cfb-exp"], short: "Only television reaches every constituency. A dollar of mail is a dollar off the air.", says: "The city is several separate constituencies and only television reaches all of them at once. Under a cap, a dollar of mail is a dollar off the air." },
-        { role: "Mail consultant", argues: "mail", basis: "predicted", sources: [], short: "Primary turnout is small. Mail talks to those voters and nobody else.", says: "Primary turnout is small and the voter file tells you who they are. Mail talks to them and nobody else." },
-        { role: "Pollster", argues: "tvnow", basis: "predicted", sources: [], short: "Voters who meet you in late August may already have chosen someone.", says: "You are fourth with eight weeks left. Voters who meet you in late August may already have chosen someone." },
-      ],
       taken: "alltv",
       did: [
         sh("About $3.88 million of $5.65 million paid out went to television. One $1,767 payment was mail.", c("The campaign's filings record about $3.88 million as television advertising out of about $5.65 million paid out between January 1 and September 10, 2013. One payment of $1,767 is coded as a campaign mailing.", "cfb-exp")),
@@ -383,7 +369,7 @@ export const mayor2013: Case = {
           sh("Bloomberg tells voters to pick a mayor who refuses retroactive raises.", c("Citing Detroit's bankruptcy, Mayor Bloomberg told voters to pick a mayor who would refuse retroactive raises for city workers.", "fa-detroit")),
           sh("End of July: Quinn 26 or 27. You, Thompson and Weiner at 15 to 21.", c("Polls of likely voters at the end of July: Quinn 26 or 27, with you, Thompson and Weiner between 15 and 21.", "q-0813", "m-0725")),
         ],
-        shift: { poll: { deblasio: 6, quinn: 5, thompson: 10, weiner: -9, liu: -1 }, groups: { black: 3, white: 5, hispanic: 4, union: 3 } },
+        shift: { poll: { deblasio: 5.7, quinn: 4.5, thompson: 9.6, weiner: -9.3, liu: -1.3 }, groups: { black: 3, white: 5, hispanic: 4, union: 3 } },
       },
       situation: [
         c("You need to finish in the top two to reach a runoff, or pass 40 percent to avoid one.", "cfb-ao"),
@@ -395,12 +381,10 @@ export const mayor2013: Case = {
         { id: "bio", label: "You, to camera, on your record", detail: "A biographical ad in which the candidate introduces himself.", preview: { up: ["Poll standing", "White voters"], down: [TV] }, effect: { poll: { deblasio: 4 }, groups: { white: 3 }, budget: -1_100_000 } },
         { id: "family", label: "A family member introduces you", detail: "Your teenage son speaks, naming the break from the incumbent, the tax plan and stop-and-frisk.", preview: { up: ["Poll standing", "Black voters", "White voters", "Hispanic voters"], down: [TV] }, effect: { poll: { deblasio: 6 }, groups: { black: 8, white: 12, hispanic: 8 }, budget: -1_100_000 }, synergy: { with: "positioning:break", effect: { poll: { deblasio: 3 }, groups: { black: 2, hispanic: 1 } } } },
         { id: "contrast", label: "A contrast with the front-runner", detail: "Open on term limits and her record alongside the incumbent.", preview: { up: ["Poll standing", "White voters"], down: [TV] }, effect: { poll: { deblasio: 5, quinn: -2 }, groups: { white: 4 }, budget: -1_100_000 } },
-        { id: "wait", label: "Hold all television for the last two weeks", detail: "Stay dark now and concentrate the buy at the end.", preview: { up: [], down: [] }, effect: {} },
+        { id: "wait", label: "Hold all television for the last two weeks", detail: "Stay dark now and concentrate the buy at the end.", preview: { up: [], down: ["Poll standing"] }, effect: { poll: { deblasio: -2 } } },
       ],
       advice: [
-        { name: "John Del Cecato", role: "Media consultant", argues: "family", basis: "on-record", sources: ["tpm-brand"], short: "Had the idea after the candidate's son drew press attention at the launch.", says: "Had the idea after the candidate's son drew press attention at the launch, and persuaded the candidate to pay for the ad and run it." },
-        { role: "Research director", argues: "contrast", basis: "predicted", sources: [], short: "The front-runner has never had to defend her record on air.", says: "The front-runner has never had to defend her record on air. Voters who want change need to hear why she is not it." },
-        { role: "Communications aide", argues: "bio", basis: "predicted", sources: [], short: "A child in the ad invites criticism. Let voters meet the candidate.", says: "Putting a child in front of a campaign invites criticism. Voters are choosing a mayor, so let them meet him." },
+        { name: "John Del Cecato", role: "Media consultant", argues: "family", sources: ["tpm-brand"], says: "Had the idea after the candidate's son drew press attention at the launch, and persuaded the candidate to pay for the ad and run it." },
       ],
       taken: "family",
       did: [
@@ -423,7 +407,7 @@ export const mayor2013: Case = {
       date: "2013-08-19",
       title: "The second ad, and whose voters you go after",
       skill: "voter-groups",
-      since: { notes: [sh("A federal judge rules stop-and-frisk unconstitutional and orders a monitor.", c("On August 12 a federal judge ruled stop-and-frisk unconstitutional and ordered a monitor. Thompson promised to work with the monitor without backing the Council's oversight bills.", "dna-0812"))], shift: { poll: { deblasio: 2, quinn: -3, thompson: 2, weiner: -6 } } },
+      since: { notes: [sh("A federal judge rules stop-and-frisk unconstitutional and orders a monitor.", c("On August 12 a federal judge ruled stop-and-frisk unconstitutional and ordered a monitor. Thompson promised to work with the monitor without backing the Council's oversight bills.", "dna-0812"))], shift: { poll: { deblasio: 1.7, quinn: -3.5, thompson: 1.6, weiner: -6.3, liu: -0.3 } } },
       situation: [
         sh("Black voters: Thompson 39, you 22, Quinn 18. White voters: you 39, Quinn 31, Thompson 12.", c("Among Black likely voters the August 13 poll has Thompson 39, de Blasio 22, Quinn 18. Among white likely voters: de Blasio 39, Quinn 31, Thompson 12.", "q-0813")),
         c("60 percent of likely primary voters call stop-and-frisk excessive.", "q-0813"),
@@ -436,11 +420,8 @@ export const mayor2013: Case = {
         { id: "jobs", label: "Move to jobs and the cost of living", detail: "The issues voters rank first.", preview: { up: ["Poll standing", "White voters", "Hispanic voters", "Union households"], down: [TV] }, effect: { poll: { deblasio: 4 }, groups: { white: 3, hispanic: 4, union: 3 }, budget: -1_700_000 } },
         { id: "manhattan", label: "Take liberal Manhattan from the Speaker", detail: "Leave the former Comptroller's supporters alone, with a runoff in mind.", preview: { up: ["Poll standing", "White voters"], down: [TV] }, effect: { poll: { deblasio: 4, quinn: -2 }, groups: { white: 8 }, budget: -1_700_000 } },
         { id: "repeat", label: "Keep the first ad on air", detail: "A smaller buy, and no direct contrast with any rival.", preview: { up: ["Poll standing", "Black voters", "White voters"], down: [TV] }, effect: { poll: { deblasio: 3 }, groups: { black: 3, white: 2 }, budget: -1_200_000 } },
-      ],
-      advice: [
-        { name: "Greenberg Quinlan Rosner", role: "Polling firm", argues: "frisk", basis: "predicted", sources: ["q-0813", "gqr"], short: "Six in ten primary voters call the policy excessive.", says: "Six in ten primary voters call the policy excessive, and the candidate they assume owns the issue has not taken the sharp position." },
-        { role: "Field director", argues: "jobs", basis: "predicted", sources: [], short: "At the doors people ask about rent and work.", says: "At the doors people ask about rent and work. The ruling already made your point on policing for you." },
-        { role: "Manhattan organiser", argues: "manhattan", basis: "predicted", sources: [], short: "The Speaker's voters are the easiest to move.", says: "The Speaker's voters are the easiest to move, and you may need the former Comptroller's supporters in a runoff." },
+        // Free, so the campaign can always go on however much the staff have spent (every decision has a $0 option).
+        { id: "save", label: "No second ad: save the money for the final days", detail: "Leave the first ad's goodwill to carry August and keep the cash for the closing stretch.", preview: { up: [], down: ["Poll standing"] }, effect: { poll: { deblasio: -3 } } },
       ],
       taken: "frisk",
       did: [
@@ -462,7 +443,7 @@ export const mayor2013: Case = {
 
   close: {
     notes: [c("The campaign's last large television payment before the primary, about $1 million, is dated August 28.", "cfb-exp")],
-    shift: { poll: { deblasio: 2, quinn: -8, thompson: 4, weiner: -5, liu: 1 }, groups: { black: 3, white: 4, hispanic: 4, union: 4 }, budget: -1_000_000 },
+    shift: { poll: { deblasio: 1.7, quinn: -8.5, thompson: 3.6, weiner: -5.3, liu: 0.7 }, groups: { black: 3, white: 4, hispanic: 4, union: 4 }, budget: -1_000_000 },
   },
 
   press: [

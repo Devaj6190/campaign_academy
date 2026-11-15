@@ -5,15 +5,16 @@ import { missingSources, realPath, simulate, type Case } from "./types";
 export const CASES: Case[] = [mayor2013];
 
 /**
- * The check every case has to pass: nothing is cited that is not listed, and the simulation is fitted to history,
- * meaning the real campaign's own choices finish within two points of the certified result.
+ * The check every case has to pass in the browser: nothing is cited that is not listed, and the real campaign's
+ * choices do not overspend. Whether the simulation is fitted to history is checked by `npm run check:engine`
+ * (lib/sim/check.ts): the record is fitted together with the rivals and a typical staff plan, so the record alone
+ * no longer adds up to the result.
  */
 export function checkCase(c: Case): string[] {
   const problems = missingSources(c).map((id) => `cites a source that is not listed: ${id}`);
-  const real = c.result.find((r) => r.candidate === c.follow)?.share ?? 0;
-  const sim = simulate(c, realPath(c)).poll[c.follow];
-  if (Math.abs(sim - real) > 2) problems.push(`the real campaign's choices simulate to ${sim.toFixed(1)}%, but the certified result was ${real}%`);
   if (simulate(c, realPath(c)).budget < 0) problems.push("the real campaign's choices overspend the simulated budget");
+  // The evals (#28) score an agent against what each sourced adviser argued, so that has to be one of the options.
+  for (const d of c.decisions) for (const a of d.advice ?? []) if (!d.options.some((o) => o.id === a.argues)) problems.push(`${d.id}: ${a.name} argues "${a.argues}", which is not an option`);
   // A short version may not carry a number its full sentence does not.
   const walk = (x: unknown): void => {
     if (!x || typeof x !== "object") return;

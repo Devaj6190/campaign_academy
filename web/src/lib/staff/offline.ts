@@ -1,4 +1,4 @@
-import { ACTIONS, type ActionId } from "../engine/catalog";
+import { ACTIONS, type ActionId, type BookingKind } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
 import { jitter, RunCtx, sleep } from "./protocol";
 import { findBoros, findFactions, findPlaces, PLACES, short, shortPlace, type Snapshot } from "./world";
@@ -61,12 +61,94 @@ function pickFaction(w: Snapshot, text: string, action: ActionId) {
   return [...w.factions].filter((f) => f.size >= 20).sort((a, b) => a.feel - b.feel)[0]?.id ?? w.factions[0].id;
 }
 
+/**
+ * What to book when there is no model: the kind the order names (a rally, a house party, a meeting), door knocking
+ * otherwise, as the cheapest; on the days after today, one per job, so they do not all land tomorrow.
+ */
+function bookingFor(text: string, today: string, n: number): { kind: BookingKind; on: string } {
+  const t = text.toLowerCase();
+  const kind: BookingKind = /rally|speech/.test(t) ? "rally" : /house part|fundrais/.test(t) ? "house_party" : /meet|leaders|coalition|church|forum/.test(t) ? "meeting" : "doors";
+  return { kind, on: new Date(Date.parse(today) + (n + 1) * 86_400_000).toISOString().slice(0, 10) };
+}
+
+/** Words that ask for ideas rather than work. */
+const IDEAS = /\b(ideas?|suggest(ions?)?|options?|advice|advise|thoughts|recommend(ations?)?|what do you think|your (view|take|read))\b/i;
+
+/**
+ * A question rather than an order: the campaigner wants options, not work. A polite request ("Can you canvass Crown
+ * Heights this week?", "Please run call time") is an order, unless it asks for ideas ("Can you suggest something?").
+ */
+export const isQuestion = (text: string) => {
+  const t = text.trim();
+  if (IDEAS.test(t)) return true;
+  if (/^(please\b|(can|could|would|will) (you|we)\b|let'?s\b)/i.test(t)) return false;
+  if (/\?\s*$/.test(t)) return true;
+  // A question word opens a question even without its mark. "Do", "is" or "should" open an order as often ("Do a
+  // canvass in Crown Heights"), so they need the question mark.
+  return /^(what|which|where|who|how|why)\b/i.test(t);
+};
+
+/** Without a model: two or three options from the post's usual work, aimed where the campaign is weakest. */
+function offlineProposals(ctx: RunCtx, first: string) {
+  const { req } = ctx;
+  const w = req.snapshot;
+  const actions = [...new Set([...pickActions(req.text, req.director), ...(DEFAULTS[req.director] ?? [])])].slice(0, 3);
+  const drafts = actions.map((a) => {
+    const act = ACTIONS[a];
+    const district = act.needs.district ? pickDistricts(w, req.text)[0] : undefined;
+    const faction = act.needs.faction || act.group ? pickFaction(w, req.text, a) : undefined;
+    const group = faction ? w.factions.find((f) => f.id === faction)?.name : undefined;
+    const where = [district && `in ${shortPlace(district)}`, group && `for ${group}`].filter(Boolean).join(" ");
+    return { title: cap(`${act.label.toLowerCase()} ${where}`.trim()), why: act.about, steps: [{ action: a, district, faction }] };
+  });
+  const opener = req.followUp
+    ? `${cap(first)} here, coming back about earlier work. ${req.text.match(/What it did: ([^\n]*)/)?.[1] ?? ""} ${req.text.match(/Where things stand now: ([^\n]*)/)?.[1] ?? ""} Here is what I would do next.`.replace(/\s+/g, " ")
+    : `${cap(first)} here. You asked, so here's what I'd put on the table. Pick one and I'll get moving.`;
+  ctx.propose(opener, drafts);
+}
+
+/**
+ * Carry out a picked option: exactly its steps, in order, with no planning. `say` writes the closing line in the
+ * director's own voice when there is a model; without one, or if it fails, a plain line stands.
+ */
+export async function runSteps(ctx: RunCtx, mode: "live" | "offline", say?: (results: string[]) => Promise<string>, pace = 1) {
+  const { req, emit } = ctx;
+  const steps = req.steps ?? [];
+  const wait = (ms: number) => sleep(ms * pace);
+  emit({ t: "start", mode });
+  const items = steps.map((s) => ({ title: ctx.describe(s), status: "pending" as const }));
+  emit({ t: "plan", items });
+  const results: string[] = [];
+  let failed = "";
+  for (const [i, s] of steps.entries()) {
+    emit({ t: "plan", items: items.map((it, k) => ({ ...it, status: k < i ? "completed" : k === i ? "in-progress" : "pending" })) });
+    if (s.by !== req.director) emit({ t: "delegate", to: s.by, job: items[i].title });
+    await wait(600);
+    const r = ctx.act(s.by, s.action, { district: s.district, faction: s.faction, on: s.on, kind: s.kind });
+    if (r.ok) results.push(r.text.split(" Cost ")[0]);
+    else failed = r.text;
+    await wait(600);
+    if (s.by !== req.director) emit({ t: "job-done", to: s.by, summary: r.ok ? r.text.split(" Cost ")[0] : r.text });
+  }
+  emit({ t: "plan", items: items.map((it) => ({ ...it, status: "completed" })) });
+  let text = failed ? `Not all of it went through. ${failed}` : "Done, exactly as we agreed.";
+  if (!failed && say) { try { text = (await say(results)) || text; } catch { /* the plain line stands */ } }
+  ctx.report(text, null, "");
+  emit({ t: "done" });
+}
+
 export async function runOffline(ctx: RunCtx, pace = 1) {
   const { req, emit } = ctx;
   const w = req.snapshot;
   const me = w.staff.find((s) => s.id === req.director);
   if (!me?.name) return emit({ t: "done" }); // the post is vacant now
   const first = short(me);
+  if (req.followUp || (!req.followOf && isQuestion(req.text))) {
+    emit({ t: "start", mode: "offline" });
+    await sleep(600 * pace);
+    offlineProposals(ctx, first);
+    return emit({ t: "done" });
+  }
   const team = describeTeam(w, req.director);
   const basis = req.followOf ?? req.text;
   const actions = pickActions(basis, req.director);
@@ -120,7 +202,7 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
     await wait(900);
     ctx.think(j.who, j.doing);
     await wait(700);
-    const r = ctx.act(j.who, j.a, { district: j.district, faction: j.faction });
+    const r = ctx.act(j.who, j.a, { district: j.district, faction: j.faction, ...(j.a === "schedule_event" ? bookingFor(basis, w.date, i) : {}) });
     notes.push(r.text);
     await wait(1100);
     if (j.who !== req.director) emit({ t: "job-done", to: j.who, summary: r.ok ? r.text.split(" Cost ")[0] : r.text });

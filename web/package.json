@@ -7,7 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "node scripts/copy-map-worker.mjs"
+    "postinstall": "node scripts/copy-map-worker.mjs",
+    "check:engine": "node scripts/check-engine.mjs",
+    "refit:case": "node scripts/refit-case.mjs",
+    "check:staff": "node scripts/check-staff.mjs",
+    "check:memos": "node scripts/check-memos.mjs",
+    "check:save": "node scripts/check-save.mjs",
+    "demo:start": "node scripts/demo-start.mjs"
   },
   "dependencies": {
     "@langchain/anthropic": "^1.6.5",
@@ -28,6 +34,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "jiti": "^2.7.0",
     "tailwindcss": "4.3.3",
     "typescript": "^5"
   }

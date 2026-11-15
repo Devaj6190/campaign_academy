@@ -5,7 +5,20 @@ import { STAFF, type Staff, type View } from "./data";
 // The campaign itself (money, poll, voter groups, the date, the work done) is NOT here. It lives in the case store,
 // lib/cases/store.ts, and every screen reads it from there.
 
-export type Toast = { id: number; staff: string; text: string };
+/**
+ * A notification. A staff remark has only `staff` and `text`. A result (lib/results.ts) also says who did it, what it
+ * cost or moved (`chips`) and where clicking it goes; `kind` "rival" for another campaign's move.
+ */
+export type Toast = {
+  id: number;
+  staff: string;
+  text: string;
+  kind?: "remark" | "result" | "rival";
+  name?: string;
+  role?: string;
+  chips?: { text: string; tone: "pos" | "neg" }[];
+  target?: { view: "war"; person: string } | { view: "map"; district: number };
+};
 
 type State = {
   view: View;

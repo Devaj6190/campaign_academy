@@ -4,13 +4,15 @@ import { ArrowDownRight, ArrowUp, Brain, Check, ChevronDown, CircleDollarSign, L
 import { animate, AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Fit } from "@/components/Fit";
+import { TypeOut } from "@/components/TypeOut";
 import { Avatar, Button, Dock, DockButton, Label, Meter, Section, ViewHeader } from "@/components/ui";
 import { AgentPlan, type PlanTask } from "@/components/ui21/agent-plan";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import type { Staff } from "@/lib/data";
+import { ACTIONS, BOOKING } from "@/lib/engine/catalog";
 import type { Effect } from "@/lib/engine/resolve";
 import { profileFor } from "@/lib/staff/roster";
-import { answerAsk, hire, letGo, loadCandidates, reassign } from "@/lib/staff/run";
+import { answerAsk, hire, letGo, loadCandidates, pick, reassign } from "@/lib/staff/run";
 import { useStaff, type ChatItem, type Run } from "@/lib/staff/store";
 import { FACTIONS_2013 } from "@/lib/cases/mayor2013-factions";
 import { currentCase, shortDate, shortMoney, staffMoney, useCase } from "@/lib/cases/store";
@@ -165,7 +167,7 @@ export function WarRoom() {
       return (
         <g key={p.id} transform={`translate(${q.x} ${q.y})`}>
           <circle r="38" fill="url(#foot)" />
-          <circle r="40" fill="none" stroke={c} strokeWidth={p.id === person ? 3.6 : lit ? 2.6 : 1.6} strokeOpacity={lit ? 1 : 0.55} className={cn(!!active[p.id] && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 6px ${c})` } : undefined} />
+          <circle r="40" fill="none" stroke={c} strokeWidth={p.id === person ? 3.6 : lit ? 2.6 : 1.6} strokeOpacity={lit ? 1 : 0.55} className={cn((!!active[p.id] || !!busy[p.id]) && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 6px ${c})` } : undefined} />
         </g>
       );
     });
@@ -341,6 +343,29 @@ function ModeBadge() {
   );
 }
 
+/** The money a person's latest piece of work cost or raised, popping above their node for a moment as it lands. */
+function Landed({ id }: { id: string }) {
+  const latest = useCase((s) => { for (let i = s.work.length - 1; i >= 0; i--) if (s.work[i].by === id) return s.work[i]; return undefined; });
+  // Work already there when the War room opens is old news; only what lands while it is open pops.
+  const [opened] = useState(() => latest?.id ?? 0);
+  if (!latest || latest.id <= opened) return null;
+  const net = latest.raised - latest.cost;
+  const text = latest.raised ? `+$${Math.round(latest.raised / 1000)}k raised` : latest.cost ? `−$${latest.cost.toLocaleString("en-US")}` : null;
+  if (!text) return null;
+  return (
+    <motion.span
+      key={latest.id}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: [0, 1, 1, 0], y: [4, -6, -6, -10] }}
+      transition={{ duration: 2.8, times: [0, 0.12, 0.8, 1], ease: "easeOut" }}
+      // In the room it pops over the figure's chest: above the head is where a director's name sits.
+      className={cn("tnum pointer-events-none absolute top-[22%] left-1/2 z-10 -translate-x-1/2 rounded px-2 font-mono text-[18px] leading-[26px] whitespace-nowrap shadow-[0_6px_18px_-6px_rgba(0,0,0,0.9)]", net >= 0 ? "bg-[#0d2a1c]/90 text-pos" : "bg-[#2e1210]/90 text-neg")}
+    >
+      {text}
+    </motion.span>
+  );
+}
+
 /** A person standing on the stone: placed on the floor plan, then stood upright to face the camera. */
 function Node({ id, at: where, name, role, figure, shadow, job, misfit, morale, you, selected, full, dim, unread, onClick }: { id: string; at: Pt; name?: string; role: string; figure?: string; shadow?: boolean; job?: string; misfit?: boolean; morale?: number; you?: boolean; selected?: boolean; full?: boolean; dim?: boolean; unread?: boolean; onClick?: () => void }) {
   const lv = LEVELS[where.t], q = at(lv.r, where.a);
@@ -367,6 +392,7 @@ function Node({ id, at: where, name, role, figure, shadow, job, misfit, morale, 
       {/* eslint-disable-next-line @next/next/no-img-element -- a cut-out sized by the scene, not a content image */}
       <img src={figure ?? `${ART}generic.webp`} alt="" draggable={false} className={cn("absolute bottom-0 left-1/2 h-full w-auto max-w-none -translate-x-1/2 transition-[filter,transform] duration-300 group-hover:-translate-y-0.5", !name && "opacity-80")} style={{ filter: tone }} />
       {!name && <Plus className="absolute top-[30%] left-1/2 size-4 -translate-x-1/2 text-gold" />}
+      {!you && <Landed id={id} />}
       {unread && <i className="absolute top-0 right-1 size-2.5 rounded-full border-2 border-bg bg-warm" />}
       {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute top-0 left-1 size-2.5 rounded-full border-2 border-bg bg-neg" />}
       {/*
@@ -399,6 +425,28 @@ function Node({ id, at: where, name, role, figure, shadow, job, misfit, morale, 
   );
 }
 
+/** The candidate's calendar: what staff have booked him for, and what came of each once its day has passed. */
+function Calendar() {
+  const bookings = useCase((s) => s.bookings);
+  if (!bookings.length) return null;
+  const ahead = bookings.filter((b) => !b.done).sort((a, b) => a.date.localeCompare(b.date));
+  const past = bookings.filter((b) => b.done).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+  const row = (b: (typeof bookings)[number]) => (
+    <li key={b.id} className="flex gap-2.5 text-[12px] leading-snug">
+      <span className="tnum w-[44px] shrink-0 pt-px font-mono text-[10.5px] text-faint">{shortDate(b.date)}</span>
+      <span className="min-w-0 flex-1">
+        <span className={b.done ? "text-muted" : "text-soft"}>{BOOKING[b.kind].label[0].toUpperCase()}{BOOKING[b.kind].label.slice(1)} in {shortPlace(b.cd)}</span>
+        {b.done && <span className={cn("block text-[11.5px]", /^(Cancelled|Dropped)/.test(b.done) ? "text-neg" : "text-muted")}>{b.done}</span>}
+      </span>
+    </li>
+  );
+  return (
+    <Section title="Candidate's calendar" right={<span className="text-[10.5px] text-faint">{ahead.length ? `${ahead.length} booked` : "Nothing ahead"}</span>}>
+      <ol className="space-y-2">{ahead.map(row)}{past.map(row)}</ol>
+    </Section>
+  );
+}
+
 function Overview({ pick }: { pick: (id: string) => void }) {
   const staff = useGame((s) => s.staff);
   const spent = staffMoney(useCase((s) => s.work)).spent;
@@ -418,6 +466,7 @@ function Overview({ pick }: { pick: (id: string) => void }) {
           ))}
         </div>
       </Section>
+      <Calendar />
       <Section title="Direct reports">
         <div className="-mx-2">
           {staff.filter((p) => !p.boss).map((p) => (
@@ -488,7 +537,8 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
   // The plan is a live checklist: shown while an order runs. Once the report is in, the order card says it all.
   const plan = useMemo(() => (thinking ? toPlan(runs?.slice(0, 1), staff) : []), [thinking, runs, staff]);
   const lastSuggest = [...(chat ?? [])].reverse().find((c): c is Extract<ChatItem, { k: "them" }> => c.k === "them" && !!c.suggest)?.suggest;
-  const ideas = [...(lastSuggest ? [lastSuggest] : []), ...ideasFor(p)].slice(0, 3);
+  // The post's last suggestion can be one of the stock ideas; each idea is offered once.
+  const ideas = [...new Set([...(lastSuggest ? [lastSuggest] : []), ...ideasFor(p)])].slice(0, 3);
   const rows = useMemo(() => group(chat ?? []), [chat]);
   const lastOrder = rows.findLast((r) => r.order)?.order;
   // Ideas help at the start, and right after a report when the student is deciding what next.
@@ -633,7 +683,7 @@ function OrderCard({ rows, id, latest, onSuggest }: { rows: Row[]; id: string; l
   const effects = rows.flatMap((r) => (r.c.k === "receipt" ? [r.c.effect] : []));
   // What the director says while working comes before the receipts; the report and coaching close the card.
   const said = rows.filter((r) => r.c.k === "them" || r.c.k === "note");
-  const closing = rows.filter((r) => r.c.k === "report" || r.c.k === "coach");
+  const closing = rows.filter((r) => r.c.k === "report" || r.c.k === "coach" || r.c.k === "proposals");
   const reported = closing.some((r) => r.c.k === "report");
   const staff = useGame((s) => s.staff);
   const misfits = effects.filter((e) => !e.fit).map((e) => { const p = staff.find((x) => x.id === e.by); return `${e.label} went to ${p ? short(p) : "someone"}`; });
@@ -660,12 +710,13 @@ function OrderCard({ rows, id, latest, onSuggest }: { rows: Row[]; id: string; l
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="max-w-[88%] rounded-xl bg-gold px-3 py-2 text-[13px] leading-snug text-bg">{order.text}</motion.div>
         </div>
       )}
+      {order?.budget !== undefined && <p className="tnum -mt-1 text-right font-mono text-[10.5px] text-muted">Budget for this order: ${order.budget.toLocaleString("en-US")}</p>}
       {thoughts && <Thoughts c={thoughts} latest={latest} />}
       {said.map((r) => <ChatRow key={r.i} c={r.c} index={r.i} id={id} latest={false} onSuggest={onSuggest} />)}
       {/* Until the report is in, each action shows as it lands; after, they fold into the report's totals line. */}
       {!reported && !!effects.length && <div className="space-y-px border-l border-line pl-1.5">{effects.map((e, i) => <ReceiptLine key={i} e={e} />)}</div>}
       {closing.map((r) =>
-        r.c.k === "coach" ? <CoachLine key={r.i} c={r.c} misfits={misfits} /> : r.c.k === "report" ? <Reply key={r.i} c={r.c} index={r.i} id={id} effects={effects} /> : null,
+        r.c.k === "coach" ? <CoachLine key={r.i} c={r.c} misfits={misfits} /> : r.c.k === "report" ? <Reply key={r.i} c={r.c} index={r.i} id={id} effects={effects} /> : r.c.k === "proposals" ? <Proposals key={r.i} c={r.c} index={r.i} id={id} /> : null,
       )}
     </div>
   );
@@ -705,7 +756,7 @@ function Reply({ c, index, id, effects }: { c: Extract<ChatItem, { k: "report" }
   const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
   return (
     <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start">
-      <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft">{c.text}</div>
+      <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft"><TypeOut id={`report-${id}-${c.run ?? index}`} text={c.text} /></div>
       <div className="tnum mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-1 font-mono text-[10.5px] text-muted">
         <span>Spent <span className="text-neg">{usd(c.spent)}</span></span>
         {!!c.raised && <span>Raised <span className="text-pos">{usd(c.raised)}</span></span>}
@@ -730,6 +781,50 @@ function Reply({ c, index, id, effects }: { c: Extract<ChatItem, { k: "report" }
         ) : (
           <span className={cn("mt-1 pl-1 text-[11px]", c.state === "approved" ? "text-pos" : "text-muted")}>{c.state === "approved" ? "Approved" : "Declined"}: {usd(c.ask.amount)} more {c.ask.reason}</span>
         ))}
+    </motion.div>
+  );
+}
+
+/** The director's answer to a question, and its options as cards. Picking one sends its order; nothing is spent before. */
+function Proposals({ c, index, id }: { c: Extract<ChatItem, { k: "proposals" }>; index: number; id: string }) {
+  const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
+  const staff = useGame((s) => s.staff);
+  const done = c.picked !== undefined;
+  // While the director is on another job, an option cannot start: the buttons wait.
+  const busy = useStaff((s) => !!s.active[id]);
+  return (
+    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start">
+      <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft">{c.text}</div>
+      <div className="mt-2 w-full space-y-1.5">
+        {c.options.map((o, i) => {
+          const chosen = c.picked === i;
+          return (
+            <div key={i} className={cn("rounded-lg border p-2.5 transition-colors", chosen ? "border-gold bg-hover" : "border-line bg-raised", done && !chosen && "opacity-45")}>
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-[13px] font-medium">{chosen && <Check className="size-3.5 shrink-0 text-gold-bright" />}{o.title}</div>
+                  {o.why && <p className="mt-0.5 text-[11.5px] leading-snug text-muted">{o.why}</p>}
+                  <ul className="mt-1.5 space-y-0.5">
+                    {o.steps.map((st, k) => {
+                      const who = staff.find((x) => x.id === st.by);
+                      const group = st.faction ? FACTIONS_2013.find((f) => f.id === st.faction)?.name : undefined;
+                      const what = st.action === "schedule_event" ? `Book the candidate: ${BOOKING[st.kind ?? "rally"].label}` : ACTIONS[st.action].label;
+                      return <li key={k} className="text-[11px] leading-snug text-faint">{what}{st.district ? ` · ${shortPlace(st.district)}` : ""}{group ? ` · ${group}` : ""}{who ? ` · ${short(who)}` : ""}</li>;
+                    })}
+                  </ul>
+                </div>
+                <span className="tnum shrink-0 font-mono text-[11px] text-warm" title="The engine's price for exactly these steps">{usd(o.cost)}</span>
+              </div>
+              {!done && (
+                <Button size="sm" variant="primary" className="mt-2" disabled={busy} title={busy ? "Still on the last job" : undefined} onClick={() => pick(id, index, i)}>
+                  <Check className="size-3.5" />Do this
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {!done && <span className="mt-1 pl-1 text-[11px] text-faint">{busy ? "Still on the last job: pick one when the report is in." : "Each price is exact for the steps listed. Nothing is spent until you pick one, or give your own order."}</span>}
     </motion.div>
   );
 }
@@ -773,6 +868,7 @@ function ChatRow({ c, index, id, latest, onSuggest }: { c: ChatItem; index: numb
     );
   if (c.k === "receipt") return <Receipt e={c.effect} />;
   if (c.k === "report") return <Report c={c} index={index} id={id} />;
+  if (c.k === "proposals") return <Proposals c={c} index={index} id={id} />;
   return <Coach c={c} />;
 }
 
@@ -911,9 +1007,9 @@ function Vacancy({ p }: { p: Staff }) {
           {box?.list.map((o, i) => (
             <motion.div key={o.name} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0, transition: { delay: i * 0.06 } }} className="rounded-lg border border-line bg-raised p-3">
               <div className="flex items-center gap-3">
-                <Avatar name={`Applicant ${i + 1}`} size={34} />
+                <Avatar name={o.name} size={34} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-medium">Applicant {i + 1}</div>
+                  <div className="text-[13px] font-medium">{o.name}</div>
                 </div>
                 <Button size="sm" onClick={() => hire(p.id, o)}>Hire</Button>
               </div>

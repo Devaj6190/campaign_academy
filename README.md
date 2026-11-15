@@ -36,7 +36,7 @@ flowchart LR
 1. **Briefing.** The race on a real date: who is running, the rules, the money, the polls.
 2. **Decision.** A real moment the campaign faced, on its real date. The clock stops and a decision card opens. What the world did since your last decision is real: rivals enter, scandals break, courts rule.
 3. **You decide.** The campaign's advisers argue for different options. Each option shows a small preview of what it will move, up or down, and nothing more. Once you have chosen you see what the real campaign did at that point.
-4. **The calendar runs.** Days pass towards the next decision. You give the staff work in plain language and they plan it, hand it down and report back. You can send the candidate out in person, and add planks to the platform. The other candidates make moves of their own. On mornings with news the clock pauses for the paper.
+4. **The calendar runs.** Days pass towards the next decision. You give the staff work in plain language and they plan it, hand it down and report back. You can send the candidate out in person, and add planks to the platform. The other candidates make moves of their own. On mornings with news the clock pauses and the paper's notice glows until you read it or put it aside.
 5. **Election night.** On primary day the count comes in across the city's Assembly Districts. Then the debrief: your result against the threshold you needed, the certified real result, and, decision by decision, how the real campaign's choices turned out.
 
 ---
@@ -62,8 +62,8 @@ The simulation is grounded in the record and is not a replay of it. The six deci
 - **The real campaign's choice is shown only after you decide.** Once you have chosen, you see what they did at that point. How it turned out for them is held to the end, so later events are not spoiled.
 - **Decisions are never on a timer.** The clock stops at a decision and stays stopped until you choose.
 - **The real choice is not always the right one.** Luck and rivals' mistakes are part of the record and are shown as such.
-- **No invented person sits in a real campaign.** A real name appears only where the record names that person in that post. Every other post is shown by its title.
-- **Poll numbers and inferences are kept apart.** How large a voter group is and how it polled are real figures. What a group is likely to value is inferred, and is stored and labelled separately.
+- **A real name is always sourced.** A real person appears in a post only where the record names them in it, and the War room cites that source. The rest of the staff are invented people, so the student has a full team to direct.
+- **Poll numbers and inferences are kept apart.** How large a voter group is and how it polled are real figures. What a group is likely to value, and so which groups pull together or apart, is inferred and stored separately. The Factions screen is the one place that shows real, simulated and inferred figures side by side without tags.
 - **Cases are chosen for the lesson.** Not for who won or what they believed. Party primaries are preferred because the contest is inside one party.
 
 ---
@@ -107,10 +107,10 @@ A case is a data file. Adding a case means researching and writing one more file
 | **Case** | The briefing, each decision you have reached, and the debrief |
 | **Profile** | The real candidate and race as of your date: record, platform (each plank dated and cited), and the planks you add |
 | **War room** | The campaign's staff. You give orders in plain language and watch the work travel down and back |
-| **Map** | The city: where your campaign is stronger or weaker, the candidate's own appearances, and on primary day the count as it comes in |
-| **Factions** | The voter groups the polls reported: how large each is and where you stand with it |
+| **Map** | The city: where your campaign is stronger or weaker, which districts your last decision moved, the candidate's own appearances, and on primary day the count as it comes in |
+| **Factions** | The voter groups the polls reported: how large each is, where you stand with it, what it is likely to want, and which groups pull together or against each other |
 
-The top bar holds the money (spent, left under the cap, raised), the poll, the date and the clock. Hovering the poll lists what each rival is doing, and it glows when one of them has done something you have not read. The morning paper opens from the sidebar and on mornings with news.
+The top bar holds the money (spent, left under the cap, raised), the poll, the date and the clock. Hovering the poll lists what each rival is doing, and it glows when one of them has done something you have not read. The morning paper opens from the sidebar. On a morning with news the clock pauses and a notice glows in the corner until you open the paper or put it aside.
 
 ---
 
@@ -126,5 +126,4 @@ One deep case first, then four that each add a different lesson. The shortlist a
 
 - How strong staff work and rival moves should be next to the decisions. The current sizes are first guesses.
 - Whether the student can replay the same race from another campaign's side.
-- How the student's reasoning at each decision is used afterwards.
 - The named user: high school or college, in class or solo.

@@ -1,4 +1,5 @@
-import { runOffline } from "@/lib/staff/offline";
+import { profileOf } from "@/lib/engine/resolve";
+import { runOffline, runSteps } from "@/lib/staff/offline";
 import { RunCtx, type RunEvent, type RunRequest } from "@/lib/staff/protocol";
 
 // One instruction to one director. Streams the run as newline-delimited JSON so the war room can show the work
@@ -18,7 +19,18 @@ export async function POST(request: Request) {
       };
       const ctx = new RunCtx(req, emit);
       try {
-        if (process.env.ANTHROPIC_API_KEY) {
+        if (req.steps?.length) {
+          // A picked option: its steps were set and priced when it was offered, so they run as they are.
+          const live = !!process.env.ANTHROPIC_API_KEY;
+          const w = req.snapshot;
+          const say = live
+            ? async (results: string[]) => {
+                const { wrapUp } = await import("@/lib/staff/chatter");
+                return wrapUp({ name: `the ${me.role}`, campaign: `${w.candidate}'s campaign in ${w.race}`, voice: profileOf(w, me.id).voice, option: req.text, results });
+              }
+            : undefined;
+          await runSteps(ctx, live ? "live" : "offline", say);
+        } else if (process.env.ANTHROPIC_API_KEY) {
           try {
             const { runLive } = await import("@/lib/staff/agents");
             await runLive(ctx, request.signal);

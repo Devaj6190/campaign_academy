@@ -1,6 +1,7 @@
 import { presence } from "../demographics";
 import { hash } from "../util";
 import { ACTIONS, type ActionId } from "./catalog";
+import type { BookingKind } from "./catalog";
 import { CANDIDATE, profileFor, type Profile } from "../staff/roster";
 import { findBoros, findFactions, findPlaces, PLACES, placeName, shortPlace, type Snapshot } from "../staff/world";
 
@@ -20,6 +21,8 @@ export type Effect = {
   factions: Record<string, number>;
   momentum: number;
   calendar?: string;
+  /** A scheduled appearance: nothing happens now; the candidate does it in person on `date` (lib/staff/run runBookings). */
+  booking?: { date: string; kind: BookingKind };
   /** A rival move: who made it and how much stronger they got in each district (poll.ts). */
   rival?: { who: "hale" | "brandt"; strength: Record<number, number> };
   /** False when the job went to someone without the skills for it. */
