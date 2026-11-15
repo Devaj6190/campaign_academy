@@ -13,6 +13,7 @@
     "check:staff": "node scripts/check-staff.mjs",
     "check:memos": "node scripts/check-memos.mjs",
     "check:save": "node scripts/check-save.mjs",
+    "check:paper": "node scripts/check-paper.mjs",
     "demo:start": "node scripts/demo-start.mjs"
   },
   "dependencies": {

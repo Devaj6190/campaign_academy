@@ -100,7 +100,22 @@ const sentence = (s: string) => {
   const t = s.trim().replace(/\s+/g, " ");
   return /[.!?]$/.test(t) ? t : `${t}.`;
 };
-const headlineOf = (s: string) => sentence(s).split(/(?<=\.) /)[0].replace(/\.$/, "").replace(/^[^:]{1,40}: /, "");
+/**
+ * A headline from a note: its first sentence, without a quoted aside, cut at a colon (a one-word label before it is
+ * dropped; otherwise the clause after it is). "Bill de Blasio answered the morning paper's lead ("..."): The campaign
+ * ties" becomes "Bill de Blasio answered the morning paper's lead".
+ */
+export const headlineOf = (s: string) => {
+  const first = sentence(s).replace(/\s*\("[^"]*"\)/g, "").split(/(?<=\.) /)[0].replace(/\.$/, "");
+  const i = first.indexOf(": ");
+  if (i < 0) return first;
+  return /\s/.test(first.slice(0, i)) ? first.slice(0, i) : first.slice(i + 2);
+};
+/** The simulation's tallies ("Support +3.5.", "Women +0.6.") are game readouts, not newspaper copy. */
+export const prose = (note: string) => sentence(note).split(/(?<=[.!?]) /).filter((x) => !/[+\u2212]\d/.test(x)).join(" ");
+/** A note that opens on a bare verb ("Knocked 1,448 doors") gets its subject, as a reporter would write it. */
+const withSubject = (note: string, subject: string) =>
+  /^[A-Z][a-z]+ed\b|^(Ran|Held|Sent|Spent|Won|Took|Put|Made|Met|Gave|Went|Bought|Hit|Cut|Set)\b/.test(note) ? `${subject} ${lowerFirst(note)}` : note;
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** "Bill de Blasio" → "de Blasio": everything after the first name, so particles stay. */
@@ -112,9 +127,10 @@ function letter(f: Faction, pleased: boolean): Story & { group: string } {
   const not = l?.dislikes.length ? l.dislikes.map(lowerFirst).join(", ") : null;
   // Boroughs, races and religions keep their capitals ("Queens", "Black voters"); "Liberals" does not.
   const who = ["Borough", "Race", "Religion"].includes(f.kind) ? f.name : f.name.toLowerCase();
+  // Written as letters to the editor: measured, first person, no slogans.
   return pleased
-    ? { group: f.name, headline: `From ${who}: "Someone is finally listening"`, body: want ? `What we ask for is plain: ${want}. This campaign is starting to talk about it.` : "We have not been courted like this before. We will see whether it lasts past the primary." }
-    : { group: f.name, headline: `From ${who}: "We are being taken for granted"`, body: not ? `We have said it before: no ${not}. Whoever wants our vote should show us, not tell us.` : "Nobody running has come to our neighbourhood to ask what we need. That will be remembered in September." };
+    ? { group: f.name, headline: `From ${who}: a campaign begins to listen`, body: want ? `To the editor: What we ask for is plain: ${want}. This year, for the first time, one campaign has begun to speak to those concerns.` : "To the editor: We have not been courted like this before. Whether it lasts past the primary remains to be seen." }
+    : { group: f.name, headline: `From ${who}: still waiting to be asked`, body: not ? `To the editor: We have said it before: no ${not}. Whoever wants our votes will have to show us, not tell us.` : "To the editor: No one running has come to our neighborhood to ask what we need. Voters here will remember that in September." };
 }
 
 type Inputs = { c: Case; w: World; today: string; step: number; work: Work[]; since: string | null; groupWork: Record<string, number>; id: number; lastPoll: string | null };
@@ -130,14 +146,23 @@ export function buildEdition({ c, w, today, step, work, since, groupWork, id, la
 
   const mine = fresh.filter((x) => !isRival(x.by) && x.note).slice(-4);
   const spent = mine.reduce((s, x) => s + x.cost, 0), raised = mine.reduce((s, x) => s + x.raised, 0);
-  const campaign: Story = mine.length
-    ? { headline: headlineOf(mine.at(-1)!.note!), body: `${mine.map((x) => sentence(cap(x.note!))).join(" ")}${spent || raised ? ` The campaign spent $${spent.toLocaleString("en-US")} and raised $${raised.toLocaleString("en-US")} on it.` : ""}` }
-    : { headline: step === 0 ? `The ${surname} campaign opens` : `A quiet stretch for the ${surname} campaign`, body: step === 0 ? `${you} starts ${days(today, c.electionDate)} days out, behind in every public poll.` : "No events, no ads, no doors since the last edition. The rival campaigns will have noticed." };
+  const told = mine.map((x) => withSubject(prose(cap(x.note!)), `The ${surname} campaign`)).filter(Boolean);
+  const campaign: Story = told.length
+    ? { headline: headlineOf(told.at(-1)!), body: `${told.join(" ")}${spent || raised ? ` The campaign spent $${spent.toLocaleString("en-US")} and raised $${raised.toLocaleString("en-US")} on it.` : ""}` }
+    : { headline: step === 0 ? `The ${surname} campaign opens` : `A quiet stretch for the ${surname} campaign`, body: step === 0 ? `${you} starts ${days(today, c.electionDate)} days out, behind in every public poll.` : "No events, advertising or canvassing since the last edition. The rival campaigns will have noticed." };
 
+  // Rival notes arrive as "John Liu: digital ads aimed at Moderates." One sentence per rival, in the paper's voice.
   const theirs = fresh.filter((x) => isRival(x.by) && x.note).slice(-4);
-  const rivals: Story = theirs.length
-    ? { headline: headlineOf(theirs.at(-1)!.note!), body: theirs.map((x) => sentence(x.note!)).join(" ") }
-    : { headline: "The rivals hold their fire", body: "No moves by the other campaigns since the last edition. Their plans show here the morning after they act." };
+  const byRival = new Map<string, string[]>();
+  for (const x of theirs) {
+    const m = /^(.+?): (.+?)\.?$/.exec(x.note!.trim());
+    const who = m ? m[1] : name(x.by), what = m ? m[2] : prose(x.note!).replace(/\.$/, "");
+    byRival.set(who, [...(byRival.get(who) ?? []), lowerFirst(what)]);
+  }
+  const last = [...byRival].at(-1);
+  const rivals: Story = last
+    ? { headline: `${cap(surnameOf(last[0]))} campaign turns to ${last[1].at(-1)}`, body: [...byRival].map(([who, did]) => `${who} spent the stretch on ${did.join(" and ")}.`).join(" ") }
+    : { headline: "No new moves from the rival campaigns", body: "The other campaigns made no public moves since the last edition. Their plans appear here the morning after they act." };
 
   const yours = w.poll[c.follow] ?? 0, yoursStart = c.start.poll[c.follow] ?? 0;
   const standing = FACTIONS_2013.map((f) => ({ f, v: factionNow(f, w.groups, yours, yoursStart, groupWork) })).sort((a, b) => b.v - a.v);

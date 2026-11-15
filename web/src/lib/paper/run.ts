@@ -141,3 +141,4 @@ export function respond(e: Edition, choice: "respond" | "staff" | "pass", pick?:
   patch(e.id, (x) => ({ ...x, decision: choice, answer }));
   return answer;
 }
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") queueMicrotask(() => ((window as unknown as { paperStore: unknown }).paperStore = usePaper));

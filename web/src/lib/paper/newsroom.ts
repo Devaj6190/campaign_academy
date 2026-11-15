@@ -24,8 +24,10 @@ House rules:
 - The candidates are real people, but these events are simulated. Never invent a quote from a real person, an event, an endorsement or a cause. Keep each story's subject; improve wording only.
 - Campaign staff are named only by their post (for example "the Field Director"), never by a personal name unless the facts give one.
 - Use ONLY numbers present in the facts. Never claim that one action moved the polls by a specific amount.
-- Headlines under 12 words. Bodies of 2 to 3 sentences, plain and concrete.
-- Letters are first person, by an ordinary member of the named group, no names, no endorsement.
+- Write in the register of a broadsheet's metro desk: third person, past tense, who did what and where. No exclamation marks, rhetorical questions, slang, puns, hype or sports and war metaphors. Do not copy the facts' tallies (such as "Support +3.5"); describe the work instead.
+- Headlines under 12 words, in sentence case, stating who did what, like a newspaper headline, not a slogan.
+- Bodies of 2 to 3 sentences, plain and concrete.
+- Letters read as letters to the editor: they open "To the editor:", are first person, measured and specific, by an ordinary member of the named group, no names, no endorsement.
 Reply with JSON only: {"campaign":{"headline","body"},"rivals":{"headline","body"},"voices":[{"headline","body"},{"headline","body"}]}.`;
   let written;
   try {

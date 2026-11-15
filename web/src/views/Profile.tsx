@@ -27,7 +27,7 @@ const arrive = { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: {
 
 // ponytail: keyed by candidate id here, not a field on the shared Candidate type; move it into the case file once that
 // type change has been announced on the board. A candidate without an entry gets their initials.
-const PHOTOS: Record<string, { src: string; credit: string; href: string }> = {
+export const PHOTOS: Record<string, { src: string; credit: string; href: string }> = {
   deblasio: { src: "/art/deblasio-2013.jpg", credit: "Kevin Case · CC BY 2.0", href: "https://commons.wikimedia.org/wiki/File:Bill_de_Blasio_11-2-2013.jpg" },
 };
 
