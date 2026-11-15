@@ -1,56 +1,65 @@
-import { CASES } from "../cases/index";
-import { useCase } from "../cases/store";
+import { run, skip } from "../cases/clock";
+import { useRivals } from "../cases/rivals";
+import { currentCase, useCase } from "../cases/store";
 import { realPath } from "../cases/types";
-import { useGame } from "../store";
-import { profileOf } from "../engine/resolve";
-import { assign, HINDSIGHT, memoDecision, rulesMemo, WRITERS, type Memo, type MemoRequest } from "./memo";
-import { snapshot } from "./run";
-import { describeWorld } from "./world";
+import { rulesMemo, type Memo, type MemoRequest } from "./memo";
+import { LEAD_DAYS, memoDay, setMemoWriter, useMemos, watchMemos } from "./memos";
 
-// The memo test Devaj asked for (#32): memos must not simply land on what the real campaign chose.
-// For every decision, two directors write as the game would at that point, playing the real campaign's earlier
-// choices. The model never picks the option (memo.ts assign); this checks that what is written keeps to it, that the
-// two disagree, that no part of the record is in the request, and that no memo reaches past its date.
-// Before the options were assigned, a model left to choose landed on the real choice on all six decisions.
+// The staff memos, checked the way the game makes them (#41, item 8; review on #32). The clock runs through the whole
+// campaign with Skip, taking the real campaign's choices, while the game's own watcher writes the memos and its own
+// code builds each request; only the writer is swapped in. Each assertion can fail:
+// 1. Every decision has its two memos by the time the campaign reaches it.
+// 2. Each was written from the campaign as it stood within LEAD_DAYS of the decision's date, not months before.
+// 3. No request carries any part of the record: what the real campaign did, what followed, what was said after.
+// How often a memo lands on the real choice is reported, not judged: the option is assigned by rules (memo.ts).
 
-const RECORD = ["taken", "did", "followed", "saidAfter", "advice"];
+const settle = () => new Promise((r) => setTimeout(r, 0));
+const dateIn = (campaign: string) => campaign.match(/Today is (\d{4}-\d{2}-\d{2})/)?.[1] ?? "";
 
 export async function checkMemos(write: (r: MemoRequest) => Promise<Memo>) {
   const problems: string[] = [], report: string[] = [];
-  const c = CASES[0];
+  const c = currentCase(useCase.getState().caseId);
   const real = realPath(c);
-  let anyOnReal = 0, total = 0, late = 0;
-  for (const [i, d] of c.decisions.entries()) {
-    useCase.getState().restart();
-    const picks = Object.fromEntries(c.decisions.slice(0, i).map((x) => [x.id, { option: real[x.id] ?? x.options[0].id, why: "" }]));
-    useCase.setState({ at: i + 1, step: i + 1, date: d.date, picks });
-    const w = snapshot();
-    const decision = memoDecision(d);
-    const leaked = RECORD.filter((k) => k in decision);
-    if (leaked.length) problems.push(`${d.id}: the memo request carries part of the record (${leaked.join(", ")})`);
-    const staff = useGame.getState().staff;
-    const writers = [...new Set([...WRITERS[d.skill], "cm", "com", "fd", "fin"])].map((id) => staff.find((p) => p.id === id && p.name)).filter((p): p is NonNullable<typeof p> => !!p).slice(0, 2);
-    const memos: Memo[] = [];
-    for (const p of writers) {
-      const first = memos[0];
-      const option = assign(p.id, decision.options, first?.option);
-      const m = await write({ option, decision, director: { id: p.id, role: p.role, name: p.name, onRecord: p.onRecord, good: p.good, weak: p.weak }, voice: profileOf(w, p.id).voice, campaign: describeWorld(w), memory: [], against: first ? { option: first.option, who: `the ${staff.find((x) => x.id === first.director)?.role}` } : undefined });
-      if (m.option !== option) problems.push(`${d.id}: ${p.id} was assigned ${option} but argued for ${m.option}`);
-      if (HINDSIGHT.test(m.text)) { late++; problems.push(`${d.id}: ${p.id}'s memo reaches past ${d.date}: "${m.text.match(HINDSIGHT)?.[0]}"`); }
-      memos.push(m);
+  const sent: MemoRequest[] = [];
+  setMemoWriter(async (r) => { sent.push(r); return write(r); });
+  useCase.getState().restart();
+  useMemos.setState({ byDecision: {} });
+  // The rival agents plan over the network; there is no server here, so count every step as planned.
+  useRivals.setState({ planned: Object.fromEntries(c.decisions.map((_, i) => [i + 1, true])) });
+  const off = watchMemos();
+  try {
+    run();
+    for (const [i, d] of c.decisions.entries()) {
+      // Run the clock to this decision, as a student pressing Skip would.
+      for (let k = 0; k < 400 && useCase.getState().at < i + 1; k++) { skip(); await settle(); }
+      await settle();
+      // Live memos take seconds to write; the game shows them as coming. The check waits up to a minute for them.
+      for (let k = 0; k < 600 && useMemos.getState().byDecision[d.id]?.status === "writing"; k++) await new Promise((r) => setTimeout(r, 100));
+      const entry = useMemos.getState().byDecision[d.id];
+      if (!entry || entry.memos.length < 2) problems.push(`${d.id}: ${entry?.memos.length ?? 0} memos when the campaign reached the decision, not two`);
+      const mine = sent.filter((r) => r.decision.id === d.id);
+      for (const r of mine) {
+        const on = dateIn(r.campaign);
+        if (!on || on < memoDay(d.date) || on > d.date) problems.push(`${d.id}: ${r.director.id}'s memo was written from the campaign on ${on || "an unknown day"}, not within ${LEAD_DAYS} days of ${d.date}`);
+        const body = JSON.stringify(r);
+        const record = [...d.did, ...d.followed, ...d.saidAfter].map((x) => x.text).filter((t) => t.length >= 25);
+        const leak = record.find((t) => body.includes(t));
+        if (leak) problems.push(`${d.id}: ${r.director.id}'s request carries the record: "${leak.slice(0, 60)}…"`);
+      }
+      const on = [...new Set(mine.map((r) => dateIn(r.campaign)))].join(", ");
+      report.push(`${d.id} (${d.date}): written from ${on || "nothing"}; ${(entry?.memos ?? []).map((m) => `${m.director} → ${m.option}${m.option === d.taken ? " (the real choice)" : ""}`).join(", ")}`);
+      useCase.getState().decide(d.id, { option: real[d.id] ?? d.options[0].id });
+      await settle();
     }
-    if (memos.length === 2 && memos[0].option === memos[1].option) problems.push(`${d.id}: both memos argue for the same option`);
-    if (memos.some((m) => !d.options.some((o) => o.id === m.option))) problems.push(`${d.id}: a memo argues for an option that does not exist`);
-    total += memos.length;
-    anyOnReal += memos.filter((m) => m.option === d.taken).length;
-    report.push(`${d.id}: ${memos.map((m) => `${m.director} → ${m.option}${m.option === d.taken ? " (the real choice)" : ""}`).join(", ")}${write === offlineWriter ? "" : `\n    ${memos.map((m) => `${m.director}: ${m.text}`).join("\n    ")}`}`);
+  } finally {
+    off();
+    setMemoWriter(null);
   }
-  const n = c.decisions.length;
-  report.push(`memos: options assigned by the rules, never the model; ${anyOnReal} of ${total} land on the real choice; ${late} reach past their date (${n} decisions)`);
-  if (anyOnReal > total / 2) problems.push(`memos: more than half of all memos landed on the real choice (${anyOnReal} of ${total})`);
+  const byId = useMemos.getState().byDecision;
+  const written = c.decisions.flatMap((d) => (byId[d.id]?.memos ?? []).map((m) => m.option === d.taken));
+  report.push(`memos: ${written.length} written, ${written.filter(Boolean).length} on the real choice (assigned by rules; reported, not judged)`);
   useCase.getState().restart();
   return { problems, report };
 }
 
-const offlineWriter = async (r: MemoRequest) => rulesMemo(r);
-export const checkMemosOffline = () => checkMemos(offlineWriter);
+export const checkMemosOffline = () => checkMemos(async (r) => rulesMemo(r));

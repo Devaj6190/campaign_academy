@@ -1,4 +1,4 @@
-// npm run check:memos — the staff memos, written live, must not simply land on what the real campaign chose (#41).
+// npm run check:memos — the staff memos, written live through the game's own path (#41; see src/lib/staff/memoCheck.ts).
 // Needs ANTHROPIC_API_KEY (read from .env.local). About twelve calls to the director model.
 import { existsSync } from "node:fs";
 import { createJiti } from "jiti";
@@ -11,4 +11,4 @@ const { liveMemo } = await jiti.import("../src/lib/staff/memoLive.ts");
 const { problems, report } = await checkMemos(liveMemo);
 console.log(report.join("\n"));
 if (problems.length) { console.error(`\n${problems.length} problem(s):\n- ${problems.join("\n- ")}`); process.exit(1); }
-console.log("\nMemo checks pass: the memos disagree, carry no part of the record, and do not simply land on the real choice.");
+console.log("\nMemo checks pass: every decision has its memos in time, each written from the campaign near its date, and no request carries the record.");
