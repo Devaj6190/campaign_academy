@@ -4,6 +4,7 @@ import { ArrowDownRight, ArrowUp, Brain, Check, ChevronDown, CircleDollarSign, L
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Fit } from "@/components/Fit";
+import { TypeOut } from "@/components/TypeOut";
 import { Avatar, Button, Dock, DockButton, Label, Meter, Section, ViewHeader } from "@/components/ui";
 import { AgentPlan, type PlanTask } from "@/components/ui21/agent-plan";
 import { ShaderBackground } from "@/components/ui21/dithering";
@@ -529,7 +530,7 @@ function Reply({ c, index, id, effects }: { c: Extract<ChatItem, { k: "report" }
   const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
   return (
     <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start">
-      <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft">{c.text}</div>
+      <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft"><TypeOut id={`report-${id}-${c.run ?? index}`} text={c.text} /></div>
       <div className="tnum mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-1 font-mono text-[10.5px] text-muted">
         <span>Spent <span className="text-neg">{usd(c.spent)}</span></span>
         {!!c.raised && <span>Raised <span className="text-pos">{usd(c.raised)}</span></span>}
