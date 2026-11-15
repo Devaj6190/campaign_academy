@@ -47,15 +47,18 @@ export function contradictions(planks: Pick<Plank, "serves" | "offends">[]) {
   return [...new Set(planks.flatMap((p) => p.offends.map((r) => r.faction)))].filter((f) => served.has(f));
 }
 
-/** The fallback without a key: match the idea's words against each group's values and dislikes. */
+/**
+ * The fallback without a key: match the idea's words against each group's values and dislikes. Keywords cannot tell
+ * "raise taxes" from "lower taxes", so a group counts only when two or more words match; one shared word is not enough.
+ */
 export function rulesShape(req: ShapeRequest, by: string): Shaped {
   const words = req.idea.toLowerCase().split(/\W+/).filter((w) => w.length > 3);
   const count = (v: string) => words.filter((w) => v.toLowerCase().includes(w)).length;
   // The entry in a list that the idea's words match best, and how well.
   const best = (list: string[]) => list.map((v) => ({ v, n: count(v) })).sort((x, y) => y.n - x.n)[0] ?? { v: "", n: 0 };
   const scored = req.factions.map((f) => ({ f, up: best(f.values), down: best(f.dislikes) }));
-  const serves = scored.filter((x) => x.up.n > 0).sort((a, b) => b.up.n - a.up.n).slice(0, 2).map((x) => ({ faction: x.f.id, why: `It speaks to something they are likely to value: ${x.up.v.toLowerCase()}.` }));
-  const offends = scored.filter((x) => x.down.n > 0 && !serves.some((s) => s.faction === x.f.id)).sort((a, b) => b.down.n - a.down.n).slice(0, 1).map((x) => ({ faction: x.f.id, why: `It touches something they are likely to dislike: ${x.down.v.toLowerCase()}.` }));
+  const serves = scored.filter((x) => x.up.n >= 2).sort((a, b) => b.up.n - a.up.n).slice(0, 2).map((x) => ({ faction: x.f.id, why: `It speaks to something they are likely to value: ${x.up.v.toLowerCase()}.` }));
+  const offends = scored.filter((x) => x.down.n >= 2 && !serves.some((s) => s.faction === x.f.id)).sort((a, b) => b.down.n - a.down.n).slice(0, 1).map((x) => ({ faction: x.f.id, why: `It touches something they are likely to dislike: ${x.down.v.toLowerCase()}.` }));
   const t = req.idea.trim().replace(/\.$/, "");
   return { text: `${t[0].toUpperCase()}${t.slice(1)}.`, serves, offends, tradeoff: "A rough draft matched on keywords. With an API key the plank is shaped and judged by an agent.", mode: "rules", by };
 }
