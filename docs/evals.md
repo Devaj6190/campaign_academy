@@ -142,6 +142,31 @@ What it showed:
 - **At the last decision, memory is wrong and the card is right.** With no card, the model remembered the second ad as a repeat of the first, or as an attack on Quinn in Manhattan (0 of 3, and it said it was unsure). Given the card, it chose the stop-and-frisk ad every time, with and without the chips. That is the clearest case so far of the card, not memory, producing the real choice.
 - **The chips did not matter this time** (18/18 without them, against 16/18 in run 1). The budget decision is the one that moves between runs.
 
+### Run 3: tuning 1, N = 3 (commit 87c97f8, 15 November)
+
+The campaigner is now told the facts it is given are this campaign's facts, even where they differ from what it remembers. Card, masked and changed only.
+
+| Condition | On the real choice | Chance |
+|---|---|---|
+| card | 17/18 (94%) | 24% |
+| masked | 13/18 (72%) | 24% |
+| changed: stuck to 2013 anyway | 8/18 (44%) | |
+
+| Decision | card | masked | changed (stuck) |
+|---|---|---|---|
+| positioning | 3/3 | 3/3 | 2/3 |
+| weiner | 3/3 | 2/3 | 3/3 |
+| hospital | 3/3 | 3/3 | 3/3 |
+| budget | 2/3 | 0/3 | 0/3 |
+| firstad | 3/3 | 3/3 | 0/3 |
+| base | 3/3 | 2/3 | 0/3 |
+
+Grounding: changed facts followed 10 of 18, against 9 of 18 before. All 18 masked cards were recognised.
+
+What it showed:
+- **Tuning 1 made no clear difference.** One more changed-facts card was followed (positioning, once), which is within run-to-run noise at N = 3. Weiner and the hospital still kept the 2013 choice every time.
+- **Masked agreement fell** (13/18, against 15 and 16 in runs 1 and 2), mostly at budget. With every masked card recognised, this is not a memory effect; budget is the decision that moves most between runs.
+
 ## 8. Decisions log
 
 | Date | Decision | Why |
