@@ -1,11 +1,12 @@
 "use client";
 
-import { Check, ChevronRight, Plus } from "lucide-react";
+import { Check, ChevronRight, Newspaper, Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { create } from "zustand";
 import { currentCase, useCase } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
+import { usePaper } from "./Paper";
 import { Label } from "./ui";
 
 // The student's own to-do list. It starts empty: the game store's tasks belong to the fictional race, which is no longer mounted.
@@ -32,12 +33,22 @@ export function SidebarBody() {
   const { caseId, step, picks, go: goStep } = useCase();
   const c = currentCase(caseId);
   const reached = c.decisions.filter((d) => picks[d.id]).length + 1; // furthest step open
+  const openPaper = usePaper((s) => s.set);
   // A decision's title is only shown once the student has reached it, so the list can't give away what is coming.
   const steps = ["Briefing", ...c.decisions.map((d, i) => (i + 1 <= reached ? d.title : `Decision ${i + 1}`)), "Election night"];
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto pt-5 pb-4">
       <Tasks />
+      <section className="mt-7">
+        <div className="plate mb-2 flex h-8 items-center gap-2.5 px-5"><Label className="flex-1 text-gold-bright">Desk</Label></div>
+        <div className="px-4">
+          <button onClick={() => openPaper(true)} className="group flex h-10 w-full items-center gap-3 rounded-lg px-1 text-[13px] text-soft transition-colors hover:text-gold-bright">
+            <span className="grid size-7 shrink-0 place-items-center rounded-full border border-line-strong transition-colors group-hover:border-gold [&_svg]:size-3.5 [&_svg]:text-gold"><Newspaper /></span>
+            Morning paper
+          </button>
+        </div>
+      </section>
       {/* The outline is its own section, closed until asked for: the Case screen already shows the same steps. */}
       <details className="group mt-7">
         <summary className="plate flex h-8 cursor-pointer list-none items-center gap-2.5 px-5 [&::-webkit-details-marker]:hidden">

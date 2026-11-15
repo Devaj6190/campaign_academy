@@ -48,3 +48,7 @@ export function factionSupport(f: Faction, citywideNow: number, citywideStart: n
   const done = (citywideNow - citywideStart) / (FACTION_POLLS.sep.citywide - FACTION_POLLS.feb.citywide);
   return Math.max(0, Math.min(100, f.feb + (f.sep - f.feb) * done));
 }
+
+/** Where the student stands with a faction now: from the case where the case simulates it, otherwise derived. */
+export const factionNow = (f: Faction, groups: Record<string, number>, citywideNow: number, citywideStart: number): number =>
+  f.tracks ? (groups[f.tracks] ?? 0) : factionSupport(f, citywideNow, citywideStart);

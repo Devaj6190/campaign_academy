@@ -5,7 +5,7 @@ import { ArrowRight, BookOpen, Map as MapIcon } from "lucide-react";
 import { useState } from "react";
 import { Fit } from "@/components/Fit";
 import { Dock, DockButton, Inspector, Label, Meter, Section, Tag, ViewHeader } from "@/components/ui";
-import { FACTION_POLLS, FACTIONS_2013, factionSupport, type Faction } from "@/lib/cases/mayor2013-factions";
+import { FACTION_POLLS, FACTIONS_2013, factionNow, type Faction } from "@/lib/cases/mayor2013-factions";
 import { useCase, useCaseNow, worldAt } from "@/lib/cases/store";
 import { DISTRICTS } from "@/lib/geo";
 import { useGame } from "@/lib/store";
@@ -45,7 +45,7 @@ export function VoterGroups() {
   const select = useGame((s) => s.select);
   const [picked, setPicked] = useState<string | null>(null);
   const mine = w.poll[c.follow] ?? 0, mineStart = c.start.poll[c.follow] ?? 0;
-  const now = (f: Faction) => (f.tracks ? (w.groups[f.tracks] ?? 0) : factionSupport(f, mine, mineStart));
+  const now = (f: Faction) => factionNow(f, w.groups, mine, mineStart);
   const sel = FACTIONS_2013.find((f) => f.id === picked) ?? null;
 
   return (

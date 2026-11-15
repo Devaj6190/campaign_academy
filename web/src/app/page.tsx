@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import { Paper } from "@/components/Paper";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { useGame } from "@/lib/store";
@@ -31,6 +32,7 @@ export default function Home() {
           </AnimatePresence>
         </main>
       </div>
+      <Paper />
     </div>
   );
 }
