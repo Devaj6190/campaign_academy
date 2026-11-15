@@ -1,10 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, BookOpen, Map as MapIcon, X } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, Map as MapIcon, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Fit } from "@/components/Fit";
-import { Dock, DockButton, Label, Meter, ViewHeader } from "@/components/ui";
+import { Dock, DockButton, Label, ViewHeader } from "@/components/ui";
 import { FACTION_POLLS, FACTIONS_2013, factionNow, type Faction } from "@/lib/cases/mayor2013-factions";
 import { LEANINGS_2013 } from "@/lib/cases/mayor2013-leanings";
 import { LINKS_2013, linksOf, type Link } from "@/lib/cases/mayor2013-links";
@@ -118,7 +118,7 @@ export function VoterGroups() {
 
   return (
     <section className="@container relative flex h-full min-w-0 flex-col">
-      <ViewHeader title="Factions" sub="Who the primary's voters are. A circle's size is the group's share of likely voters, and its colour shows whether you run ahead of or behind your citywide figure there. Lines join groups that want the same thing or pull against each other." />
+      <ViewHeader title="Factions" sub="Who votes in the primary. Bigger circle, more voters. Lines show who pulls together and who pulls apart." />
       <div className="relative min-h-0 flex-1 px-6 pb-24" onClick={() => setPicked(null)}>
         <div className="dots pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_78%)]" />
         <Fit w={W} h={H}>
@@ -173,11 +173,11 @@ export function VoterGroups() {
           })}
         </Fit>
         <div className="pointer-events-none absolute bottom-24 left-7 flex max-w-[calc(100%-3.5rem)] flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
-          <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-warm" />Ahead of your citywide {Math.round(mine)}%</span>
-          <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-cool" />Behind it</span>
-          <span className="flex items-center gap-1.5"><svg width="30" height="10" aria-hidden><line x1="1" y1="5" x2="29" y2="5" stroke={LINE.shared} strokeWidth="2" /><circle cx="15" cy="5" r="3.2" fill={LINE.shared} /></svg>Want the same thing</span>
-          <span className="flex items-center gap-1.5"><svg width="30" height="10" aria-hidden><line x1="1" y1="5" x2="29" y2="5" stroke={LINE.opposed} strokeWidth="2" strokeDasharray="5 4" /><path d="M12 2l6 6M18 2l-6 6" stroke={LINE.opposed} strokeWidth="1.6" /></svg>Pull against each other</span>
-          <span>A voter belongs to several groups at once, so shares do not add to 100.</span>
+          <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-warm" />Ahead of your {Math.round(mine)}%</span>
+          <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-cool" />Behind</span>
+          <span className="flex items-center gap-1.5"><svg width="30" height="10" aria-hidden><line x1="1" y1="5" x2="29" y2="5" stroke={LINE.shared} strokeWidth="2" /><circle cx="15" cy="5" r="3.2" fill={LINE.shared} /></svg>Same wants</span>
+          <span className="flex items-center gap-1.5"><svg width="30" height="10" aria-hidden><line x1="1" y1="5" x2="29" y2="5" stroke={LINE.opposed} strokeWidth="2" strokeDasharray="5 4" /><path d="M12 2l6 6M18 2l-6 6" stroke={LINE.opposed} strokeWidth="1.6" /></svg>Opposed</span>
+          <span title="A voter belongs to several groups at once, so shares do not add to 100.">Groups overlap</span>
         </div>
         <AnimatePresence>
           {sel && (
@@ -231,13 +231,17 @@ const Wants = ({ title, items, color }: { title: string; items: string[]; color:
   </div>
 );
 
-/** One group, read like a faction card: who they are and where you stand, what they want, and what you have done about it. */
+/**
+ * One group as a faction card: who they are, how you stand with them and what they want. Everything else the old
+ * sidebar held (the citywide comparison, the poll line, your path, where they live) waits behind "More".
+ */
 function Card({ f, now, mine, path, census, planks, onClose, toDistrict }: { f: Faction; now: number; mine: number; path: number[] | null; census?: "white" | "black" | "asian" | "hispanic"; planks: Plank[]; onClose: () => void; toDistrict: (cd: number) => void }) {
+  const [more, setMore] = useState(false);
   const col = tint(now, mine);
   const l = LEANINGS_2013[f.id];
   const homes = census ? DISTRICTS.filter((d) => d.demo && !d.park).sort((a, b) => b.demo!.race[census] - a.demo!.race[census]).slice(0, 4) : [];
-  const mineHere = planks.flatMap((p) => [...p.serves.filter((r) => r.faction === f.id).map((r) => ({ text: p.text, good: true, why: r.why })), ...p.offends.filter((r) => r.faction === f.id).map((r) => ({ text: p.text, good: false, why: r.why }))]);
-  const src = "text-gold underline decoration-gold/40 hover:text-gold-bright";
+  const mineHere = planks.flatMap((p) => [...p.serves.filter((r) => r.faction === f.id).map(() => ({ text: p.text, good: true })), ...p.offends.filter((r) => r.faction === f.id).map(() => ({ text: p.text, good: false }))]);
+  const src = "tnum font-mono text-fg underline decoration-gold/40 underline-offset-2 hover:text-gold-bright";
   return (
     <motion.aside
       initial={{ opacity: 0, x: 28 }}
@@ -245,82 +249,73 @@ function Card({ f, now, mine, path, census, planks, onClose, toDistrict }: { f: 
       exit={{ opacity: 0, x: 28, transition: { duration: 0.18 } }}
       onClick={(e) => e.stopPropagation()}
       aria-label={f.name}
-      className="panel absolute top-2 right-5 bottom-24 z-20 flex w-[440px] max-w-[calc(100%-2.5rem)] flex-col overflow-hidden rounded-xl border border-line-strong shadow-[0_30px_80px_-20px_rgba(0,0,0,1)]"
+      className="panel absolute top-1/2 right-5 z-20 flex max-h-[calc(100%-7rem)] w-[420px] max-w-[calc(100%-2.5rem)] -translate-y-[calc(50%+2.5rem)] flex-col overflow-hidden rounded-xl border border-line-strong shadow-[0_30px_80px_-20px_rgba(0,0,0,1)]"
     >
       <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 z-10 grid size-7 place-items-center rounded-full border border-line-strong text-muted transition-colors hover:border-gold hover:text-gold-bright"><X className="size-4" /></button>
-      <div className="border-b border-line px-6 pt-5 pb-4 pr-14">
+      <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
         <Label>{f.kind}</Label>
-        <h2 className="mt-1 font-serif text-[32px] leading-none tracking-tight">{f.name}</h2>
-        <div className="mt-3 flex items-end justify-between gap-4">
-          <p className="text-[13.5px]" style={{ color: col }}>{word(now, mine)} <span className="text-muted">your citywide {Math.round(mine)}%</span></p>
-          <p className="text-[12.5px] text-muted"><span className="tnum font-mono text-soft">{f.share}%</span> of voters</p>
+        <h2 className="mt-1 font-serif text-[34px] leading-none tracking-tight">{f.name}</h2>
+        <div className="mt-2.5 flex items-baseline justify-between gap-4 border-b border-line pb-4">
+          <span className="text-[14px]" style={{ color: col }}>{word(now, mine)} <span className="text-muted">your {Math.round(mine)}%</span></span>
+          <span className="text-[12.5px] text-muted"><span className="tnum font-mono text-soft">{f.share}%</span> of voters</span>
         </div>
-        <div className="mt-2 flex items-center gap-3">
-          <span className="tnum font-mono text-[30px] leading-none font-medium" style={{ color: col }}>{Math.round(now)}%</span>
-          <Meter value={now * 2} color={col} className="flex-1" />
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-        <div>
-          <p className="text-[13.5px] leading-relaxed text-soft">
-            {f.share} in every 100 likely primary voters. De Blasio polled <span className="tnum font-mono text-fg">{f.feb}%</span> with them in February 2013, against {FACTION_POLLS.feb.citywide}% citywide, and <span className="tnum font-mono text-fg">{f.sep}%</span> the week before the primary, against {FACTION_POLLS.sep.citywide}%.
-          </p>
-          <p className="mt-1.5 text-[11.5px] leading-relaxed text-faint">
-            <a href={FACTION_POLLS.feb.url} target="_blank" rel="noreferrer" title={FACTION_POLLS.feb.label} className={src}>February poll</a> · <a href={FACTION_POLLS.sep.url} target="_blank" rel="noreferrer" title={FACTION_POLLS.sep.label} className={src}>September poll</a> · February asked registered Democrats and September likely voters, so the two are not strictly comparable.
-          </p>
-        </div>
+        <p className="mt-4 text-[14px] leading-relaxed text-soft">
+          De Blasio polled <a href={FACTION_POLLS.feb.url} target="_blank" rel="noreferrer" title={FACTION_POLLS.feb.label} className={src}>{f.feb}%</a> with them in February 2013 and <a href={FACTION_POLLS.sep.url} target="_blank" rel="noreferrer" title={FACTION_POLLS.sep.label} className={src}>{f.sep}%</a> in September.
+        </p>
 
-        <Part title="What they want">
+        <div className="mt-5">
           {l && (l.values.length || l.dislikes.length) ? (
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-2 gap-6">
               {!!l.values.length && <Wants title="They want" items={l.values} color="var(--color-gold-bright)" />}
               {!!l.dislikes.length && <Wants title="They do not want" items={l.dislikes} color="var(--color-neg)" />}
             </div>
           ) : (
-            <p className="text-[13px] leading-relaxed text-muted">Who they are says too little about what they want.</p>
+            <p className="text-[13px] text-muted">Who they are says too little about what they want.</p>
           )}
-          {l?.poll && <p className="mt-3 text-[12.5px] leading-relaxed text-muted">In the 2013 polls: <span className="text-soft">{l.poll}</span></p>}
-        </Part>
-
-        <Part title="Your path with them">
-          {path ? (
-            <div className="tnum flex flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-[13px] text-soft">
-              {path.map((v, i) => <span key={i} className="flex items-center gap-1.5">{i > 0 && <ArrowRight className="size-3 text-faint" />}<span className={i === path.length - 1 ? "text-fg" : ""}>{Math.round(v)}</span></span>)}
-            </div>
-          ) : (
-            <p className="text-[13px] leading-relaxed text-muted">This group moves with your citywide standing: gain citywide and you gain here in proportion to how far the real campaign moved this group.</p>
-          )}
-        </Part>
+        </div>
 
         {!!mineHere.length && (
-          <Part title="Your planks that touch them">
-            <ul className="space-y-2.5">
-              {mineHere.map((p) => (
-                <li key={p.text + p.why} className="text-[13px] leading-snug text-soft">
-                  {p.text}
-                  <span className={cn("mt-0.5 block text-[12px]", p.good ? "text-pos" : "text-neg")}>{p.good ? "Serves them" : "Costs you here"}: <span className="text-muted">{p.why}</span></span>
-                </li>
-              ))}
-            </ul>
-          </Part>
+          <ul className="mt-5 space-y-1.5 border-t border-line pt-4">
+            {mineHere.map((p) => (
+              <li key={p.text + p.good} className="flex gap-2 text-[13px] leading-snug text-soft"><span className={cn("shrink-0 font-medium", p.good ? "text-pos" : "text-neg")}>{p.good ? "Your plank serves them" : "Your plank costs you here"}</span><span className="min-w-0 truncate text-muted" title={p.text}>{p.text}</span></li>
+            ))}
+          </ul>
         )}
 
-        {census && (
-          <Part title="Where they live">
-            <ul>
-              {homes.map((d) => (
-                <li key={d.cd}>
-                  <button onClick={() => toDistrict(d.cd)} className="-mx-2 flex w-[calc(100%+16px)] items-center justify-between gap-3 rounded-md px-2 py-1 text-left text-[13px] text-soft transition-colors hover:bg-hover hover:text-fg">
-                    <span className="min-w-0 truncate">{d.name}</span>
-                    <span className="tnum shrink-0 font-mono text-[11.5px] text-muted">{Math.round(d.demo!.race[census])}% of residents</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[11.5px] text-faint">Census estimates by community district. Current figures, not 2013.</p>
-          </Part>
+        {more && (
+          <div className="mt-5 space-y-5 border-t border-line pt-5">
+            <p className="text-[12.5px] leading-relaxed text-muted">Citywide he had {FACTION_POLLS.feb.citywide}% in February and {FACTION_POLLS.sep.citywide}% in September. February asked registered Democrats and September likely voters, so the two are not strictly comparable.</p>
+            {l?.poll && <Part title="In the 2013 polls"><p className="text-[13px] leading-relaxed text-soft">{l.poll}</p></Part>}
+            <Part title="Your path with them">
+              {path ? (
+                <div className="tnum flex flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-[13px] text-soft">
+                  {path.map((v, i) => <span key={i} className="flex items-center gap-1.5">{i > 0 && <ArrowRight className="size-3 text-faint" />}<span className={i === path.length - 1 ? "text-fg" : ""}>{Math.round(v)}</span></span>)}
+                </div>
+              ) : (
+                <p className="text-[13px] leading-relaxed text-muted">This group moves with your citywide standing: gain citywide and you gain here in proportion to how far the real campaign moved this group.</p>
+              )}
+            </Part>
+            {census && (
+              <Part title="Where they live">
+                <ul>
+                  {homes.map((d) => (
+                    <li key={d.cd}>
+                      <button onClick={() => toDistrict(d.cd)} className="-mx-2 flex w-[calc(100%+16px)] items-center justify-between gap-3 rounded-md px-2 py-1 text-left text-[13px] text-soft transition-colors hover:bg-hover hover:text-fg">
+                        <span className="min-w-0 truncate">{d.name}</span>
+                        <span className="tnum shrink-0 font-mono text-[11.5px] text-muted">{Math.round(d.demo!.race[census])}% of residents</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11.5px] text-faint">Census estimates by community district. Current figures, not 2013.</p>
+              </Part>
+            )}
+          </div>
         )}
       </div>
+      <button onClick={() => setMore(!more)} aria-expanded={more} className="flex h-11 shrink-0 items-center justify-center gap-1.5 border-t border-line font-display text-[12.5px] text-muted transition-colors hover:bg-gold/5 hover:text-gold-bright">
+        {more ? "Less" : "More"} <ChevronDown className={cn("size-3.5 transition-transform", more && "rotate-180")} />
+      </button>
     </motion.aside>
   );
 }
