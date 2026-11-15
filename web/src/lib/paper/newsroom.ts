@@ -1,6 +1,7 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import { numbersIn, type Story } from "./edition";
+import { CANDIDATES, FRAMING } from "../scenario";
 
 // The Ledger's newsroom: one fast call that turns the template stories into readable copy. It may only use
 // numbers that appear in the facts; any story with a number that is not there keeps its template text.
@@ -34,7 +35,7 @@ export async function write(req: WriteRequest): Promise<WriteResult> {
   const res = await model.invoke([
     {
       role: "system",
-      content: `You are the newsroom of The Five Borough Ledger, a fictional New York City newspaper in a nonpartisan teaching game about running for mayor. The candidates (Adrian Cole, Victoria Hale, Naomi Brandt) and campaign staff are fictional; never name or quote real people.
+      content: `You are the newsroom of The Five Borough Ledger, a fictional New York City newspaper in a teaching simulation about running for mayor. The candidates are ${CANDIDATES.map((c) => c.name).join(", ")}. ${FRAMING} Never quote anyone.
 House rules:
 - Rewrite each story as lively, concrete newspaper copy. Headlines under 12 words. Bodies of 2 to 4 sentences.
 - Use ONLY facts and numbers present in the facts JSON. Do not invent any number, quote, event or cause. Never claim that one specific action moved the polls by a specific amount.

@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { groupsHere } from "@/lib/demographics";
 import { DISTRICTS } from "@/lib/geo";
 import { sentimentOf, useGame } from "@/lib/store";
+import { CANDIDATES } from "@/lib/scenario";
 
 // A real street map of New York (OpenFreeMap, no key) with the 59 community districts on top, coloured by
 // how each one feels about Cole. Buildings rise in 3D when you zoom in on a district.
@@ -109,7 +110,7 @@ export function MapCanvas({ onHover, onSelect }: { onHover: (t: { x: number; y: 
         m.addSource("districts", { type: "geojson", data: geojson });
         const support = ["interpolate", ["linear"], ["coalesce", ["feature-state", "v"], 50], 20, "rgb(70,116,214)", 47.5, "rgb(50,50,58)", 75, "rgb(240,162,59)"];
         // On election night a district shows its winner once its result is in.
-        const heat = ["match", ["coalesce", ["feature-state", "winner"], "none"], "cole", "#f0a23b", "hale", "#a3a3ad", "brandt", "#7b72d6", support];
+        const heat = ["match", ["coalesce", ["feature-state", "winner"], "none"], ...CANDIDATES.flatMap((c) => [c.id, c.color]), support];
         m.addLayer({ id: "district-fill", type: "fill", source: "districts", filter: ["!", ["get", "park"]], paint: { "fill-color": heat as never, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], ["+", ["coalesce", ["feature-state", "op"], 0.6], 0.18], ["coalesce", ["feature-state", "op"], 0.6]] as never, "fill-opacity-transition": { duration: 400 }, "fill-color-transition": { duration: 600 } } }, firstLabel);
         m.addLayer({ id: "district-line", type: "line", source: "districts", filter: ["!", ["get", "park"]], paint: { "line-color": "rgba(255,255,255,0.22)", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 14, 1.6] } }, firstLabel);
         m.addLayer({ id: "district-pulse", type: "line", source: "districts", paint: { "line-color": "#f0a23b", "line-blur": 3, "line-width": ["case", ["boolean", ["feature-state", "pulse"], false], 6, 0], "line-opacity": ["case", ["boolean", ["feature-state", "pulse"], false], 0.9, 0], "line-width-transition": { duration: 500 }, "line-opacity-transition": { duration: 900 } } });

@@ -1,6 +1,7 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import { genericPool, POOL, type Candidate } from "./roster";
+import { FRAMING, MY_CAMPAIGN } from "../scenario";
 
 // Short single calls: a staffer speaking up unprompted, and a shortlist of people to hire.
 
@@ -15,7 +16,7 @@ export async function speak(r: SpeakRequest): Promise<{ text: string; suggest: s
   if (!live()) return { ...r.fallback, mode: "offline" };
   try {
     const res = await model().invoke([
-      { role: "system", content: `You are ${r.name}, ${r.role} on Adrian Cole's fictional mayoral campaign in a nonpartisan teaching game. Voice: ${r.voice}` },
+      { role: "system", content: `You are ${r.name}, ${r.role} on ${MY_CAMPAIGN} for mayor. ${FRAMING} Voice: ${r.voice}` },
       { role: "user", content: `Something your boss should hear about, unprompted:\n${r.situation}\n\nCampaign state: ${r.context}\n\nWrite exactly two lines.\nLine 1: what you say to your boss, under 35 words, in your voice, no greeting.\nLine 2: SUGGEST: a short instruction (under 12 words) your boss could give you to act on it.` },
     ]);
     const lines = text(res.content).split("\n").map((l) => l.trim()).filter(Boolean);

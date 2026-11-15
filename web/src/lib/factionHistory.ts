@@ -1,6 +1,7 @@
 import { FACTIONS } from "./data";
 import type { LedgerEntry } from "./store";
 import type { Staff } from "./data";
+import { ME, nameOf } from "./scenario";
 
 // Why a group feels the way it does. Every change to a group's feeling goes through the ledger (directly or
 // as a knock-on from a group it moves with), so its whole history can be read back from it.
@@ -11,11 +12,11 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /** Who caused a ledger entry, in words the player recognises. */
 export function actor(l: LedgerEntry, staff: Staff[]) {
-  if (l.source === "candidate") return "Cole";
+  if (l.source === "candidate") return ME.short;
   if (l.source === "manifesto") return "Your manifesto";
   if (l.source === "tactic") return "Contrast ad";
   if (l.source === "debate") return "Debate";
-  if (l.source === "rival") return l.effect.by === "hale" ? "Hale" : "Brandt";
+  if (l.source === "rival") return nameOf(l.effect.by);
   return staff.find((p) => p.id === l.effect.by)?.name ?? "Staff";
 }
 

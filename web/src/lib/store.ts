@@ -8,7 +8,7 @@ import { effectOf, type Effect } from "./engine/resolve";
 import { knockOns } from "./relations";
 import { calibrate, pollOf, type Rival } from "./engine/poll";
 import { publish, type PollRecord } from "./engine/polls";
-import { RIVALS } from "./engine/rivals";
+import { RIVAL_LIST } from "./scenario";
 import { tacticOutcome, type Deliverer } from "./engine/tactic";
 import { electionResult, type ElectionResult } from "./engine/election";
 import type { Edition } from "./paper/edition";
@@ -41,9 +41,9 @@ type State = {
   speed: number;
   cash: number;
   /** The latest PUBLISHED poll: all anyone (player, staff, rivals) ever sees of public opinion. */
-  poll: { cole: number; hale: number; brandt: number };
+  poll: Record<string, number>;
   /** The true opinion, moved by every Effect. Internal: only the engine and election night read it. */
-  truth: { cole: number; hale: number; brandt: number };
+  truth: Record<string, number>;
   /** Every poll published so far (engine/polls.ts). */
   polls: PollRecord[];
   /** The campaign's own read of each district: updated where Cole or his staff worked, and citywide on poll days. */
@@ -177,10 +177,9 @@ const NOON = 720;
 // Tune the poll so day 1 reads as the README describes (Hale 38, Cole 31, Brandt 14, undecided 17).
 calibrate(sent);
 
-const START_RIVALS: Record<Rival, RivalState> = {
-  hale: { cash: RIVALS.hale.cash, raised: 0, spent: 0, matchable: 0, matchPaid: 0, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
-  brandt: { cash: RIVALS.brandt.cash, raised: 0, spent: 0, matchable: 0, matchPaid: 0, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } },
-};
+const START_RIVALS: Record<Rival, RivalState> = Object.fromEntries(
+  RIVAL_LIST.map((r) => [r.id, { cash: r.cash, raised: 0, spent: 0, matchable: 0, matchPaid: 0, strength: {}, memory: [], plan: { day: 0, status: "idle", moves: [] } } satisfies RivalState]),
+);
 const DAY1_TRUTH = pollOf({ sent, day: 1, rivals: START_RIVALS });
 const DAY1_POLL = publish({ truth: DAY1_TRUTH, factions: FACTIONS, ledger: [] }, 1);
 
@@ -190,7 +189,7 @@ export const useGame = create<State>((set, get) => ({
   min: DAY_START,
   speed: 1,
   cash: 412000,
-  poll: { cole: DAY1_POLL.cole, hale: DAY1_POLL.hale, brandt: DAY1_POLL.brandt },
+  poll: DAY1_POLL.shares,
   truth: DAY1_TRUTH,
   polls: [DAY1_POLL],
   fieldRead: { ...sent },

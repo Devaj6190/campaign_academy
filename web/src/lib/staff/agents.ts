@@ -6,6 +6,7 @@ import { ACTION_IDS, ACTIONS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
 import type { RunCtx } from "./protocol";
 import { humanize, PLACES, type Snapshot } from "./world";
+import { CANDIDATES, FRAMING, ME, MY_CAMPAIGN } from "../scenario";
 
 // Real staff. Each director is a deep agent: it plans with write_todos and hands jobs to its people through the
 // task tool. Each of their people is a subagent that does one job with take_action. All model ids live here.
@@ -28,10 +29,10 @@ const slug = (name: string) => name.toLowerCase().replace(/[^a-z]+/g, "_").repla
 
 export function world(w: Snapshot) {
   const days = 30 - w.day;
-  const factions = w.factions.map((f) => `${f.id} (${f.name}): feels ${Math.round(f.feel)}/100 toward Cole, size ${f.size}`).join("\n");
+  const factions = w.factions.map((f) => `${f.id} (${f.name}): feels ${Math.round(f.feel)}/100 toward ${ME.short}, size ${f.size}`).join("\n");
   const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 50) - (w.sent[b.cd] ?? 50));
   const line = (p: (typeof PLACES)[number]) => `${p.cd} ${p.name} (${p.boro}): support ${Math.round(w.sent[p.cd] ?? 50)}, top complaint "${p.issue}"`;
-  return `Day ${w.day} of 30 (${days} left). Cash $${w.cash.toLocaleString("en-US")}. Poll: Hale ${w.poll.hale}, Cole ${w.poll.cole}, Brandt ${w.poll.brandt}.
+  return `Day ${w.day} of 30 (${days} left). Cash $${w.cash.toLocaleString("en-US")}. Poll: ${CANDIDATES.map((c) => `${c.short} ${w.poll[c.id] ?? 0}`).join(", ")}.
 Manifesto: ${w.manifesto.map((m, i) => `${i + 1}. ${m}`).join(" ")}
 Factions (use the id):
 ${factions}
@@ -70,7 +71,7 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
     description: `${p.name}, ${p.role}. Good at: ${p.good ?? p.profile.skills.join(", ")}. Weak at: ${p.weak ?? "nothing noted"}. Skills: ${p.profile.skills.join(", ")}.`,
     model: worker(),
     tools: [actionTool(ctx, p.id)],
-    systemPrompt: `You are ${p.name}, ${p.role} on Adrian Cole's campaign for Mayor of New York City. This is a fictional, nonpartisan teaching simulation.
+    systemPrompt: `You are ${p.name}, ${p.role} on ${MY_CAMPAIGN} for Mayor of New York City. ${FRAMING}
 Voice: ${p.profile.voice}
 Your boss ${me.name} has handed you one job. Do it with take_action: usually one action, at most two. Pick the action, district and faction that best fit the job and your skills. If take_action says something was not done, do not retry the same thing.
 Then reply in under 40 words, in your own voice, saying what happened. Use only the facts take_action gave you.
@@ -104,7 +105,7 @@ ${world(w)}`,
     name: slug(me.name!),
     tools: team.length ? [send] : [actionTool(ctx, me.id), send],
     subagents,
-    systemPrompt: `You are ${me.name}, ${me.role} on Adrian Cole's campaign for Mayor of New York City. This is a fictional, nonpartisan teaching simulation; the player is a student learning to run a campaign, and they are your boss.
+    systemPrompt: `You are ${me.name}, ${me.role} on ${MY_CAMPAIGN} for Mayor of New York City. ${FRAMING} the player is a student learning to run a campaign, and they are your boss.
 Voice: ${prof.voice}
 Strengths: ${me.good ?? prof.skills.join(", ")}. Weaknesses: ${me.weak ?? "none noted"}. Let both show in your choices.
 

@@ -10,6 +10,7 @@ import { useGame } from "../store";
 import { canPay } from "../money/run";
 import { buildEdition, factsOf, type Edition, type Kind, type Story } from "./edition";
 import type { WriteResult } from "./newsroom";
+import { ME } from "../scenario";
 
 // Puts each edition together: the template goes out at once, the newsroom's copy replaces it when ready.
 
@@ -54,16 +55,16 @@ export function respond(e: Edition, choice: "statement" | "staff" | "pass"): str
   if (!r || e.decision) return "";
   const g = useGame.getState();
   if (choice === "statement") {
-    if (appearancesToday(g) >= DAILY) return `Cole has already made ${DAILY} appearances today. Hand it to Comms instead.`;
+    if (appearancesToday(g) >= DAILY) return `${ME.short} has already made ${DAILY} appearances today. Hand it to Comms instead.`;
     const cd = r.cd;
     const action = r.kind === "attack" ? "rapid_response" : "coalition_meeting";
     const faction = r.faction ?? (cd ? largestGroup(cd) : undefined);
     const effect = resolve(snapshot(), "candidate", action, { district: cd, faction }, { quality: 1, seed: g.day * 977 + (cd ?? 0), load: 0 });
     const pay = canPay(action, effect.cost);
     if (!pay.ok) return pay.text;
-    g.applyEffect({ ...effect, summary: `Cole answered the Ledger's front page ("${e.lead.headline}"): ${effect.summary}` }, "candidate");
+    g.applyEffect({ ...effect, summary: `${ME.short} answered the Ledger's front page ("${e.lead.headline}"): ${effect.summary}` }, "candidate");
     patch(e.day, e.kind, (x) => ({ ...x, decision: "respond" }));
-    return "Cole responded in person.";
+    return `${ME.short} responded in person.`;
   }
   if (choice === "staff") {
     const group = r.faction ? g.factions.find((f) => f.id === r.faction)?.name.toLowerCase() : undefined;

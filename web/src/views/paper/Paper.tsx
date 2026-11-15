@@ -8,6 +8,7 @@ import { markRead, respond } from "@/lib/paper/run";
 import { appearancesToday, DAILY } from "@/lib/candidate";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
+import { CANDIDATES } from "@/lib/scenario";
 
 // The Five Borough Ledger. A broadsheet in four sections, with every past edition one click away.
 // It never opens itself: it arrives as a chip in the top bar.
@@ -120,18 +121,19 @@ function Front({ e, close }: { e: Edition; close: () => void }) {
   );
 }
 
-const ROWS = [["Hale", "hale", "rgb(255 255 255 / .55)"], ["Cole", "cole", "var(--color-warm)"], ["Brandt", "brandt", "#9d95e8"]] as const;
+// Everyone who has a share in the poll, as [short name, id, colour].
+const rowsOf = (polls: { shares: Record<string, number> }[]) => CANDIDATES.filter((c) => polls.some((p) => (p.shares[c.id] ?? 0) > 0)).map((c) => [c.short, c.id, c.color] as const);
 
 function PollBars({ p }: { p: Edition["polls"]["latest"] }) {
   return (
     <div className="mt-3 space-y-2.5">
-      {ROWS.map(([n, k, c]) => (
+      {rowsOf([p]).map(([n, k, c]) => (
         <div key={k} className="text-[13px]">
-          <div className="flex justify-between"><span className="text-soft">{n}</span><span className="tnum font-mono text-[12px]">{p[k]}%</span></div>
+          <div className="flex justify-between"><span className="text-soft">{n}</span><span className="tnum font-mono text-[12px]">{p.shares[k] ?? 0}%</span></div>
           {/* The bar with its margin of error as a faint band around the end. */}
           <div className="relative mt-1 h-1.5 rounded-full bg-white/[0.06]">
-            <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${p[k] * 2}%`, background: c }} />
-            <div className="absolute inset-y-[-2px] rounded-sm bg-white/15" style={{ left: `${Math.max(0, p[k] - p.moe) * 2}%`, width: `${p.moe * 4}%` }} />
+            <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${(p.shares[k] ?? 0) * 2}%`, background: c }} />
+            <div className="absolute inset-y-[-2px] rounded-sm bg-white/15" style={{ left: `${Math.max(0, (p.shares[k] ?? 0) - p.moe) * 2}%`, width: `${p.moe * 4}%` }} />
           </div>
         </div>
       ))}
@@ -173,11 +175,11 @@ function Polls({ e }: { e: Edition }) {
         <Label>Every poll so far</Label>
         <svg viewBox={`0 0 ${W + 70} ${H + 18}`} className="mt-3 w-full overflow-visible">
           {[10, 20, 30, 40, 50].map((v) => <line key={v} x1={0} x2={W} y1={y(v)} y2={y(v)} stroke="rgb(255 255 255 / .06)" />)}
-          {ROWS.map(([n, k, c]) => (
+          {rowsOf(all).map(([n, k, c]) => (
             <g key={k}>
-              <path d={"M" + all.map((q, i) => `${x(i)} ${y(q[k])}`).join("L")} fill="none" stroke={c} strokeWidth={1.8} />
-              {all.map((q, i) => <circle key={i} cx={x(i)} cy={y(q[k])} r={2.5} fill={c} />)}
-              <text x={x(all.length - 1) + 8} y={y(all[all.length - 1][k]) + 3} fill={c} className="font-mono text-[10px]">{n} {all[all.length - 1][k]}</text>
+              <path d={"M" + all.map((q, i) => `${x(i)} ${y(q.shares[k] ?? 0)}`).join("L")} fill="none" stroke={c} strokeWidth={1.8} />
+              {all.map((q, i) => <circle key={i} cx={x(i)} cy={y(q.shares[k] ?? 0)} r={2.5} fill={c} />)}
+              <text x={x(all.length - 1) + 8} y={y(all[all.length - 1].shares[k] ?? 0) + 3} fill={c} className="font-mono text-[10px]">{n} {all[all.length - 1].shares[k] ?? 0}</text>
             </g>
           ))}
           {all.map((q, i) => <text key={q.day} x={x(i)} y={H + 14} textAnchor="middle" className="fill-[var(--color-faint)] font-mono text-[9px]">D{q.day}</text>)}

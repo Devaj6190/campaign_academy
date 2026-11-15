@@ -23,7 +23,7 @@ export type Effect = {
   momentum: number;
   calendar?: string;
   /** A rival move: who made it and how much stronger they got in each district (poll.ts). */
-  rival?: { who: "hale" | "brandt"; strength: Record<number, number> };
+  rival?: { who: string; strength: Record<number, number> };
   /** Which daily budget paid, or "cash" (cheap actions, and money you approved beyond a budget). */
   paidFrom?: Envelope | "cash";
   /** Donors this brought in, and the groups it asked (they tire of being asked). */

@@ -6,13 +6,14 @@ import type { PollRecord } from "../engine/polls";
 import type { ElectionResult } from "../engine/election";
 import type { LedgerEntry } from "../store";
 import { hash } from "../util";
+import { activeRivals, ME, nameOf } from "../scenario";
 
 // The Five Borough Ledger. Each edition covers what happened since the previous one. Stories are picked
 // by newsworthiness and written here as plain templates from the facts; the AI newsroom may rewrite them,
 // but only with numbers that appear in these facts (newsroom.ts checks).
 
 export type Story = { kicker: string; headline: string; body: string; cd?: number };
-export type Respond = { kind: "issue" | "attack"; cd?: number; faction?: string; rival?: "hale" | "brandt" };
+export type Respond = { kind: "issue" | "attack"; cd?: number; faction?: string; rival?: string };
 export type Kind = "daily" | "debate" | "eve" | "result";
 
 export type Edition = {
@@ -47,7 +48,7 @@ type World = {
   election: { result: ElectionResult } | null;
   money?: { events: MoneyEvent[]; raisedTotal: number; spentTotal: number; matchPaid: number };
   cash?: number;
-  rivals?: Record<"hale" | "brandt", { raised: number; spent: number; cash: number }>;
+  rivals?: Record<string, { raised: number; spent: number; cash: number }>;
 };
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -64,9 +65,9 @@ export const numbersIn = (text: string) =>
   });
 
 function who(l: LedgerEntry, staff: World["staff"]) {
-  if (l.source === "candidate") return "Cole";
-  if (l.source === "rival") return RIVALS[l.effect.by as "hale" | "brandt"]?.short ?? "A rival";
-  return staff.find((p) => p.id === l.effect.by)?.name ?? "The Cole campaign";
+  if (l.source === "candidate") return ME.short;
+  if (l.source === "rival") return RIVALS[l.effect.by]?.short ?? "A rival";
+  return staff.find((p) => p.id === l.effect.by)?.name ?? `The ${ME.short} campaign`;
 }
 
 function cityStory(cd: number, why: string): Story {
@@ -79,6 +80,9 @@ function cityStory(cd: number, why: string): Story {
   ].filter(Boolean);
   return { kicker: d.boro, headline: `${d.name}: ${why}`, body: bits.join(" "), cd };
 }
+
+/** "Quinn 36, de Blasio 12, Thompson 11": everyone in the race, highest first. */
+const pollNames = (p: PollRecord) => Object.entries(p.shares).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([id, v]) => `${nameOf(id)} ${v}`).join(", ");
 
 export function buildEdition(w: World, kind: Kind = "daily"): Edition {
   const prev = w.editions[w.editions.length - 1];
@@ -97,34 +101,35 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
   const moneyNews = (w.money?.events ?? []).slice(prev?.moneyUpTo ?? 0);
   const urgent = moneyNews.find((e) => e.kind === "fine" || e.kind === "quit" || e.kind === "missed" || e.kind === "broke");
   const plain = moneyNews.find((e) => e.kind === "joined" || e.kind === "declined" || e.kind === "payment" || e.kind === "qualified");
-  const filings = w.money && w.rivals ? ` Latest filings: Cole has raised $${fmt(w.money.raisedTotal + w.money.matchPaid)} and spent $${fmt(w.money.spentTotal)}; Hale raised $${fmt(w.rivals.hale.raised)} and spent $${fmt(w.rivals.hale.spent)}; Brandt raised $${fmt(w.rivals.brandt.raised)} and spent $${fmt(w.rivals.brandt.spent)}.` : "";
-  const MONEY_HEAD: Record<MoneyEvent["kind"], string> = { fine: "Cole campaign fined for breaking the spending limit", quit: "Staffer quits Cole campaign over missed pay", missed: "Cole campaign misses payroll", broke: "Cole campaign runs short of cash", joined: "Cole opts into public financing", declined: "Cole turns down public financing", payment: "Public funds arrive for Cole", qualified: "Cole qualifies for matching funds" };
+  const filings = w.money && w.rivals ? ` Latest filings: ${ME.short} has raised $${fmt(w.money.raisedTotal + w.money.matchPaid)} and spent $${fmt(w.money.spentTotal)}; ${activeRivals(w.day).map((id) => `${nameOf(id)} raised $${fmt(w.rivals![id].raised)} and spent $${fmt(w.rivals![id].spent)}`).join("; ")}.` : "";
+  const MONEY_HEAD: Record<MoneyEvent["kind"], string> = { fine: `${ME.short} campaign fined for breaking the spending limit`, quit: `Staffer quits ${ME.short} campaign over missed pay`, missed: `${ME.short} campaign misses payroll`, broke: `${ME.short} campaign runs short of cash`, joined: `${ME.short} opts into public financing`, declined: `${ME.short} turns down public financing`, payment: `Public funds arrive for ${ME.short}`, qualified: `${ME.short} qualifies for matching funds` };
   const moneyLead = (e: MoneyEvent): Edition["lead"] => ({ kicker: "Campaign money", headline: MONEY_HEAD[e.kind], body: `${e.text}${filings}` });
-  const pollLine = (p: PollRecord) => `Hale ${p.hale}, Cole ${p.cole}, Brandt ${p.brandt}, undecided ${p.undecided} (${p.pollster}, ${fmt(p.n)} likely voters, margin of error ±${p.moe})`;
+  const pollLine = (p: PollRecord) => `${pollNames(p)}, undecided ${p.undecided} (${p.pollster}, ${fmt(p.n)} likely voters, margin of error ±${p.moe})`;
 
   // Front page, in order of news value.
   let lead: Edition["lead"];
   if (kind === "result" && w.election) {
     const r = w.election.result;
-    lead = { kicker: "Election night", headline: r.won ? "Cole wins City Hall" : "Cole concedes", body: `With all 59 districts reporting: Cole ${r.pct.cole}%, Hale ${r.pct.hale}%, Brandt ${r.pct.brandt}%. Cole carried ${r.districtsWon.cole} districts, Hale ${r.districtsWon.hale}, Brandt ${r.districtsWon.brandt}.` };
+    lead = { kicker: "Election night", headline: r.won ? `${ME.short} wins ${r.runoff ? "the runoff" : "City Hall"}` : `${ME.short} concedes`, body: `With all 59 districts reporting: ${r.ranked.map((id) => `${nameOf(id)} ${r.pct[id]}%`).join(", ")}. ${r.runoff ? `Nobody reached the threshold, so ${nameOf(r.runoff.a)} and ${nameOf(r.runoff.b)} met in a runoff: ${nameOf(r.runoff.a)} ${r.runoff.pct[r.runoff.a]}%, ${nameOf(r.runoff.b)} ${r.runoff.pct[r.runoff.b]}%.` : `${ME.short} carried ${r.districtsWon[ME.id] ?? 0} districts.`}` };
   } else if (kind === "eve") {
     lead = { kicker: "Election day", headline: "New York votes today", body: `The final poll: ${pollLine(latest)}. The race is decided in the districts below.` };
   } else if (debate) {
-    lead = { kicker: "Debate night", headline: clean(debate.effect.summary).replace(/\.$/, ""), body: `The candidates met on stage with ${w.manifesto.length} planks in Cole's platform. ${freshPoll ? `The latest poll: ${pollLine(latest)}.` : "The next poll will show whether it moved anyone."}` };
+    lead = { kicker: "Debate night", headline: clean(debate.effect.summary).replace(/\.$/, ""), body: `The candidates met on stage with ${w.manifesto.length} planks in ${ME.short}'s platform. ${freshPoll ? `The latest poll: ${pollLine(latest)}.` : "The next poll will show whether it moved anyone."}` };
   } else if (urgent) {
     lead = moneyLead(urgent);
   } else if (freshPoll) {
-    const change = previous ? latest.cole - previous.cole : 0;
-    lead = { kicker: "New poll", headline: `Hale ${latest.hale}, Cole ${latest.cole}, Brandt ${latest.brandt}`, body: `${pollLine(latest)}.${previous ? ` In the day ${previous.day} poll Cole stood at ${previous.cole}; ${change === 0 ? "no change beyond the margin" : Math.abs(change) <= latest.moe ? "a shift within the margin of error" : change > 0 ? "a real gain" : "a real slide"}.` : ""}` };
+    const mine = (p: PollRecord) => p.shares[ME.id] ?? 0;
+    const change = previous ? mine(latest) - mine(previous) : 0;
+    lead = { kicker: "New poll", headline: pollNames(latest), body: `${pollLine(latest)}.${previous ? ` In the day ${previous.day} poll ${ME.short} stood at ${mine(previous)}; ${change === 0 ? "no change beyond the margin" : Math.abs(change) <= latest.moe ? "a shift within the margin of error" : change > 0 ? "a real gain" : "a real slide"}.` : ""}` };
   } else if (plain) {
     lead = moneyLead(plain);
   } else if (backfire) {
-    lead = { kicker: "Campaign trail", headline: "Cole's contrast ad backfires", body: `${clean(backfire.effect.summary)} Critics called it the first negative ad of the race.` };
+    lead = { kicker: "Campaign trail", headline: `${ME.short}'s contrast ad backfires`, body: `${clean(backfire.effect.summary)} Critics called it the first negative ad of the race.` };
   } else if (blitz) {
-    const r = RIVALS[blitz.effect.by as "hale" | "brandt"];
-    lead = { kicker: "Campaign trail", headline: `${r.short} moves into ${short(blitz.effect.district)}`, body: `${clean(blitz.effect.summary)} ${short(blitz.effect.district)} had been one of Cole's stronger districts.`, cd: blitz.effect.district, respond: { kind: "attack", cd: blitz.effect.district, faction: blitz.effect.faction, rival: blitz.effect.by as "hale" | "brandt" } };
+    const r = RIVALS[blitz.effect.by];
+    lead = { kicker: "Campaign trail", headline: `${r.short} moves into ${short(blitz.effect.district)}`, body: `${clean(blitz.effect.summary)} ${short(blitz.effect.district)} had been one of ${ME.short}'s stronger districts.`, cd: blitz.effect.district, respond: { kind: "attack", cd: blitz.effect.district, faction: blitz.effect.faction, rival: blitz.effect.by } };
   } else if (biggest) {
-    lead = { kicker: "Campaign trail", headline: clean(biggest.effect.summary).replace(/\.$/, ""), body: `${who(biggest, w.staff)} led the Cole campaign's biggest push since the last edition.`, cd: biggest.effect.district };
+    lead = { kicker: "Campaign trail", headline: clean(biggest.effect.summary).replace(/\.$/, ""), body: `${who(biggest, w.staff)} led the ${ME.short} campaign's biggest push since the last edition.`, cd: biggest.effect.district };
   } else {
     const [issue, count] = worst311.issues[0];
     lead = { kicker: "City", headline: `${cap(issue.toLowerCase())} complaints pile up in ${worst311.name}`, body: `Residents filed ${fmt(count)} reports in a month and say nobody at City Hall is listening. All three campaigns were asked what they would do.`, cd: worst311.cd, respond: { kind: "issue", cd: worst311.cd } };
@@ -134,16 +139,16 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
 
   const campaign: Story = cole.length
     ? { kicker: "Your campaign", headline: clean(cole[cole.length - 1].effect.summary).replace(/\.$/, ""), body: cole.slice(-4).map((l) => `${who(l, w.staff)}: ${clean(l.effect.summary)}`).join(" ") }
-    : { kicker: "Your campaign", headline: w.day === 1 ? "Cole takes over a campaign in motion" : "A quiet day for the Cole campaign", body: w.day === 1 ? `Thirty days out, the council member inherits a staff, ${w.manifesto.length} planks and a deficit in the polls.` : "No events, no ads, no doors. Rivals noticed." };
+    : { kicker: "Your campaign", headline: w.day === 1 ? `${ME.short} opens the campaign` : `A quiet day for the ${ME.short} campaign`, body: w.day === 1 ? `The campaign starts with a staff, ${w.manifesto.length} planks and ground to make up in the polls.` : "No events, no ads, no doors." };
   const opposition: Story = rival.length
     ? { kicker: "The opposition", headline: clean(rival[0].effect.summary).replace(/\.$/, ""), body: rival.map((l) => clean(l.effect.summary)).join(" ") }
-    : { kicker: "The opposition", headline: w.day === 1 ? "Hale and Brandt open their final month" : "A quiet night for the rivals", body: w.day === 1 ? `Hale runs on ${RIVALS.hale.runsOn.split(":")[0]}; Brandt on ${RIVALS.brandt.runsOn.split(":")[0]}. Both will answer what Cole does.` : "Their moves will show here the morning after they make them." };
+    : { kicker: "The opposition", headline: w.day === 1 ? "The field takes shape" : "A quiet night for the rivals", body: w.day === 1 ? `${activeRivals(1).map((id) => `${nameOf(id)} runs on ${RIVALS[id].runsOn.split(":")[0]}`).join("; ")}.` : "Their moves will show here the morning after they make them." };
 
   const coleCd = [...cole].reverse().find((l) => l.effect.district)?.effect.district;
   const rivalCd = [...rival].reverse().find((l) => l.effect.district)?.effect.district;
   const picks: [number, string][] = [];
-  if (coleCd) picks.push([coleCd, "where Cole's campaign worked"]);
-  if (rivalCd && rivalCd !== coleCd) picks.push([rivalCd, `where ${RIVALS[rival.find((l) => l.effect.district === rivalCd)!.effect.by as "hale" | "brandt"].short} campaigned`]);
+  if (coleCd) picks.push([coleCd, `where ${ME.short}'s campaign worked`]);
+  if (rivalCd && rivalCd !== coleCd) picks.push([rivalCd, `where ${RIVALS[rival.find((l) => l.effect.district === rivalCd)!.effect.by].short} campaigned`]);
   for (const d of [worst311, ...DISTRICTS.filter((x) => !x.park && x.vote).sort((a, b) => hash(a.cd, w.day + 3) - hash(b.cd, w.day + 3))]) {
     if (picks.length >= 3) break;
     if (!picks.some(([cd]) => cd === d.cd)) picks.push([d.cd, d.cd === worst311.cd ? "the city's loudest complaint" : "a neighborhood to know"]);
@@ -157,7 +162,7 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
   const editorial: Story = {
     kicker: "Editorial",
     headline: `On ${issue}, three answers`,
-    body: `New Yorkers keep telling the city about ${issue}. The candidates offer different answers. Cole's platform: ${w.manifesto.slice(0, 2).join(" ")} Hale runs on ${RIVALS.hale.runsOn}. Brandt runs on ${RIVALS.brandt.runsOn}. This page endorses no one; voters should judge each campaign by what it does in their neighborhood, not by what it promises.`,
+    body: `New Yorkers keep telling the city about ${issue}. The candidates offer different answers. ${ME.short}'s platform: ${w.manifesto.slice(0, 2).join(" ")} ${activeRivals(w.day).map((id) => `${nameOf(id)} runs on ${RIVALS[id].runsOn}.`).join(" ")} This page endorses no one; voters should judge each campaign by what it does in their neighborhood, not by what it promises.`,
   };
   const moved = previous ? w.factions.map((f) => ({ f, d: (latest.groups[f.id]?.feel ?? 50) - (previous.groups[f.id]?.feel ?? 50) })).sort((a, b) => b.d - a.d) : w.factions.map((f) => ({ f, d: f.feel - 50 })).sort((a, b) => b.d - a.d);
   const letter = (f: Faction, pleased: boolean): Story => ({
@@ -195,7 +200,7 @@ export const factsOf = (e: Edition) => ({
   day: e.day,
   daysLeft: 30 - e.day,
   kind: e.kind,
-  poll: { latest: e.polls.latest && { day: e.polls.latest.day, pollster: e.polls.latest.pollster, n: e.polls.latest.n, moe: e.polls.latest.moe, hale: e.polls.latest.hale, cole: e.polls.latest.cole, brandt: e.polls.latest.brandt, undecided: e.polls.latest.undecided }, previous: e.polls.previous && { day: e.polls.previous.day, cole: e.polls.previous.cole, hale: e.polls.previous.hale, brandt: e.polls.previous.brandt }, fresh: e.polls.fresh },
+  poll: { latest: e.polls.latest && { day: e.polls.latest.day, pollster: e.polls.latest.pollster, n: e.polls.latest.n, moe: e.polls.latest.moe, ...e.polls.latest.shares, undecided: e.polls.latest.undecided }, previous: e.polls.previous && { day: e.polls.previous.day, ...e.polls.previous.shares }, fresh: e.polls.fresh },
   since: e.polls.since.slice(-8),
   stories: { lead: e.lead, campaign: e.campaign, opposition: e.opposition, city: e.city, editorial: e.editorial, letters: e.letters },
   allowedNumbers: e.numbers,

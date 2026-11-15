@@ -7,6 +7,7 @@ import { isPollDay, publish } from "./polls";
 import type { Rival } from "./poll";
 import type { PlanResult } from "./rivalAgent";
 import { RIVALS } from "./rivals";
+import { activeRivals, ME, RIVAL_IDS } from "../scenario";
 import { GAME, NYC, PAYMENT_DAYS } from "../money/rules";
 import { hash } from "../util";
 
@@ -14,7 +15,7 @@ import { hash } from "../util";
 // morning paper can report them and nothing ever waits on an agent. A plan that is still running at the
 // rollover lands the moment it arrives. Debates are judged at the end of their day.
 
-const WHO: Rival[] = ["hale", "brandt"];
+const WHO: Rival[] = RIVAL_IDS;
 
 const setRival = (who: Rival, patch: (r: RivalState) => Partial<RivalState>) =>
   useGame.setState((g) => ({ rivals: { ...g.rivals, [who]: { ...g.rivals[who], ...patch(g.rivals[who]) } } }));
@@ -24,7 +25,7 @@ function coleToday() {
   const g = useGame.getState();
   const today = g.ledger.filter((l) => l.day === g.day && l.source !== "rival");
   const gained = [...new Set(today.flatMap((l) => Object.entries(l.effect.sent).filter(([, d]) => d > 0).map(([cd]) => +cd)))];
-  const ignored = g.editions.filter((e) => e.day === g.day && e.decision === "pass").map((e) => `Cole chose not to respond to this story in today's paper: "${e.lead.headline}"`);
+  const ignored = g.editions.filter((e) => e.day === g.day && e.decision === "pass").map((e) => `${ME.short} chose not to respond to this story in today's paper: "${e.lead.headline}"`);
   return { lines: [...today.slice(-6).map((l) => l.effect.summary.replace(/ \(Not their strength.*$/, "")), ...ignored], gained };
 }
 
@@ -62,7 +63,7 @@ function land(who: Rival) {
 function rivalIncome(today: number) {
   for (const who of WHO) {
     const def = RIVALS[who];
-    const income = Math.round(def.income * (0.8 + hash(today * 13, who === "hale" ? 3 : 5) * 0.4));
+    const income = Math.round(def.income * (0.8 + hash(today * 13, WHO.indexOf(who) * 2 + 3) * 0.4));
     setRival(who, (r) => {
       const matchable = r.matchable + Math.round(income * def.smallShare);
       const owed = def.participant && PAYMENT_DAYS.includes(today) ? Math.max(0, Math.min(GAME.publicCap, matchable * NYC.ratio) - r.matchPaid) : 0;
@@ -73,7 +74,8 @@ function rivalIncome(today: number) {
 
 /** Called at noon game time. */
 export function planRivals() {
-  for (const who of WHO) void plan(who);
+  // Only rivals already in the race plan tonight.
+  for (const who of activeRivals(useGame.getState().day)) void plan(who);
 }
 
 /** Called at the day rollover with the day that just ended. */
@@ -84,7 +86,7 @@ export function overnight(ended: number) {
     g.applyEffect(d.effect, "debate");
     useGame.setState((s) => ({ news: { ...s.news, debate: d.story } }));
   }
-  for (const who of WHO) {
+  for (const who of activeRivals(ended)) {
     const r = useGame.getState().rivals[who];
     if (r.plan.day === ended && r.plan.status === "ready") land(who);
     // Never started (e.g. the clock jumped past noon): plan now; it lands when it arrives.
@@ -97,7 +99,7 @@ export function overnight(ended: number) {
   if (isPollDay(today)) {
     const g = useGame.getState();
     const p = publish(g, today);
-    useGame.setState({ polls: [...g.polls, p], poll: { cole: p.cole, hale: p.hale, brandt: p.brandt }, fieldRead: { ...g.sent } });
+    useGame.setState({ polls: [...g.polls, p], poll: p.shares, fieldRead: { ...g.sent } });
   }
   // Then the paper goes to press: a debate extra, election eve on day 30, a daily edition otherwise.
   void import("../paper/run").then((m) => m.publishEdition(today === 30 ? "eve" : DEBATE_DAYS.includes(ended) ? "debate" : "daily"));

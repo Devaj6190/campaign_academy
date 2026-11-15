@@ -1,6 +1,7 @@
 import type { PollRecord } from "../engine/polls";
 import { addGifts, recover, trickleGifts } from "./donors";
 import { ENVELOPES, GAME, NYC, PAYMENT_DAYS, sum, TRICKLE, type Envelopes, type Money, type MoneyEvent, type Source } from "./rules";
+import { ME } from "../scenario";
 
 // The campaign's books. Pure functions over the money state, so the store, the panels, Dana and the paper
 // all read the same numbers.
@@ -73,7 +74,7 @@ export function settle(b: Books, ended: number): { cash: number; money: Money; m
   // Anyone who hasn't decided on public financing by the end of day 1 is in (the default for most campaigns).
   if (m.participant === null) {
     m = { ...m, participant: true };
-    events.push({ day: today, kind: "joined", text: "Cole joined the city's public financing program: matching funds, and a spending limit." });
+    events.push({ day: today, kind: "joined", text: `${ME.short} joined the city's public financing program: matching funds, and a spending limit.` });
   }
 
   // Whatever was not used from yesterday's budgets is gone.
@@ -89,11 +90,11 @@ export function settle(b: Books, ended: number): { cash: number; money: Money; m
   // Public funds arrive on payment days for everything matched so far.
   const before = matchStatus(b.money);
   const ms = matchStatus(m);
-  if (ms.qualified && !before.qualified && m.participant) events.push({ day: today, kind: "qualified", text: `Cole qualified for public matching funds: ${ms.nycDonors.toLocaleString("en-US")} New York donors and ${k(ms.matchable)} in matchable gifts.` });
+  if (ms.qualified && !before.qualified && m.participant) events.push({ day: today, kind: "qualified", text: `${ME.short} qualified for public matching funds: ${ms.nycDonors.toLocaleString("en-US")} New York donors and ${k(ms.matchable)} in matchable gifts.` });
   if (PAYMENT_DAYS.includes(today) && ms.owed > 0) {
     cash += ms.owed;
     m = { ...m, matchPaid: m.matchPaid + ms.owed, payments: [...m.payments, { day: today, amount: ms.owed }], income: [...m.income, { day: today, source: "Public funds" as const, amount: ms.owed }] };
-    events.push({ day: today, kind: "payment", text: `The Campaign Finance Board paid Cole ${k(ms.owed)} in matching funds.`, amount: ms.owed });
+    events.push({ day: today, kind: "payment", text: `The Campaign Finance Board paid ${ME.short} ${k(ms.owed)} in matching funds.`, amount: ms.owed });
   }
 
   // Payroll, or a missed payday.
@@ -104,7 +105,7 @@ export function settle(b: Books, ended: number): { cash: number; money: Money; m
   } else {
     missedPayroll = true;
     m = { ...m, missed: m.missed + 1 };
-    events.push({ day: today, kind: "missed", text: `The Cole campaign missed payroll: ${k(b.payroll)} due, ${k(Math.max(0, cash))} in the bank.`, amount: b.payroll });
+    events.push({ day: today, kind: "missed", text: `The ${ME.short} campaign missed payroll: ${k(b.payroll)} due, ${k(Math.max(0, cash))} in the bank.`, amount: b.payroll });
   }
 
   // Tomorrow's budgets are paid for now, as far as the cash goes.
@@ -123,7 +124,7 @@ export function settle(b: Books, ended: number): { cash: number; money: Money; m
     const amount = lim.over - fined;
     cash -= amount;
     m = { ...m, fines: [...m.fines, { day: today, amount }], matchStopped: true };
-    events.push({ day: today, kind: "fine", text: `Cole's campaign broke the spending limit by ${k(lim.over)}. It is fined ${k(amount)} and its remaining matching funds are stopped.`, amount });
+    events.push({ day: today, kind: "fine", text: `${ME.short}'s campaign broke the spending limit by ${k(lim.over)}. It is fined ${k(amount)} and its remaining matching funds are stopped.`, amount });
   }
 
   return { cash, money: { ...m, events: [...m.events, ...events] }, missedPayroll };

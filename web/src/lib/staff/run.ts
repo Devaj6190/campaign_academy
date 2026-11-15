@@ -8,6 +8,7 @@ import { RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
 import { bumpMorale, nextId, pushChat, useStaff, type FeedItem } from "./store";
 import { shortPlace, type Snapshot } from "./world";
+import { ME } from "../scenario";
 
 // Drives one instruction from the browser: sends it, reads the event stream, and applies each event to the game.
 
@@ -201,7 +202,7 @@ export async function loadCandidates(post: string) {
   if (!role || useStaff.getState().candidates[post]) return;
   useStaff.setState((s) => ({ candidates: { ...s.candidates, [post]: { status: "loading", list: [] } } }));
   const g = useGame.getState();
-  const context = `Day ${g.day} of 30, $${g.cash.toLocaleString("en-US")} in the bank, candidate Adrian Cole stands for more housing near transit, better buses, level police funding and help for small business, and is polling ${g.poll.cole}% to Hale's ${g.poll.hale}%.`;
+  const context = `Day ${g.day} of 30, $${g.cash.toLocaleString("en-US")} in the bank, candidate ${ME.name} stands for ${ME.pitch}, and is polling ${g.poll[ME.id] ?? 0}%.`;
   try {
     const res = await fetch("/api/staff/candidates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role, context }) });
     const data = (await res.json()) as { list: Candidate[]; mode: "live" | "offline" };

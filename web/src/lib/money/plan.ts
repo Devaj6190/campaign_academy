@@ -1,5 +1,6 @@
 import { avgIncome, limitStatus, matchStatus, nextPaymentDay, runway } from "./finance";
 import { GAME, sum, type Envelopes, type Money } from "./rules";
+import { activeRivals, nameOf } from "../scenario";
 
 // Dana's weekly budget. The model (or the rules, with no key) drafts it; check() makes sure it fits the
 // cash, the runway and the spending limit before the player ever sees it.
@@ -27,7 +28,7 @@ export type BudgetFacts = {
 
 export type Draft = { ads: number; field: number; events: number; fundraising: string[]; note: string };
 
-export function facts(g: { day: number; cash: number; losses: { v: number }[]; money: Money; rivals: Record<"hale" | "brandt", { cash: number; raised: number; spent: number }> }): BudgetFacts {
+export function facts(g: { day: number; cash: number; losses: { v: number }[]; money: Money; rivals: Record<string, { cash: number; raised: number; spent: number }> }): BudgetFacts {
   const m = g.money;
   const payroll = g.losses[0]?.v ?? 0;
   const daysLeft = Math.max(1, 30 - g.day);
@@ -54,7 +55,7 @@ export function facts(g: { day: number; cash: number; losses: { v: number }[]; m
     limitLeft: lim.limit === null ? null : Math.round(lim.left),
     match: { qualified: ms.qualified, nycDonors: ms.nycDonors, matchable: ms.matchable, owed: ms.owed, thresholdDonors: GAME.thresholdDonors, thresholdDollars: GAME.thresholdDollars, nextPaymentDay: nextPaymentDay(g.day) },
     runwayDays: Number.isFinite(rw) ? Math.floor(rw) : null,
-    rivals: (["hale", "brandt"] as const).map((k) => ({ name: k === "hale" ? "Hale" : "Brandt", raised: Math.round(g.rivals[k].raised), spent: Math.round(g.rivals[k].spent), cash: Math.round(g.rivals[k].cash) })),
+    rivals: activeRivals(g.day).map((k) => ({ name: nameOf(k), raised: Math.round(g.rivals[k].raised), spent: Math.round(g.rivals[k].spent), cash: Math.round(g.rivals[k].cash) })),
     maxPerDay: Math.max(0, Math.floor(Math.min(affordable, underLimit) / 100) * 100),
   };
 }

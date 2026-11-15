@@ -6,6 +6,7 @@ import { profileFor } from "./roster";
 import { feed } from "./run";
 import { pushChat, useStaff } from "./store";
 import { PLACES } from "./world";
+import { CANDIDATES, ME } from "../scenario";
 
 // Staff speak up unprompted when something in the world deserves it. Each kind of worry fires at most once
 // every few days, and only when nobody is mid-conversation with that person.
@@ -26,7 +27,7 @@ function triggers(): Trigger[] {
   if (!g.staff.find((p) => p.id === "ox")?.name && has("fd")) out.push({ key: "bronx", who: "fd", situation: "There is still no organizer in the Bronx, the biggest open area on the map.", text: "Still nobody in the Bronx. Every day without an organizer there is a day Hale gets for free.", suggest: "Canvass the open Bronx districts this weekend" });
   if (!g.staff.find((p) => p.id === "pol")?.name && has("cm") && g.day >= 2) out.push({ key: "policy", who: "cm", situation: "The Policy Director post is still empty and the manifesto needs work.", text: "We need a Policy Director. The manifesto won't write itself, and the debate is on day 7.", suggest: "Plan the week around the debate on day 7" });
   const cold = [...g.factions].sort((a, b) => a.feel - b.feel)[0];
-  if (cold.feel < 30 && has("com")) out.push({ key: `cold-${cold.id}`, who: "com", situation: `${cold.name} are cold toward Cole (${Math.round(cold.feel)}/100).`, text: `${cold.name} have gone cold on us. I have an idea for how to reach them.`, suggest: `Reach ${cold.name.toLowerCase()} with a press pitch this week` });
+  if (cold.feel < 30 && has("com")) out.push({ key: `cold-${cold.id}`, who: "com", situation: `${cold.name} are cold toward ${ME.short} (${Math.round(cold.feel)}/100).`, text: `${cold.name} have gone cold on us. I have an idea for how to reach them.`, suggest: `Reach ${cold.name.toLowerCase()} with a press pitch this week` });
   const slipping = PLACES.filter((p) => (g.sent[p.cd] ?? 50) < 40 && Math.floor(p.cd / 100) === 4).sort((a, b) => g.sent[a.cd] - g.sent[b.cd])[0];
   if (slipping && has("oq")) out.push({ key: `slip-${slipping.cd}`, who: "oq", situation: `${slipping.name} in Queens is slipping (support ${Math.round(g.sent[slipping.cd])}). Top complaint there: ${slipping.issue}.`, text: `${slipping.name.split("-")[0]} is slipping. People there are angry about ${slipping.issue.toLowerCase()}.`, suggest: `Canvass ${slipping.name.split("-")[0]} on ${slipping.issue.toLowerCase()} tomorrow` });
   const morale = Object.entries(s.morale).filter(([id]) => has(id)).sort((a, b) => a[1] - b[1])[0];
@@ -54,7 +55,7 @@ export async function speakUp() {
       const res = await fetch("/api/staff/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: p.name, role: p.role, voice: prof.voice, situation: t.situation, context: `Day ${g.day}/30, cash $${g.cash.toLocaleString("en-US")}, poll Cole ${g.poll.cole} vs Hale ${g.poll.hale}.`, fallback: said }),
+        body: JSON.stringify({ name: p.name, role: p.role, voice: prof.voice, situation: t.situation, context: `Day ${g.day}/30, cash $${g.cash.toLocaleString("en-US")}, poll ${CANDIDATES.map((c) => `${c.short} ${g.poll[c.id] ?? 0}`).join(", ")}.`, fallback: said }),
       });
       if (res.ok) said = await res.json();
     } catch {}

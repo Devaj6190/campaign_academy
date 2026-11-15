@@ -69,11 +69,6 @@ export const RECORD: { ok: boolean; text: string; liked: string; not: string }[]
   { ok: false, text: "Took union endorsements, skipped a picket", liked: "Nobody fully", not: "Union members" },
 ];
 
-export const OPPONENTS = [
-  { id: "hale", name: "Victoria Hale", tag: "Runs on public safety and business", note: "Money, homeowners, Staten Island." },
-  { id: "brandt", name: "Naomi Brandt", tag: "Runs on rent and police reform", note: "Young activists and students." },
-] as const;
-
 export const PROBLEMS = [
   "Brandt is pulling young activists and students; Hale holds homeowners and seniors.",
   "At the current burn, the money runs out before day 30.",

@@ -9,6 +9,7 @@ import { tacticRisk, type Deliverer } from "@/lib/engine/tactic";
 import { Avatar, Button, Dialog, Label, Meter } from "./ui";
 import { ShaderBackground } from "./ui21/dithering";
 import { PaperView } from "@/views/paper/Paper";
+import { ACTIVE, colorOf, fullNameOf, ME, nameOf } from "@/lib/scenario";
 
 export function Overlays() {
   const overlay = useGame((s) => s.overlay);
@@ -172,14 +173,15 @@ function Election() {
   // District-by-district result from the engine (engine/election.ts), revealed on the map first.
   const result = useGame((s) => s.election?.result);
   if (!result) return null;
-  const { cole, hale, brandt } = result.pct;
   const won = result.won;
-  const rows: [string, number, string][] = [["Adrian Cole", cole, "var(--color-warm)"], ["Victoria Hale", hale, "rgb(255 255 255 / .45)"], ["Naomi Brandt", brandt, "rgb(255 255 255 / .22)"]];
+  const rows: [string, number, string][] = result.ranked.map((id) => [fullNameOf(id), result.pct[id], colorOf(id)]);
+  const r = result.runoff;
   return (
     <div className="relative p-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-44 opacity-30 [mask-image:linear-gradient(black,transparent)]"><ShaderBackground /></div>
       <Label className="relative">Election night · polls closed</Label>
-      <h2 className="relative mt-3 font-serif text-[56px] leading-none tracking-tight">{won ? "Cole wins." : "Cole concedes."}</h2>
+      <h2 className="relative mt-3 font-serif text-[56px] leading-none tracking-tight">{r && !won && (r.a === ME.id || r.b === ME.id) ? `${ME.short} loses the runoff.` : won ? (r ? `${ME.short} wins the runoff.` : `${ME.short} wins.`) : `${ME.short} concedes.`}</h2>
+      {r && <p className="relative mt-2 text-[13px] text-muted">Nobody reached {ACTIVE.threshold}%, so {nameOf(r.a)} and {nameOf(r.b)} met in a runoff: {nameOf(r.a)} {r.pct[r.a]}%, {nameOf(r.b)} {r.pct[r.b]}% (simulated).</p>}
       <div className="mt-8 space-y-4">
         {rows.map(([n, v, c], i) => (
           <div key={n}>
@@ -191,7 +193,7 @@ function Election() {
         ))}
       </div>
       <p className="mt-8 border-t border-line pt-4 text-[12.5px] leading-relaxed text-muted">
-        Cole carried {result.districtsWon.cole} of 59 districts (Hale {result.districtsWon.hale}, Brandt {result.districtsWon.brandt}) with {result.totals.cole.toLocaleString("en-US")} votes. Turnout starts from the real 2025 count in each district and rose where your field work was strongest.
+        {ME.short} carried {result.districtsWon[ME.id] ?? 0} of 59 districts ({result.ranked.filter((id) => id !== ME.id).map((id) => `${nameOf(id)} ${result.districtsWon[id] ?? 0}`).join(", ")}) with {(result.totals[ME.id] ?? 0).toLocaleString("en-US")} votes. Turnout starts from the real 2025 count in each district and rose where your field work was strongest.
       </p>
     </div>
   );

@@ -8,6 +8,7 @@ import { ACTION_IDS, ACTIONS } from "./catalog";
 import type { Effect } from "./resolve";
 import type { Rival } from "./poll";
 import { RIVALS, rivalBudget, rivalEffect, ruleMoves } from "./rivals";
+import { FRAMING, ME } from "../scenario";
 
 // A rival campaign as a deep agent: it reads what Cole did, decides its moves for tonight, and makes them
 // through one tool that the rules engine scores. Runs on the smaller model; the fallback is ruleMoves.
@@ -59,20 +60,20 @@ export async function planLive(req: PlanRequest, signal?: AbortSignal): Promise<
     model: new ChatAnthropic({ model: RIVAL_MODEL, maxTokens: 3000, outputConfig: { effort: "low" } }),
     name: req.who,
     tools: [makeMove],
-    systemPrompt: `You are the campaign of ${r.name}, running for Mayor of New York City against Adrian Cole and one other rival. This is a fictional, nonpartisan teaching game; play fair and honest campaign moves only.
-${r.name} runs on ${r.runsOn}. Her base: ${r.base}.
-Tonight you have $${budget.toLocaleString("en-US")} and up to ${cap} moves${req.extra ? " (it is a debate day: make it count)" : ""}. Think like a real campaign: defend your base, contest districts Cole is gaining, and court groups who are cooling on him.
+    systemPrompt: `You are the campaign of ${r.name}, running for Mayor of New York City against ${ME.name} and the rest of the field. ${FRAMING} Play fair and honest campaign moves only.
+${r.name} runs on ${r.runsOn}. Base: ${r.base}.
+Tonight you have $${budget.toLocaleString("en-US")} and up to ${cap} moves${req.extra ? " (it is a debate day: make it count)" : ""}. Think like a real campaign: defend your base, contest districts ${ME.short} is gaining, and court groups who are cooling on ${ME.short}.
 Make your moves with make_move. Then reply with one sentence (under 25 words) on your strategy tonight, as a campaign memo.
 
 Actions available:
 ${CATALOG}
 
-The city right now (support figures are for Cole):
+The city right now (support figures are for ${ME.short}):
 ${world(w)}`,
   });
 
   const memory = req.memory.length ? `Your recent moves: ${req.memory.join(" | ")}` : "This is your first night.";
-  const cole = req.coleYesterday.length ? `What Cole did today: ${req.coleYesterday.join(" | ")}` : "Cole had a quiet day.";
+  const cole = req.coleYesterday.length ? `What ${ME.short} did today: ${req.coleYesterday.join(" | ")}` : `${ME.short} had a quiet day.`;
   const res = await agent.invoke({ messages: [{ role: "user", content: `${cole}\n${memory}\nPlan and make tonight's moves.` }] }, { recursionLimit: 30, signal });
   const msgs = (res as { messages?: { content?: unknown; tool_calls?: unknown[] }[] }).messages ?? [];
   const memo = [...msgs].reverse().map((m) => text(m.content)).find((t) => t && t.length < 400) ?? moves.map((m) => m.summary).join(" ");

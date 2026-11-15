@@ -1,24 +1,27 @@
 "use client";
 
 import { ArrowRight, CalendarDays, Check, Lock, Newspaper, ScrollText, X } from "lucide-react";
-import { OPPONENTS, PROBLEMS, RECORD } from "@/lib/data";
+import { PROBLEMS, RECORD } from "@/lib/data";
 import { netPerDay, useGame } from "@/lib/store";
 import { cn, money, moneyK } from "@/lib/util";
 import { Dock, DockButton, Inspector, Label, Meter, Section } from "@/components/ui";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import { districtBy } from "@/lib/geo";
+import { activeRivals, CANDIDATES, ME, rivalDef } from "@/lib/scenario";
 
 export function Profile() {
   const s = useGame();
   const net = netPerDay(s);
-  const undecided = 100 - s.poll.cole - s.poll.hale - s.poll.brandt;
+  const inRace = CANDIDATES.filter((c) => (s.poll[c.id] ?? 0) > 0).sort((a, b) => (s.poll[b.id] ?? 0) - (s.poll[a.id] ?? 0));
+  const undecided = 100 - inRace.reduce((a, c) => a + (s.poll[c.id] ?? 0), 0);
+  const rank = inRace.findIndex((c) => c.id === ME.id) + 1;
   const stats: [string, string, string, string?][] = [
-    ["Polling", `${s.poll.cole}%`, "2nd of 3"],
+    ["Polling", `${s.poll[ME.id] ?? 0}%`, `${rank} of ${inRace.length}`],
     ["Days left", String(30 - s.day), `Day ${s.day} of 30`],
     ["Cash", money(s.cash), "On hand"],
     ["Burn", `${net < 0 ? "−" : "+"}${moneyK(net)}`, "Per day", net < 0 ? "text-neg" : "text-pos"],
   ];
-  const race: [string, number, string][] = [["Victoria Hale", s.poll.hale, "rgb(255 255 255 / .45)"], ["Adrian Cole", s.poll.cole, "var(--color-warm)"], ["Naomi Brandt", s.poll.brandt, "rgb(255 255 255 / .25)"], ["Undecided", undecided, "rgb(255 255 255 / .1)"]];
+  const race: [string, number, string][] = [...inRace.map((c) => [c.name, s.poll[c.id] ?? 0, c.color] as [string, number, string]), ["Undecided", undecided, "rgb(255 255 255 / .1)"]];
 
   return (
     <div className="flex h-full">
@@ -121,7 +124,7 @@ export function Profile() {
         </Section>
         <Section title="Rivals">
           <div className="space-y-2">
-            {OPPONENTS.map((o) => <RivalCard key={o.id} id={o.id} name={o.name} tag={o.tag} note={o.note} />)}
+            {activeRivals(s.day).map((id) => <RivalCard key={id} id={id} name={rivalDef(id).name} tag={`Runs on ${rivalDef(id).runsOn.split(":")[0]}`} note={rivalDef(id).base} />)}
           </div>
         </Section>
         <Section title="Opening problems">
@@ -137,7 +140,7 @@ export function Profile() {
 }
 
 // What a rival campaign has been doing: their poll, money, last moves and where they've built strength.
-function RivalCard({ id, name, tag, note }: { id: "hale" | "brandt"; name: string; tag: string; note: string }) {
+function RivalCard({ id, name, tag, note }: { id: string; name: string; tag: string; note: string }) {
   const r = useGame((s) => s.rivals[id]);
   const poll = useGame((s) => s.poll[id]);
   const ledger = useGame((s) => s.ledger);

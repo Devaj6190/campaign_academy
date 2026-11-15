@@ -9,7 +9,7 @@ export type Snapshot = {
   day: number;
   min: number;
   cash: number;
-  poll: { cole: number; hale: number; brandt: number };
+  poll: Record<string, number>;
   sent: Record<number, number>;
   factions: Pick<Faction, "id" | "name" | "feel" | "size" | "values" | "dislikes">[];
   staff: Staff[];

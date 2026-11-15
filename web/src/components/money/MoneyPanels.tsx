@@ -9,6 +9,7 @@ import { approveProposal, dismissProposal } from "@/lib/money/run";
 import { ENVELOPES, GAME, NYC, SOURCE_NOTE, SOURCES, sum } from "@/lib/money/rules";
 import { useGame } from "@/lib/store";
 import { cn, money } from "@/lib/util";
+import { activeRivals, ME, nameOf, rivalDef } from "@/lib/scenario";
 
 // The campaign's money, in the three top-bar panels: what goes out (daily budgets), what comes in
 // (donors and public funds), and the books (runway, matching funds, the spending limit, filings, Dana).
@@ -102,9 +103,8 @@ export function FinancePanel() {
   const p = m.proposal?.state === "open" ? m.proposal : null;
   const join = g.joinPublicFinancing;
   const filings = [
-    { name: "Cole", raised: m.raisedTotal + m.matchPaid, spent: m.spentTotal, cash: g.cash, note: m.participant === false ? "not in public financing" : "in public financing" },
-    { name: "Hale", raised: g.rivals.hale.raised, spent: g.rivals.hale.spent, cash: g.rivals.hale.cash, note: "not in public financing" },
-    { name: "Brandt", raised: g.rivals.brandt.raised, spent: g.rivals.brandt.spent, cash: g.rivals.brandt.cash, note: "in public financing" },
+    { name: ME.short, raised: m.raisedTotal + m.matchPaid, spent: m.spentTotal, cash: g.cash, note: m.participant === false ? "not in public financing" : "in public financing" },
+    ...activeRivals(g.day).map((id) => ({ name: nameOf(id), raised: g.rivals[id].raised, spent: g.rivals[id].spent, cash: g.rivals[id].cash, note: rivalDef(id).participant ? "in public financing" : "not in public financing" })),
   ];
   return (
     <div className="max-h-[78vh] overflow-y-auto p-4">
@@ -180,7 +180,7 @@ export function FinancePanel() {
         <thead className="text-faint"><tr><th className="text-left font-normal">Campaign</th><th className="text-right font-normal">Raised</th><th className="text-right font-normal">Spent</th><th className="text-right font-normal">Cash</th></tr></thead>
         <tbody>
           {filings.map((f) => (
-            <tr key={f.name} title={f.note}><td className={cn("py-0.5 font-sans", f.name === "Cole" ? "text-warm" : "text-soft")}>{f.name}</td><td className="text-right">{money(f.raised)}</td><td className="text-right">{money(f.spent)}</td><td className="text-right">{money(f.cash)}</td></tr>
+            <tr key={f.name} title={f.note}><td className={cn("py-0.5 font-sans", f.name === ME.short ? "text-warm" : "text-soft")}>{f.name}</td><td className="text-right">{money(f.raised)}</td><td className="text-right">{money(f.spent)}</td><td className="text-right">{money(f.cash)}</td></tr>
           ))}
         </tbody>
       </table>

@@ -10,6 +10,7 @@ import { FinancePanel, IncomePanel, SpendingPanel } from "./money/MoneyPanels";
 import { clock, cn, money, moneyK } from "@/lib/util";
 import { SidebarBody } from "./Sidebar";
 import { Meter, Popover } from "./ui";
+import { CANDIDATES, ME } from "@/lib/scenario";
 
 const VIEWS: [View, string][] = [["profile", "Profile"], ["war", "War room"], ["map", "Map"], ["factions", "Factions"]];
 
@@ -122,19 +123,17 @@ function Clock() {
   // Only published polls are ever shown: opinion is not visible between them (engine/polls.ts).
   const latest = useGame((s) => s.polls[s.polls.length - 1]);
   const late = min > DAY_END - 120; // last two hours of the day
+  // Everyone with a share in the latest poll, the student first, then by standing.
+  const inPoll = CANDIDATES.filter((c) => (poll[c.id] ?? 0) > 0).sort((a, b) => (a.id === ME.id ? -1 : b.id === ME.id ? 1 : (poll[b.id] ?? 0) - (poll[a.id] ?? 0)));
   return (
     <div className="flex items-center justify-end gap-4">
       <PaperChip />
-      <div className="hidden w-40 xl:block" title={`${latest.pollster}, day ${latest.day}: ${latest.n.toLocaleString("en-US")} likely voters, margin of error ±${latest.moe}`}>
-        <div className="tnum mb-1 flex justify-between font-mono text-[11px]">
-          <span className="text-warm">Cole {poll.cole}</span>
-          <span className="text-muted">Hale {poll.hale}</span>
-          <span className="text-faint">Brandt {poll.brandt}</span>
+      <div className="hidden w-48 xl:block" title={`${latest.pollster}, day ${latest.day}: ${latest.n.toLocaleString("en-US")} likely voters, margin of error ±${latest.moe}`}>
+        <div className="tnum mb-1 flex justify-between gap-2 font-mono text-[11px]">
+          {inPoll.slice(0, 3).map((c) => <span key={c.id} className="truncate" style={{ color: c.id === ME.id ? "var(--color-warm)" : undefined }}>{c.short} {poll[c.id]}</span>)}
         </div>
         <div className="flex h-1 gap-px overflow-hidden rounded-full">
-          <div className="bg-warm transition-[width] duration-500" style={{ width: `${poll.cole}%` }} />
-          <div className="bg-white/40 transition-[width] duration-500" style={{ width: `${poll.hale}%` }} />
-          <div className="bg-white/20 transition-[width] duration-500" style={{ width: `${poll.brandt}%` }} />
+          {inPoll.map((c) => <div key={c.id} className="transition-[width] duration-500" style={{ width: `${poll[c.id]}%`, background: c.color }} />)}
           <div className="flex-1 bg-white/[0.06]" />
         </div>
         <div className="mt-0.5 text-right text-[9.5px] text-faint">poll as of day {latest.day} · ±{latest.moe}</div>

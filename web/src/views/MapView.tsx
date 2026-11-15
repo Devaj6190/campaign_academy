@@ -11,6 +11,7 @@ import { actor } from "@/lib/factionHistory";
 import { DISTRICTS, FETCHED, districtBy } from "@/lib/geo";
 import { sentimentOf, useGame } from "@/lib/store";
 import { clock, cn, heat, tone } from "@/lib/util";
+import { colorOf, nameOf } from "@/lib/scenario";
 
 // The map itself touches the browser (WebGL), so it only renders on the client.
 const MapCanvas = dynamic(() => import("./map/MapCanvas").then((m) => m.MapCanvas), {
@@ -268,16 +269,14 @@ function ElectionBanner() {
   const election = useGame((s) => s.election);
   if (!election) return null;
   const shown = new Set(election.result.order.slice(0, election.shown));
-  const won = { cole: 0, hale: 0, brandt: 0 };
-  for (const r of election.result.byDistrict) if (shown.has(r.cd)) won[r.winner]++;
+  const won: Record<string, number> = {};
+  for (const r of election.result.byDistrict) if (shown.has(r.cd)) won[r.winner] = (won[r.winner] ?? 0) + 1;
   const n = Math.min(election.shown, election.result.order.length);
   return (
     <div className="pointer-events-none absolute top-20 left-1/2 z-30 -translate-x-1/2 rounded-xl border border-line-strong bg-raised/90 px-5 py-3 text-center shadow-2xl backdrop-blur">
       <Label>Election night · {n} of {election.result.order.length} districts reporting</Label>
       <div className="mt-1.5 flex gap-5 text-[13px]">
-        <span className="text-warm">Cole {won.cole}</span>
-        <span className="text-soft">Hale {won.hale}</span>
-        <span className="text-[#9d95e8]">Brandt {won.brandt}</span>
+        {election.result.ranked.map((id) => <span key={id} style={{ color: colorOf(id) }}>{nameOf(id)} {won[id] ?? 0}</span>)}
       </div>
     </div>
   );
