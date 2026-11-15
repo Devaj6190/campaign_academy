@@ -28,9 +28,9 @@ export const Label = ({ children, className }: { children: ReactNode; className?
   <span className={cn("font-display text-[12px] font-medium text-gold/80", className)}>{children}</span>
 );
 
-/** Marks a number or section as coming from real data or from the simulation. */
-export const Tag = ({ kind }: { kind: "real" | "sim" }) => (
-  <span className={cn("rounded-full border px-2 py-px font-display text-[11px] font-medium", kind === "real" ? "border-pos/25 text-pos" : "border-warm/25 text-warm")}>
+/** Marks a number or section as coming from real data or from the simulation. `big` for screens that have had the text pass. */
+export const Tag = ({ kind, big }: { kind: "real" | "sim"; big?: boolean }) => (
+  <span className={cn("shrink-0 rounded-full border px-2 py-px font-display font-medium whitespace-nowrap", big ? "text-[13px]" : "text-[11px]", kind === "real" ? "border-pos/25 text-pos" : "border-warm/25 text-warm")}>
     {kind === "real" ? "Real data" : "Simulated"}
   </span>
 );
@@ -66,8 +66,9 @@ export const Section = ({ title, right, big, children }: { title: string; right?
 export const Inspector = ({ children }: { children: ReactNode }) => <aside className="edge-l panel w-[300px] shrink-0 overflow-y-auto xl:w-[340px]">{children}</aside>;
 
 export const ViewHeader = ({ title, sub, right }: { title: string; sub: string; right?: ReactNode }) => (
-  <header className="relative flex min-h-[84px] shrink-0 items-center justify-between gap-4 px-8 py-4">
-    <div className="min-w-0">
+  // The controls on the right drop below the title when there is no room for both, instead of squeezing the subtitle.
+  <header className="relative flex min-h-[84px] shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-3 px-8 py-4">
+    <div className="min-w-0 flex-[1_1_340px]">
       <h1 className="gilt font-display text-[28px] leading-none font-semibold whitespace-nowrap">{title}</h1>
       <p className="mt-2 text-[14px] leading-snug text-soft">{sub}</p>
     </div>
