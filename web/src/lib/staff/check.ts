@@ -5,7 +5,7 @@ import { KEEP, memoriesFor, remember } from "./memory";
 import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
 import { budgetIn, memoryFile, RunCtx, type Proposal, type RunEvent } from "./protocol";
-import { BASE_BUDGET, DAILY, pick, runBookings, snapshot } from "./run";
+import { BASE_BUDGET, DAILY, dueFollowUps, pick, runBookings, snapshot } from "./run";
 import "./speak"; // its restart hook is part of what is checked
 import { useStaff } from "./store";
 
@@ -14,6 +14,8 @@ import { useStaff } from "./store";
 // 2. With no key, a question to any director gets two or three options and spends nothing; an order does work.
 // 3. A scheduled event is a real appearance: it is booked on a date, paid for on the day and reserved from the order's
 //    budget until then, happens as the candidate's own work, and never puts more on one day than he can do.
+// 7. Follow-ups: one waits until its day and its director is free; offline, a follow-up run offers next steps and
+//    does no work, and says what was done.
 // 6. Memory: a post keeps dated lines up to a cap, only posts with something to remember travel with an order, the
 //    agent's memory file lists them, and a restarted case clears everything.
 // 5. No invented numbers: a figure the staff were not given is caught, and one they were given (also rounded) passes.
@@ -247,6 +249,27 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
   }
   report.push(`scheduling: 3 rallies asked for ${wanted} → booked on ${dates.join(", ")}; all happened, $${mine.reduce((a, x) => a + x.cost, 0).toLocaleString("en-US")} paid on the day (${texts[2].includes("full") ? "third moved: day was full" : "no day was full"})`);
 
+  // Follow-ups.
+  useCase.getState().restart();
+  useCase.setState({ at: 1, step: 1, date: "2013-02-03" });
+  useStaff.setState({ followups: [{ run: 1, director: "fd", order: '"Canvass Crown Heights"', due: "2013-02-06", results: ["Knocked 1,213 doors in Crown Heights. Support +3.2."], places: { 308: 13 }, groups: {} }] });
+  const early = dueFollowUps().length;
+  useCase.setState({ date: "2013-02-06" });
+  useStaff.setState({ active: { fd: 99 } });
+  const busy = dueFollowUps().length;
+  useStaff.setState({ active: {} });
+  const ready = dueFollowUps().length;
+  if (early || busy || ready !== 1) problems.push(`follow-up: due before its day ${early}, while busy ${busy}, on its day ${ready} (want 0, 0, 1)`);
+  const fuEvents: RunEvent[] = [];
+  const fuText = "(Not from the campaigner.) 3 days ago your team finished \"Canvass Crown Heights\".\nWhat it did: Knocked 1,213 doors in Crown Heights. Support +3.2.\nWhere things stand now: Crown Heights 13% then, 16.2% now.\nCome back to the campaigner about it, unprompted, with what you would do next.";
+  const fuCtx = new RunCtx({ director: "fd", text: fuText, snapshot: snapshot(), history: [], budget: BASE_BUDGET, runId: 9, followUp: true }, (e) => fuEvents.push(e));
+  await runOffline(fuCtx, 0);
+  const fuP = fuEvents.find((e) => e.t === "proposals");
+  if (!fuP || fuP.t !== "proposals" || fuP.options.length < 2) problems.push("follow-up: offline, it did not offer next steps");
+  if (fuCtx.spent || fuEvents.some((e) => e.t === "action")) problems.push("follow-up: offline, it did work instead of offering it");
+  if (fuP?.t === "proposals" && !/1,213 doors/.test(fuP.text)) problems.push(`follow-up: offline, it did not say what was done: "${fuP.text}"`);
+  report.push(`follow-up: waits for its day and a free director; offline it reports the result and offers ${fuP?.t === "proposals" ? fuP.options.length : 0} next steps`);
+
   // Memory.
   useCase.getState().restart();
   useCase.setState({ at: 1, step: 1, date: "2013-02-03" });
@@ -260,6 +283,7 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
   if (!memoryFile(sent.ob).includes("- 2013-02-03: The Field Director gave me Crown Heights.") || !memoryFile(undefined).includes("Nothing yet")) problems.push("memory: the memory file does not read as expected");
   useCase.getState().restart();
   if (Object.keys(useStaff.getState().memory).length) problems.push("memory: a restarted case kept the last campaign's memory");
+  if (useStaff.getState().followups.length) problems.push("follow-up: a restarted case kept the last campaign's follow-ups");
   report.push(`memory: capped at ${KEEP} dated lines per post, sent only where there is some, cleared on restart`);
   return { problems, report };
 }

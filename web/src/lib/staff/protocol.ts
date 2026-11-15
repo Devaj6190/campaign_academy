@@ -60,7 +60,7 @@ export type PlanItem = { title: string; status: "pending" | "in-progress" | "com
 export type Line = { who: "me" | "them"; text: string };
 
 /** followOf: the original order when this run is an approved follow-up; targets and clarity come from it. */
-export type RunRequest = { director: string; text: string; snapshot: Snapshot; history: Line[]; budget: number; runId: number; followOf?: string; /** A picked option: carry out exactly these, with no planning. */ steps?: Step[]; /** What the director and their people remember of this campaign, by post id. */ memory?: Record<string, string[]> };
+export type RunRequest = { director: string; text: string; snapshot: Snapshot; history: Line[]; budget: number; runId: number; followOf?: string; /** A picked option: carry out exactly these, with no planning. */ steps?: Step[]; /** What the director and their people remember of this campaign, by post id. */ memory?: Record<string, string[]>; /** The director coming back about its own earlier work: offer next steps, do nothing. */ followUp?: boolean };
 
 export type RunEvent =
   | { t: "start"; mode: "live" | "offline" }

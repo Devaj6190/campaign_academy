@@ -101,7 +101,10 @@ function offlineProposals(ctx: RunCtx, first: string) {
     const where = [district && `in ${shortPlace(district)}`, group && `for ${group}`].filter(Boolean).join(" ");
     return { title: cap(`${act.label.toLowerCase()} ${where}`.trim()), why: act.about, steps: [{ action: a, district, faction }] };
   });
-  ctx.propose(`${cap(first)} here. You asked, so here's what I'd put on the table. Pick one and I'll get moving.`, drafts);
+  const opener = req.followUp
+    ? `${cap(first)} here, coming back about earlier work. ${req.text.match(/What it did: ([^\n]*)/)?.[1] ?? ""} ${req.text.match(/Where things stand now: ([^\n]*)/)?.[1] ?? ""} Here is what I would do next.`.replace(/\s+/g, " ")
+    : `${cap(first)} here. You asked, so here's what I'd put on the table. Pick one and I'll get moving.`;
+  ctx.propose(opener, drafts);
 }
 
 /**
@@ -140,7 +143,7 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
   const me = w.staff.find((s) => s.id === req.director);
   if (!me?.name) return emit({ t: "done" }); // the post is vacant now
   const first = short(me);
-  if (!req.followOf && isQuestion(req.text)) {
+  if (req.followUp || (!req.followOf && isQuestion(req.text))) {
     emit({ t: "start", mode: "offline" });
     await sleep(600 * pace);
     offlineProposals(ctx, first);

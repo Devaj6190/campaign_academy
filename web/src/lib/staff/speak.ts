@@ -5,7 +5,7 @@ import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
 import { factionWork, shortMoney, supportIn, useCase, worldNow } from "../cases/store";
 import { useGame } from "../store";
 import { profileFor } from "./roster";
-import { feed } from "./run";
+import { comeBack, dueFollowUps, feed } from "./run";
 import { pushChat, useStaff } from "./store";
 import { BOROS, PLACES, short, shortPlace } from "./world";
 
@@ -99,6 +99,14 @@ export async function speakUp() {
   const day = dayNow();
   if (seen === null) { const { c, w } = worldNow(); seen = { poll: w.poll[c.follow] ?? 0, groups: { ...w.groups } }; }
   const last = useStaff.getState().spoken._last;
+  // A director coming back about its own work goes first: it is the most specific thing anyone has to say, so it
+  // does not wait out the gap between remarks. It only waits for a day when nobody else has spoken.
+  const fu = dueFollowUps()[0];
+  if (fu && (last === undefined || day > last)) {
+    useStaff.setState((s) => ({ spoken: { ...s.spoken, _last: day } }));
+    comeBack(fu);
+    return;
+  }
   if (last !== undefined && day - last < GAP) return;
   // Numbers that just moved are news; standing worries can wait their turn.
   const all = triggers(day);

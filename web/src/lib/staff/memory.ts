@@ -32,5 +32,6 @@ export function memoriesFor(ids: string[]): Record<string, string[]> {
 
 // A restarted case is another campaign: nobody remembers the last one.
 useCase.subscribe((s, p) => {
-  if ((s.at < p.at || s.date < p.date) && Object.keys(useStaff.getState().memory).length) useStaff.setState({ memory: {} });
+  // Follow-ups about the last campaign's work go with it.
+  if ((s.at < p.at || s.date < p.date) && (Object.keys(useStaff.getState().memory).length || useStaff.getState().followups.length)) useStaff.setState({ memory: {}, followups: [] });
 });

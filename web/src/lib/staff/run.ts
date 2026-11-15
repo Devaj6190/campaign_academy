@@ -10,7 +10,7 @@ import { runOffline } from "./offline";
 import { budgetIn, RunCtx, type Line, type RunEvent, type RunRequest, type Step } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
 import { memoriesFor, remember } from "./memory";
-import { bumpMorale, nextId, pushChat, useStaff, type ChatItem, type FeedItem } from "./store";
+import { bumpMorale, nextId, pushChat, useStaff, type ChatItem, type FeedItem, type FollowUp } from "./store";
 import { PLACES, short, shortPlace, type Snapshot } from "./world";
 
 // Drives one instruction from the browser: sends it, reads the event stream, and applies each event to the campaign.
@@ -165,8 +165,55 @@ function patchThoughts(director: string, runId: number, fn: (t: Thoughts) => Tho
   useStaff.setState((s) => ({ chat: { ...s.chat, [director]: (s.chat[director] ?? []).map((c) => (c.k === "thoughts" && c.run === runId ? fn(c) : c)) } }));
 }
 
-/** What each run got done, for the memory line written when it reports. */
+/** How many campaign days after a report the director comes back about it. */
+export const FOLLOW_UP_DAYS = 3;
+const pct = (n: number) => `${Math.round(n * 10) / 10}%`;
+
+/** Where a district or voter group stands now, for the follow-up's before and after. */
+function standing(): { place: (cd: number) => number | null; group: (id: string) => number | null } {
+  const { c, w } = worldNow();
+  const mine = w.poll[c.follow] ?? 0, boost = factionWork();
+  return {
+    place: (cd) => supportIn(cd),
+    group: (id) => { const f = FACTIONS_2013.find((x) => x.id === id); return f ? factionNow(f, w.groups, mine, c.start.poll[c.follow] ?? 0, boost) : null; },
+  };
+}
+
+function planFollowUp(director: string, run: number, order: string, results: string[], where: { places: Set<number>; groups: Set<string> }) {
+  const now = standing();
+  const places = Object.fromEntries([...where.places].flatMap((cd) => { const v = now.place(cd); return v === null ? [] : [[cd, v]]; }));
+  const groups = Object.fromEntries([...where.groups].flatMap((g) => { const v = now.group(g); return v === null ? [] : [[g, v]]; }));
+  const due = new Date(Date.parse(useCase.getState().date) + FOLLOW_UP_DAYS * 86_400_000).toISOString().slice(0, 10);
+  useStaff.setState((s) => ({ followups: [...s.followups.filter((f) => f.run !== run), { run, director, order, due, results, places, groups }] }));
+}
+
+/** The follow-ups whose day has come and whose director is free, oldest first. */
+export const dueFollowUps = () => {
+  const { date } = useCase.getState(), s = useStaff.getState();
+  return s.followups.filter((f) => !f.done && f.due <= date && !s.active[f.director] && useGame.getState().staff.some((p) => p.id === f.director && p.name));
+};
+
+/** The director comes back about its own earlier work: what it did, how things stand now, and next steps. */
+export function comeBack(f: FollowUp) {
+  useStaff.setState((s) => ({ followups: s.followups.map((x) => (x.run === f.run ? { ...x, done: true } : x)) }));
+  const now = standing();
+  const name = (g: string) => FACTIONS_2013.find((x) => x.id === g)?.name ?? g;
+  const moved = [
+    ...Object.entries(f.places).map(([cd, then]) => { const v = now.place(+cd); return v === null ? "" : `${shortPlace(+cd)} ${pct(then)} then, ${pct(v)} now`; }),
+    ...Object.entries(f.groups).map(([g, then]) => { const v = now.group(g); return v === null ? "" : `${name(g)} ${pct(then)} then, ${pct(v)} now`; }),
+  ].filter(Boolean);
+  const days = Math.round((Date.parse(useCase.getState().date) - Date.parse(f.due)) / 86_400_000) + FOLLOW_UP_DAYS;
+  // What the rival campaigns did in the same places and groups since then: often the reason a gain did not hold.
+  const { c } = worldNow();
+  const since = new Date(Date.parse(f.due) - FOLLOW_UP_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const rivals = useCase.getState().work.filter((x) => x.date >= since && x.by !== c.follow && c.candidates.some((r) => r.id === x.by) && (Object.keys(x.districts).some((cd) => +cd in f.places) || Object.keys({ ...x.groups, ...x.factions }).some((g) => g in f.groups))).map((x) => x.note ?? x.label);
+  const text = `(Not from the campaigner.) ${days} days ago your team finished ${f.order}.\nWhat it did: ${f.results.join(" ")}\nWhere things stand now: ${moved.join("; ") || "no change to report"}.\nWhat the rival campaigns did there since: ${rivals.length ? rivals.join(" ") : "nothing"}.\nCome back to the campaigner about it, unprompted, with what you would do next.`;
+  void instruct(f.director, text, 0, undefined, undefined, undefined, f.order);
+}
+
+/** What each run got done, for the memory line written when it reports, and where it worked, for the follow-up. */
 const did = new Map<number, string[]>();
+const touched = new Map<number, { places: Set<number>; groups: Set<string> }>();
 const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
 
 function handle(director: string, runId: number, e: RunEvent) {
@@ -201,6 +248,15 @@ function handle(director: string, runId: number, e: RunEvent) {
     }
     case "action": {
       did.set(runId, [...(did.get(runId) ?? []), e.effect.summary.replace(/ \(Not their strength.*$/, "")]);
+      {
+        const t = touched.get(runId) ?? { places: new Set<number>(), groups: new Set<string>() };
+        // A booked appearance has not happened yet: it is the calendar's, not this follow-up's.
+        if (!e.effect.booking) {
+          for (const cd of Object.keys(e.effect.sent)) t.places.add(+cd);
+          for (const f of Object.keys(e.effect.factions)) t.groups.add(f);
+        }
+        touched.set(runId, t);
+      }
       apply(e.effect);
       if (e.effect.booking && e.effect.district) useCase.getState().book({ date: e.effect.booking.date, kind: e.effect.booking.kind, cd: e.effect.district, faction: e.effect.faction, by: e.effect.by });
       if (!e.effect.fit) {
@@ -226,15 +282,21 @@ function handle(director: string, runId: number, e: RunEvent) {
       break;
     case "proposals":
       pushChat(director, { k: "proposals", text: e.text, options: e.options, run: runId });
-      remember(director, `The boss asked "${clip(current()?.text ?? "", 90)}". I offered: ${e.options.map((o) => o.title).join("; ")}.`);
+      if (current()?.followUp) {
+        remember(director, `I came back to the boss about ${current()?.origin} and offered: ${e.options.map((o) => o.title).join("; ")}.`);
+        useGame.setState((g) => ({ toasts: [...g.toasts.slice(-2), { id: Date.now(), staff: director, text: e.text }], unread: { ...g.unread, [director]: true } }));
+      } else remember(director, `The boss asked "${clip(current()?.text ?? "", 90)}". I offered: ${e.options.map((o) => o.title).join("; ")}.`);
       feed(director, `${cap(first(director))} answered with ${e.options.length} options.`);
       break;
     case "report":
       pushChat(director, { k: "report", text: e.text, ask: e.ask, state: e.ask ? "open" : "approved", spent: e.spent, raised: e.raised, run: runId });
       {
         // The plain record of the order, then the one thing the director chose to keep.
-        const run = current(), done = did.get(runId) ?? [];
+        const run = current(), done = did.get(runId) ?? [], where = touched.get(runId);
         did.delete(runId);
+        touched.delete(runId);
+        // Real work gets one follow-up a few days on; a follow-up does not get one of its own.
+        if (done.length && where && (where.places.size || where.groups.size) && !run?.followUp) planFollowUp(director, runId, run?.picked ? `the option you picked ("${clip(run.text, 80)}")` : `"${clip(run?.text ?? "", 90)}"`, done, where);
         remember(director, `${run?.picked ? "Carried out the option the boss picked" : run?.follow ? "With the extra money approved" : `Order: "${clip(run?.text ?? "", 90)}"`}. ${done.length ? clip(done.join(" "), 150) : "Nothing was done."}${e.ask ? ` I asked for $${e.ask.amount.toLocaleString("en-US")} more ${e.ask.reason}.` : ""}`);
         if (e.note) remember(director, `Note to self: ${e.note}`);
       }
@@ -258,7 +320,12 @@ function handle(director: string, runId: number, e: RunEvent) {
  * `extra` is the approved amount when this continues an earlier order (`followOf`). `own` is a budget that comes with
  * the order from elsewhere (a picked option's price). Otherwise the order's own words set it, or the default does.
  */
-export async function instruct(id: string, text: string, extra = 0, followOf?: string, own?: number, steps?: Step[]) {
+/**
+ * `extra` is the approved amount when this continues an earlier order (`followOf`); `own` a budget that comes with the
+ * order (a picked option's price); `steps` a picked option's exact actions. `about` makes this the director coming
+ * back about its own earlier work: `text` is then what it is told, not something the campaigner said.
+ */
+export async function instruct(id: string, text: string, extra = 0, followOf?: string, own?: number, steps?: Step[], about?: string) {
   const s = useStaff.getState();
   if (s.active[id]) {
     pushChat(id, { k: "note", text: `${cap(first(id))} is still on the last job. Wait for the report.` });
@@ -273,13 +340,14 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
   // The budget is what the order says, never more than the campaign has. An order that names no limit gets the default.
   const stated = followOf ? null : (own ?? budgetIn(text));
   const budget = Math.max(0, Math.min(followOf ? extra : (stated ?? BASE_BUDGET), worldNow().w.budget));
-  pushChat(id, { k: "me", text, run: runId, budget: stated === null ? undefined : budget });
+  if (about) pushChat(id, { k: "note", text: `${cap(first(id))} is coming back about ${about}.`, run: runId });
+  else pushChat(id, { k: "me", text, run: runId, budget: stated === null ? undefined : budget });
   pushChat(id, { k: "thoughts", run: runId, items: [], live: true });
-  useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, origin: followOf ?? text, follow: !!followOf, picked: !!steps?.length, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
+  useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, origin: about ?? followOf ?? text, follow: !!followOf, picked: !!steps?.length, followUp: !!about, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
   setBusy(id, "down");
-  feed("you", `You → ${first(id)}: ${text}`);
+  if (!about) feed("you", `You → ${first(id)}: ${text}`);
 
-  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget, runId, followOf, steps, memory: memoriesFor([id, ...useGame.getState().staff.filter((p) => p.boss === id).map((p) => p.id)]) };
+  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget, runId, followOf, steps, followUp: !!about || undefined, memory: memoriesFor([id, ...useGame.getState().staff.filter((p) => p.boss === id).map((p) => p.id)]) };
   const on = (e: RunEvent) => handle(id, runId, e);
   try {
     const res = await fetch("/api/staff/instruct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });

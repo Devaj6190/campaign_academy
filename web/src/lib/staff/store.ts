@@ -26,7 +26,13 @@ export type Thought = { who: string; text: string };
 
 export type Job = { to: string; job: string; done: boolean; summary?: string };
 /** origin: the order this run carries out (its own text, or the order an approved ask continues). */
-export type Run = { id: number; text: string; origin: string; follow: boolean; /** Carrying out an option the campaigner picked. */ picked?: boolean; items: PlanItem[]; jobs: Job[]; status: "running" | "done" };
+/**
+ * One finished order a director will come back about. `places` and `groups` were touched by it, with where each stood
+ * when the report came in, so the follow-up can say what changed since.
+ */
+export type FollowUp = { run: number; director: string; order: string; due: string; results: string[]; places: Record<number, number>; groups: Record<string, number>; done?: boolean };
+
+export type Run = { id: number; text: string; origin: string; follow: boolean; /** The director coming back about earlier work, not an order. */ followUp?: boolean; /** Carrying out an option the campaigner picked. */ picked?: boolean; items: PlanItem[]; jobs: Job[]; status: "running" | "done" };
 export type FeedItem = { id: number; date: string; who: string; text: string; tone?: "pos" | "neg" | "warm" };
 export type Packet = { id: number; from: string; to: string };
 
@@ -43,6 +49,8 @@ type StaffState = {
   candidates: Record<string, { status: "loading" | "ready"; list: Candidate[]; mode?: "live" | "offline" }>;
   mode: "live" | "offline" | null;
   spoken: Record<string, number>; // trigger → day it last fired
+  /** Directors' own work they will come back about, a few days after it is done (lib/staff/followup.ts). */
+  followups: FollowUp[];
   /** What each post remembers of this campaign, oldest first (lib/staff/memory.ts). */
   memory: Record<string, string[]>;
   /** A ready-made order waiting in someone's input box (e.g. "Send staff" from the map). */
@@ -62,6 +70,7 @@ export const useStaff = create<StaffState>(() => ({
   candidates: {},
   mode: null,
   spoken: {},
+  followups: [],
   memory: {},
   draft: {},
 }));
