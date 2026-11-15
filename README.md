@@ -4,9 +4,9 @@
 
 The first case is the 2013 Democratic primary for Mayor of New York. You run it from inside Bill de Blasio's campaign, which started in fourth place. The calendar runs. At the six moments where the real campaign had to decide something, the clock stops and you decide instead. Between decisions you direct a staff of live AI agents, the rival campaigns move against you, and a morning paper reports it all. On election night you see your result beside the certified one.
 
-> **About this README (15 Nov 2026).** This is a working snapshot written to help make the demo video. It is not the final README (that is issue #56).
-> - It describes `main` at `18bf5a8`.
-> - It folds in every doc in the repo, plus the evals report, which is still being written on the unmerged `feat/evals` branch.
+> **About this README (15 Nov 2026).** This is the big rough draft. Everything is in; it gets made beautiful next, and the Devpost is written from it. It is not the final README (that is issue #56).
+> - It describes `main` at `6f4bcfc`, plus two unmerged pieces: the evals (`feat/evals`, through run 7, §9) and the end-of-election debrief agent (`feat/debrief`, PR #73, in the deep agents section).
+> - It folds in every doc in the repo.
 > - Where a doc and the code disagree, the code on `main` wins.
 >
 > **Live site:** `campaign-academy.vercel.app` is stuck at `bbee564` (#67). Vercel's daily deploy limit blocked the later merges (#65, #68, #69, #70). A fresh deploy from Devank's Vercel account is under way; until then, demo from a local production build (see [Run it](#13-run-it)).
@@ -113,6 +113,7 @@ This is a shot list. Everything here is on `main` today.
   - Then **What changed** (animated before → after bars, with "See it on the map"), **What the real campaign did**, and "Carry on with the campaign" or "Give your staff work first".
   - The same card opens over any screen when the clock reaches a decision.
 - **Debrief:** "Your election night", "What really happened" (certified shares and votes), "Your decisions against the record" (what followed, what was said afterwards), "Play it again", and the sources.
+  - **Your debrief** (PR #73, on `feat/debrief`): below "Your election night", a read-only deep agent writes a cited analysis of all six decisions and a review of how you ran your staff and handled the rivals. It takes 25–35 s. With no key, or if the run fails, the existing debrief stands.
 
 ### Profile
 - A photo card of de Blasio. **Platform** shows the cited record, your choices so far and the rivals' platforms.
@@ -143,7 +144,7 @@ This is a shot list. Everything here is on `main` today.
 - MapLibre with real streets, the 59 community districts, and 3D buildings when you fly in (right-drag to tilt).
 - **Colour by:** Your support, Last decision (arrows and point labels), or a census group.
 - **Click a district** for support, voter groups, "Who lives here" (census) and 311 requests.
-- **Dock:** **Knock doors**, **Hold a rally**, **House party** (the candidate, two appearances a day, priced) and **Send staff**. Districts glow when work lands.
+- **Dock:** **Knock doors**, **Hold a rally**, **House party** (the candidate, two appearances a day, priced) and **Send staff**. Once the day's two are used the buttons dim, and pressing one says "Today's two appearances are done." (PR #74). Districts glow when work lands.
 - **Election night:** the app switches to the Map by itself.
   - Districts count in one by one ("N of 65 reporting") with the 40% line, then the verdict.
   - Toggle **Your campaign / Your election night / Real result 2013** (Assembly Districts).
@@ -389,7 +390,32 @@ The tunable numbers (money scale, caps, rival budgets, plank sizes, spill, donor
 
 ## 9. Evals: do the agents decide as the real people did?
 
-Issue #28. **This section is a snapshot of `docs/evals.md` on the `feat/evals` branch at `b69da82`.** That branch isn't merged, and more runs are under way (run 5, with masked and twin cards and a neutral recognition probe). The code is in `web/src/lib/eval/`, run with `npm run eval` in `web/`. Every run's requests, replies and summary are saved in `web/eval/runs/` and traced in LangSmith (project `campaign-academy-evals`).
+Issue #28. The short version comes first, as the evals session wrote it for the README (`feat/evals` at `5afe8c6`). The detail below it is taken from `docs/evals.md` on `feat/evals`, through run 7. Tuning is frozen at `bdd01be`. **The held-out run is not reported yet:** when it lands, its numbers go here and in `docs/evals.md`. The code is in `web/src/lib/eval/`, run with `npm run eval` in `web/`. Every run's requests, replies and summary are saved in `web/eval/runs/` and traced in LangSmith (project `campaign-academy-evals`).
+
+### In short
+
+We tested it with no student. A campaigner agent plays Bill de Blasio, and the staff, rivals and memos are the live agents. Each real person is played from verified research, knowing only what was true before each date. Their choices are compared with what the real people chose in 2013.
+
+**The catch: the model already knows this race.** Asked with no card at all what de Blasio's campaign did, it names the real choice at five of the six decisions. So plain agreement (about 90% on the cards) mostly measures memory. Hiding names didn't help: the model recognised the race on all but one masked card, and on every "twin" moved to an invented city, from the shape of the race alone.
+
+**So we measured something memory can't fake: whether the choices follow the facts on the card.**
+
+| Test | Result |
+|---|---|
+| Card rewritten so the facts point away from the 2013 choice: the agent moved | **78%** (28 of 36) |
+| Control, same facts in other words: the agent kept its choice | **94%** (17 of 18) |
+| Memory wrong, card given: still chose what really happened | **11 of 11** (all at the last decision, the second ad) |
+| The whole campaign on its own, January to September | 6 of 6 real choices, 32 weekly staff meetings, 294 staff jobs |
+
+Simulated vote share, as context only, since the engine is fitted to the real result: 42.4, against a certified 40.81.
+
+What this shows:
+- The agent follows evidence, not wording. It changes course when the facts change and holds when only the words change.
+- Where its memory is wrong, the card carries it to the real choice. At the budget decision it's the other way round: memory knows the real answer every time, and the card leads the agent elsewhere.
+- Memory still wins at the hospital protest. On rewritten cards the agent kept the 2013 choice, citing details the card never gave.
+
+What it cannot show: that the agents would decide as these people did in a race the model has never read about. Two prompt changes aimed at grounding made no measurable difference. Eleven held-out decisions, written before any run and run once at the end, are reported in `docs/evals.md`.
+(The 11 of 11 adds up runs 2, 4, 6 and 7: 3 + 2 + 3 + 3.)
 
 ### The question
 When an agent stands in for a real person, does it decide as that person did? The LangChain judges asked this on 14 November. The case has six real decision points, each with what the campaign really chose (`Decision.taken`).
@@ -479,6 +505,42 @@ Plain agreement in run 4: card 16/18, nochips 15/18, masked 14/18, reworded 17/1
 - **The agent follows the facts, not the wording.** Changed facts moved it 72% of the time; rewording alone left it 94% of the time. That's the strongest grounding result so far.
 - **Where memory and the card disagree, the card wins:** 2/2 at the second ad. At budget it went the other way: memory knew the real choice (3/3), and the card mostly didn't take it (1/3).
 
+**Run 5, masked and twin cards with a neutral probe, N = 3** (`b69da82`):
+- The probe no longer says names were replaced; it only asks whether the decision comes from a real election.
+- masked 14/18 on the real choice, twin 12/18. **Recognised as the real race: 18/18 masked, 18/18 twin.**
+- **Nothing hides this race.** The model named the 2013 New York primary on every masked card and every twin, mapping each invented person to the real one ("Ellen Marsh is Christine Quinn").
+- So the twins can't give the clean score they were built for. The grounding evidence has to come from changed facts against their control, and from the decisions where memory is wrong.
+- **Recognising the race doesn't make the agent replay it.** At Weiner, the agent left the 2013 choice in five of six twin runs (runs 4 and 5), though the probe recognised every twin.
+
+**Run 6, tuning 2, N = 3** (`96fcf73`):
+- Tuning 2: the agent's reason must name the facts it rests on and the one fact that would most change its mind.
+- Changed facts followed 25/36 (69%), control 16/18 (89%), memory wrong and card right 3/3. **No difference**, like tuning 1.
+- **The hospital kept 2013 on all six changed cards, and the reasons showed why: the chips.** "C is the only option expected to raise my poll standing." The changed cards rewrote the facts but kept the chips set for the real situation. From run 7, changed and reworded cards have no chips.
+
+**Run 7, changed and reworded cards without chips, N = 3** (`05c3057`). This is the headline:
+
+| Grounding score | Result |
+|---|---|
+| Changed facts followed | **28/36 (78%)** |
+| Of the runs where the same decision's card (no chips) chose 2013, changed facts moved it | **22/30 (73%)** |
+| Control kept its choice | **17/18 (94%)** |
+| Where memory was wrong, the card got the real choice | **3/3** (all at the second ad) |
+
+| Decision | nochips | reworded | changed (stuck) | recall |
+|---|---|---|---|---|
+| positioning | 3/3 | 3/3 | 0/6 | 3/3 |
+| weiner | 3/3 | 3/3 | 3/6 | 3/3 |
+| hospital | 3/3 | 3/3 | 5/6 | 3/3 |
+| budget | 0/3 | 0/3 | 0/6 | 3/3 |
+| firstad | 3/3 | 3/3 | 0/6 | 3/3 |
+| base | 3/3 | 3/3 | 0/6 | 0/3 |
+
+- **Without the chips, it follows changed facts every time at four of six decisions**, positioning included.
+- **Weiner's first changed card and the hospital still hold.** At the hospital it calls it "a hospital closing in my own borough": the changed card names no borough, so that part is memory.
+- **At budget the card never takes the real choice** (0/3 without chips), while memory always knows it (3/3). That's the plainest case of the agent not reading its answer from memory.
+
+**Held out, run once, frozen:** not reported yet. TODO: add the result when the evals session finishes it.
+
 **Free run 1, the whole system** (`b28d704`, before the memo-leak fix and tuning 1):
 - The campaigner held 32 weekly meetings and gave 64 orders. The staff carried out 294 jobs and the rivals made 46 moves.
 - It made **6 of 6 real choices** (break, hold, arrest, all on TV, family, frisk).
@@ -495,6 +557,9 @@ Plain agreement in run 4: card 16/18, nochips 15/18, masked 14/18, reworded 17/1
 - After run 1, the target became grounding, not agreement.
 - Memos skip dropped card lines.
 - After run 3, the headline became changed-vs-reworded, agreement where memory is wrong, and unrecognised twins. Twins and controls were written before any of them ran.
+- Tuning 2 (the reason names its facts) is kept, though it made no measurable difference.
+- After run 6, changed and reworded cards drop the chips: the chips, written for the real situation, contradicted the changed facts.
+- Tuning frozen at `bdd01be`; the held-out set runs once. No final N = 5 replay and no second free run: out of time for the hackathon.
 
 ### Limits
 - The model knows this race.
@@ -513,6 +578,9 @@ npm run eval -- free --runs 1
 ```
 ```bash
 npm run eval -- heldout --frozen --n 3
+```
+```bash
+npm run eval -- score eval/runs/<file>.jsonl
 ```
 Options: `--cond card,nochips,masked,changed,recall`, `--kinds case,adviser`, `--only weiner,base`, `--concurrency 4`, `--dry` (rules only, no key needed).
 
