@@ -261,6 +261,33 @@ What it showed:
 - **Weiner's first changed card and the hospital still hold.** At the hospital the agent argues that a fourth-place candidate needs the attention, and calls it "a hospital closing in my own borough": the changed card names no borough, so that part is memory. Whether a reasoning agent should move away from arrest on that card is itself a judgement made in writing it.
 - **At budget the card never takes the real choice** (0/3 without chips), while memory always knows it (3/3). That is the plainest case of the agent not reading its answer from memory.
 
+### Held out: 11 decisions, run once after the freeze, N = 3 (commit 84fb0b4, 15 November)
+
+The held-out file's hash was `591f8b618429`, unchanged since it was written before run 1.
+
+| Decision | Person | recall (no card) | card | masked |
+|---|---|---|---|---|
+| quinn-kelly | Quinn | 3/3 | 3/3 | 0/3 |
+| deblasio-kelly | de Blasio | 3/3 | 3/3 | 0/3 |
+| liu-hospital | Liu | 1/3 | 0/3 | 0/3 |
+| weiner-hospital | Weiner | 0/3 | 0/3 | 0/3 |
+| deblasio-weiner-call | de Blasio | 3/3 | 3/3 | 0/3 |
+| quinn-weiner-call | Quinn | 0/3 | 0/3 | 2/3 |
+| weiner-stay | Weiner | 3/3 | 3/3 | 3/3 |
+| deblasio-appeal | de Blasio | 3/3 | 3/3 | 3/3 |
+| quinn-appeal | Quinn | 0/3 | 2/3 | 3/3 |
+| thompson-appeal | Thompson | 3/3 | 3/3 | 3/3 |
+| thompson-ad | Thompson | 3/3 | 3/3 | 3/3 |
+| **all** | | **22/33 (67%)** | **23/33 (70%)** | **17/33 (52%)** |
+
+Chance is 25%. Where memory was wrong, the card led to the real choice 2 of 11 times (both at Quinn's appeal pledge). All 33 masked cards were recognised.
+
+What it showed:
+- **On decisions the model was never tuned on, the card adds almost nothing to memory.** 70% on the card against 67% from memory alone. Where the model remembers the real choice, the agent makes it; where it does not, the agent mostly does not find it either.
+- **The misses are the moments of personal caution:** Liu and Weiner stepping back from arrest at the hospital, and Quinn declining to tell Weiner to quit. Played as those people, the agents chose a bolder line. The one memory miss the card fixed was Quinn's pledge to drop the stop-and-frisk appeal.
+- **Masked, agreement fell to 52%**, mostly at the two Kelly decisions (0/6 masked against 6/6 on the card). Without the commissioner's name the question loses what made it contentious, so the masked card may simply be a different question.
+- **Taken with the replay:** the agents follow the facts they are given (changed facts 78%, controls 94%), but on new decisions they do not reproduce what the real people chose beyond what the model already remembers. The eval supports "grounded in the evidence"; it does not support "decides as these people did".
+
 ### Free run 1: the whole system, one run (commit b28d704, 15 November)
 
 Run before the memo-leak fix and before tuning 1. The campaigner held 32 weekly meetings and gave 64 orders; the staff carried out 294 jobs; the rivals made 46 moves.

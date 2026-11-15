@@ -409,7 +409,17 @@ What this shows:
 - Where its memory is wrong, the card carries it to the real choice. At the budget decision it's the other way round: memory knows the real answer every time, and the card leads the agent elsewhere.
 - Memory still wins at the hospital protest. On rewritten cards the agent kept the 2013 choice, citing details the card never gave.
 
-What it cannot show: that the agents would decide as these people did in a race the model has never read about. Two prompt changes aimed at grounding made no measurable difference. Eleven held-out decisions, written before any run and run once at the end, are reported in `docs/evals.md`.
+**The held-out test: 11 more real decisions**, five of them rivals' choices, written before any run and run once at the end:
+
+| Held out | Result |
+|---|---|
+| On the card, chose what the real person chose | 23 of 33 (70%) |
+| Memory alone, no card | 22 of 33 (67%) |
+| Memory wrong, card given: still chose what really happened | 2 of 11 |
+
+On decisions it was never tuned on, the card adds almost nothing to memory. The misses are moments of personal caution: Liu and Weiner stepping back from arrest at the hospital protest, and Quinn declining to tell Weiner to quit. Played as those people, the agents chose a bolder line.
+
+**The honest summary:** the agents are grounded in the evidence they are given, and the free run behaves like a real campaign. But they do not reproduce what the real people chose beyond what the model already remembers. Two prompt changes aimed at grounding made no measurable difference.
 
 ---
 
