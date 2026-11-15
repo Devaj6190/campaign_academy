@@ -1,5 +1,6 @@
 "use client";
 
+import { isLoading } from "./loading";
 import { FACTIONS_2013 } from "./cases/mayor2013-factions";
 import { currentCase, useCase, type Work } from "./cases/store";
 import { useGame, type Toast } from "./store";
@@ -80,6 +81,7 @@ function flush() {
 export function watchResults() {
   return useCase.subscribe((s, p) => {
     if (s.work.length <= p.work.length) return; // a restart empties it; nothing to announce
+    if (isLoading()) return; // a loaded campaign's work is not news
     const c = currentCase(s.caseId);
     for (const w of s.work.slice(p.work.length)) {
       const rival = w.by !== c.follow && c.candidates.some((r) => r.id === w.by);
