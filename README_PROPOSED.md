@@ -114,7 +114,7 @@ The honest summary: the agents are grounded in the evidence they are given, but 
 
 ## Validation
 
-Devank wrote to about 60 political science professors and students while we built it. Six replied, and three students tried the tool during the hackathon.
+We wrote to about 60 political science professors and students while we built it. Six replied, and three students tried the tool during the hackathon.
 
 **Prof. Samuel S.-H. Wang** (Princeton Neuroscience Institute, founder of the Princeton Election Consortium) replied with two points to be careful about:
 
