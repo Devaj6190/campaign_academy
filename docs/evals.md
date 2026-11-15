@@ -201,7 +201,25 @@ What it showed:
 - **The agent follows the facts, not the wording.** Changed facts moved it off the 2013 choice 72% of the time, while the same facts in other words left its choice alone 94% of the time. That is the strongest grounding result so far. Positioning and the hospital are where memory holds on longest: they kept the 2013 choice on half or more of their changed cards.
 - **Where memory and the card disagree, the card wins.** At the second ad, memory picked the wrong option twice; the card picked the real one both times. At budget the reverse: memory knows the real choice (3/3), and the card mostly did not take it (1/3). Either way the agent is not just reading its memory.
 - **The twins were recognised too: 18 of 18.** The probe named the race from its shape: a fourth-place progressive citywide official, a council-leader front-runner, a late entrant with a scandal, a hospital protest. But that probe was leading: it told the model names had been replaced. It is neutral from run 5. Recognising the race when asked is not the same as deciding from memory: on twins the agent chose differently from the card at Weiner (1/3) and budget (0/3).
-- **The free run's six decisions all matched 2013** (section on the free run, once it finishes).
+### Free run 1: the whole system, one run (commit b28d704, 15 November)
+
+Run before the memo-leak fix and before tuning 1. The campaigner held 32 weekly meetings and gave 64 orders; the staff carried out 294 jobs; the rivals made 46 moves.
+
+| Decision | Chose | The real choice? |
+|---|---|---|
+| positioning | break | yes |
+| weiner | hold | yes |
+| hospital | arrest | yes |
+| budget | alltv | yes |
+| firstad | family | yes |
+| base | frisk | yes |
+
+Result (context, not the score): de Blasio 42.4, first, no runoff. Certified: 40.81, no runoff.
+
+What it showed:
+- **The whole system runs on its own for the full calendar** and stays on the real path: 6 of 6, so there was no first different choice and nothing to score after one.
+- **Its orders read like a real campaign's, and like this campaign's.** Its first orders were small-donor fundraising for matching funds, earned media on the pre-K tax and paid sick leave "framing the race as a tale of two cities", and organising with union locals and Black churches. That is the platform it was given, but also how 2013 went, so the free run on its own says nothing about memory against judgement. The replay's grounding scores carry that.
+- **The staff work pushed de Blasio 1.6 points past the certified result.** The engine was fitted with a fixed weekly staff routine; 64 orders from a live campaigner do more. That is a finding for the engine fit (#35), not for the agents.
 
 ## 8. Decisions log
 
