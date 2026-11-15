@@ -17,7 +17,7 @@ import { factsBefore, PEOPLE, personNamed, type Person } from "./people";
 // the same world and only the condition changes. Cards are built one at a time (they read the shared case store),
 // then the agents decide in parallel.
 
-export type Kind = "case" | "adviser" | "heldout";
+export type Kind = "case" | "adviser" | "heldout" | "free";
 export type Rec = {
   kind: Kind; cond: Condition; decision: string; person: string; n: number;
   chosen: string | null; taken: string; onReal: boolean | null;
@@ -98,7 +98,7 @@ function masked(card: Card, p: Person): Card {
 }
 
 /** A case decision's card for one run, as the student sees it on the day. */
-function caseCard(c: Case, d: Decision, i: number, n: number, memos: Memo[], who: Person, ask: Card["ask"], chips: boolean): { card: Card; dropped: string[] } {
+export function caseCard(c: Case, d: Decision, i: number, n: number, memos: Memo[], who: Person, ask: Card["ask"], chips: boolean): { card: Card; dropped: string[] } {
   const w = snapshot({ at: i + 1, date: d.date });
   const t = worldText(w);
   const drop = DROPPED[d.id] ?? [];

@@ -1,3 +1,4 @@
+import type { FinalRec } from "./free";
 import type { Rec } from "./replay";
 
 // The tables the eval reports (#28), read from the saved records after a run. Agreement is how often the agent chose
@@ -13,14 +14,18 @@ function line(rs: Rec[]) {
   return { real, scored: scored.length, none: rs.length - scored.length, chance };
 }
 
-export function summarise(recs: Rec[]): string {
+const TITLE: Record<Rec["kind"], string> = { case: "Case decisions (the campaigner)", adviser: "Adviser fidelity", heldout: "Held-out decisions", free: "Free run (the whole system)" };
+
+export function summarise(all: (Rec | FinalRec)[]): string {
   const out: string[] = [];
+  const recs = all.filter((r): r is Rec => r.kind !== "final");
+  const finals = all.filter((r): r is FinalRec => r.kind === "final");
   const kinds = [...new Set(recs.map((r) => r.kind))];
   for (const kind of kinds) {
     const rs = recs.filter((r) => r.kind === kind);
     const conds = [...new Set(rs.map((r) => r.cond))];
     const decisions = [...new Set(rs.map((r) => r.decision))];
-    out.push(`\n### ${kind === "case" ? "Case decisions (the campaigner)" : kind === "adviser" ? "Adviser fidelity" : "Held-out decisions"}\n`);
+    out.push(`\n### ${TITLE[kind]}\n`);
     out.push(`| Condition | On the real choice | Chance | No answer |`, `|---|---|---|---|`);
     for (const cond of conds) {
       const l = line(rs.filter((r) => r.cond === cond));
@@ -37,6 +42,18 @@ export function summarise(recs: Rec[]): string {
     if (memo.length) out.push(`Choices that matched one of the two staff memos: ${memo.filter((r) => r.memos!.some((m) => m.option === r.chosen)).length}/${memo.length}.`);
     const read = rs.filter((r) => r.mode === "live" && r.cond !== "recall");
     if (read.length) out.push(`Live decisions that read the map, voter groups or paper first: ${read.filter((r) => r.read.length).length}/${read.length}.`);
+    if (kind === "free") {
+      // After a run's first choice that differs from 2013, the race is no longer the real one: count those apart.
+      const order = new Map(decisions.map((d, i) => [d, i]));
+      const after = rs.filter((r) => { const f = finals.find((x) => x.n === r.n)?.firstDifferent; return f !== null && f !== undefined && order.get(r.decision)! > order.get(f)!; });
+      const l = line(after);
+      out.push(`After each run's first different choice: ${l.real}/${l.scored} on the real choice.`);
+    }
+  }
+  if (finals.length) {
+    out.push("", "### Free run results (context, not the score: the simulation is fitted to the real result)", "", "| Run | De Blasio | Leader | Runoff | First different choice | Orders | Staff jobs | Rival moves |", "|---|---|---|---|---|---|---|---|");
+    for (const f of finals) { const [lead, share] = Object.entries(f.poll).sort((a, b) => b[1] - a[1])[0]; out.push(`| ${f.n + 1} | ${f.poll.deblasio ?? 0} | ${lead} ${share} | ${f.runoff ? "yes" : "no"} | ${f.firstDifferent ?? "none"} | ${f.orders} | ${f.staffJobs} | ${f.rivalMoves} |`); }
+    out.push("", "Certified result: de Blasio 40.81, Thompson 26.14, Quinn 15.74; no runoff.");
   }
   const dropped = [...new Set(recs.flatMap((r) => (r.dropped ?? []).map((t) => `${r.decision}: ${t}`)))];
   if (dropped.length) out.push("", "Card lines left out because they state something not yet known on the card's date:", ...dropped.map((t) => `- ${t}`));

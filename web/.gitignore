@@ -46,3 +46,6 @@ next-env.d.ts
 
 # MapLibre worker, copied from node_modules on install
 /public/maplibre/
+
+# Eval runs without a key (wiring checks, not measurements)
+eval/runs/*-dry-*
