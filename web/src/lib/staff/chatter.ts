@@ -9,13 +9,14 @@ const model = () => new ChatAnthropic({ model: MODEL, maxTokens: 2000, outputCon
 const text = (c: unknown) => (typeof c === "string" ? c : Array.isArray(c) ? c.map((b) => (b as { text?: string }).text ?? "").join("") : "").trim();
 const live = () => !!process.env.ANTHROPIC_API_KEY;
 
-export type SpeakRequest = { name: string; role: string; voice: string; situation: string; context: string; fallback: { text: string; suggest: string } };
+/** `name` is how the post is addressed ("the Field Director"); `campaign` says whose campaign and which race, from the case. */
+export type SpeakRequest = { name: string; campaign: string; voice: string; situation: string; context: string; fallback: { text: string; suggest: string } };
 
 export async function speak(r: SpeakRequest): Promise<{ text: string; suggest: string; mode: "live" | "offline" }> {
   if (!live()) return { ...r.fallback, mode: "offline" };
   try {
     const res = await model().invoke([
-      { role: "system", content: `You are ${r.name}, ${r.role} on Adrian Cole's fictional mayoral campaign in a nonpartisan teaching game. Voice: ${r.voice}` },
+      { role: "system", content: `You are ${r.name} on ${r.campaign}. This is a nonpartisan teaching simulation built on the real race: speak as a professional in that post, never as an impersonation of a real person, and use only the figures you are given. Voice: ${r.voice}` },
       { role: "user", content: `Something your boss should hear about, unprompted:\n${r.situation}\n\nCampaign state: ${r.context}\n\nWrite exactly two lines.\nLine 1: what you say to your boss, under 35 words, in your voice, no greeting.\nLine 2: SUGGEST: a short instruction (under 12 words) your boss could give you to act on it.` },
     ]);
     const lines = text(res.content).split("\n").map((l) => l.trim()).filter(Boolean);

@@ -25,7 +25,8 @@ export function useTicker() {
   const paper = usePaper((s) => s.open);
   useEffect(() => {
     if (!running || paper) return;
-    const t = setInterval(() => land(tick()), DAY_MS / speed);
+    // Each day that passes, the staff get the chance to speak up; speakUp decides whether anyone has something to say.
+    const t = setInterval(() => { land(tick()); void import("@/lib/staff/speak").then((m) => m.speakUp()); }, DAY_MS / speed);
     return () => clearInterval(t);
   }, [running, speed, paper]);
 }
