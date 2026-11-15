@@ -6,13 +6,22 @@ import type { PollRecord } from "../engine/polls";
 import type { ElectionResult } from "../engine/election";
 import type { LedgerEntry } from "../store";
 import { hash } from "../util";
-import { activeRivals, ME, nameOf } from "../scenario";
+import { ACTIVE, activeRivals, dayLabel, ME, nameOf } from "../scenario";
+import { CASE } from "../scenario/case";
 
 // The Five Borough Ledger. Each edition covers what happened since the previous one. Stories are picked
 // by newsworthiness and written here as plain templates from the facts; the AI newsroom may rewrite them,
 // but only with numbers that appear in these facts (newsroom.ts checks).
 
-export type Story = { kicker: string; headline: string; body: string; cd?: number };
+export type Story = {
+  kicker: string;
+  headline: string;
+  body: string;
+  cd?: number;
+  /** "real": from the 2013 record, cited, never rewritten by the AI newsroom. "sim": what the simulation produced. */
+  tag?: "real" | "sim";
+  sources?: { url: string; label: string }[];
+};
 export type Respond = { kind: "issue" | "attack"; cd?: number; faction?: string; rival?: string };
 export type Kind = "daily" | "debate" | "eve" | "result";
 
@@ -26,6 +35,8 @@ export type Edition = {
   polls: { latest: PollRecord; previous?: PollRecord; since: string[]; fresh: boolean };
   editorial: Story;
   letters: Story[];
+  /** The real coverage of the race in this edition's window (a real scenario only). */
+  record: Story[];
   /** Every figure a writer may use. */
   numbers: string[];
   upTo: number;
@@ -84,12 +95,28 @@ function cityStory(cd: number, why: string): Story {
 /** "Quinn 36, de Blasio 12, Thompson 11": everyone in the race, highest first. */
 const pollNames = (p: PollRecord) => Object.entries(p.shares).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([id, v]) => `${nameOf(id)} ${v}`).join(", ");
 
+/** Case source ids as links. */
+const cite = (ids: string[]) => [...new Set(ids)].map((id) => CASE.sources.find((x) => x.id === id)).filter(Boolean).map((x) => ({ url: x!.url, label: `${x!.publisher}${x!.date ? `, ${x!.date}` : ""}` }));
+/** The case's notes speak to the student ("You raised"); a newspaper names the candidate. */
+const thirdPerson = (t: string) => t.replace(/\bYou\b/g, ME.short).replace(/\byou\b/g, ME.short).replace(/\b[Yy]our\b/g, `${ME.short}'s`);
+/** A headline from the first sentence of a real note, under about 12 words. */
+const headlineOf = (text: string) => {
+  const first = text.split(/(?<=\.)\s/)[0].replace(/\.$/, "");
+  const words = first.split(" ");
+  return words.length > 13 ? `${words.slice(0, 12).join(" ")}…` : first;
+};
+const dayOfDate = (iso: string) => {
+  const a = Date.parse(CASE.briefingDate), b = Date.parse(CASE.electionDate);
+  return Math.max(1, Math.min(30, Math.round(1 + (29 * (Date.parse(iso) - a)) / (b - a))));
+};
+
 export function buildEdition(w: World, kind: Kind = "daily"): Edition {
   const prev = w.editions[w.editions.length - 1];
   const since = w.ledger.filter((l) => !prev || l.id > prev.upTo);
-  const cole = since.filter((l) => l.source === "staff" || l.source === "candidate" || l.source === "manifesto" || l.source === "tactic");
+  const cole = since.filter((l) => l.source === "staff" || l.source === "candidate" || l.source === "manifesto" || l.source === "tactic" || l.source === "moment");
   const rival = since.filter((l) => l.source === "rival");
   const debate = since.find((l) => l.source === "debate");
+  const realEvent = [...since].reverse().find((l) => l.source === "event");
   const backfire = since.find((l) => l.source === "tactic" && /attack/.test(l.effect.summary));
   const latest = w.polls[w.polls.length - 1];
   const previous = w.polls[w.polls.length - 2];
@@ -113,6 +140,8 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
     lead = { kicker: "Election night", headline: r.won ? `${ME.short} wins ${r.runoff ? "the runoff" : "City Hall"}` : `${ME.short} concedes`, body: `With all 59 districts reporting: ${r.ranked.map((id) => `${nameOf(id)} ${r.pct[id]}%`).join(", ")}. ${r.runoff ? `Nobody reached the threshold, so ${nameOf(r.runoff.a)} and ${nameOf(r.runoff.b)} met in a runoff: ${nameOf(r.runoff.a)} ${r.runoff.pct[r.runoff.a]}%, ${nameOf(r.runoff.b)} ${r.runoff.pct[r.runoff.b]}%.` : `${ME.short} carried ${r.districtsWon[ME.id] ?? 0} districts.`}` };
   } else if (kind === "eve") {
     lead = { kicker: "Election day", headline: "New York votes today", body: `The final poll: ${pollLine(latest)}. The race is decided in the districts below.` };
+  } else if (realEvent) {
+    lead = { kicker: `The real race · ${dayLabel(w.day) || `day ${w.day}`}`, headline: headlineOf(thirdPerson(realEvent.effect.summary)), body: thirdPerson(clean(realEvent.effect.summary)), tag: "real", sources: cite(realEvent.effect.sources ?? []) };
   } else if (debate) {
     lead = { kicker: "Debate night", headline: clean(debate.effect.summary).replace(/\.$/, ""), body: `The candidates met on stage with ${w.manifesto.length} planks in ${ME.short}'s platform. ${freshPoll ? `The latest poll: ${pollLine(latest)}.` : "The next poll will show whether it moved anyone."}` };
   } else if (urgent) {
@@ -134,6 +163,10 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
     const [issue, count] = worst311.issues[0];
     lead = { kicker: "City", headline: `${cap(issue.toLowerCase())} complaints pile up in ${worst311.name}`, body: `Residents filed ${fmt(count)} reports in a month and say nobody at City Hall is listening. All three campaigns were asked what they would do.`, cd: worst311.cd, respond: { kind: "issue", cd: worst311.cd } };
   }
+  // What the real 2013 press reported in this edition's window (paraphrased in the case file, cited).
+  const fromDay = prev ? prev.day : 0;
+  const record: Story[] = ACTIVE.kind === "real" ? CASE.press.filter((p) => { const d = dayOfDate(p.date); return d > fromDay && d <= w.day; }).map((p) => ({ kicker: `${p.outlet} · ${p.date}`, headline: headlineOf(thirdPerson(p.summary)), body: thirdPerson(p.summary), tag: "real" as const, sources: cite([p.source]) })) : [];
+
   // Every real city issue on the front page can be answered, even when something else leads.
   if (!lead.respond && kind === "daily" && !freshPoll && !debate) lead.respond = { kind: "issue", cd: worst311.cd };
 
@@ -182,6 +215,7 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
     polls: { latest, previous, since: sinceLines, fresh: freshPoll },
     editorial,
     letters,
+    record,
     numbers: [],
     upTo: w.ledger.at(-1)?.id ?? 0,
     moneyUpTo: w.money?.events.length ?? 0,

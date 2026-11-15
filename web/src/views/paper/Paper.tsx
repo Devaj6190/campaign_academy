@@ -8,7 +8,7 @@ import { markRead, respond } from "@/lib/paper/run";
 import { appearancesToday, DAILY } from "@/lib/candidate";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
-import { CANDIDATES, ME } from "@/lib/scenario";
+import { ACTIVE, CANDIDATES, ME } from "@/lib/scenario";
 
 // The Five Borough Ledger. A broadsheet in four sections, with every past edition one click away.
 // It never opens itself: it arrives as a chip in the top bar.
@@ -73,11 +73,22 @@ function Archive({ current }: { current: Edition }) {
   );
 }
 
-const Body = ({ s, big }: { s: Story; big?: boolean }) => (
+// A story, with where it comes from: the real 2013 record (cited) or the simulation. `sim` marks simulated
+// stories in a real race; a fictional race shows no tags.
+const Body = ({ s, big, sim }: { s: Story; big?: boolean; sim?: boolean }) => (
   <article>
-    <Label>{s.kicker}</Label>
+    <div className="flex items-center gap-2">
+      <Label>{s.kicker}</Label>
+      {s.tag === "real" ? <Tag kind="real" /> : sim && ACTIVE.kind === "real" ? <Tag kind="sim" /> : null}
+    </div>
     <h3 className={cn("mt-1.5 font-serif leading-[1.1] tracking-tight", big ? "text-[34px]" : "text-[21px]")}>{s.headline}</h3>
     <p className={cn("mt-2 leading-relaxed text-soft", big ? "text-[14.5px]" : "text-[13px]")}>{s.body}</p>
+    {big && s.tag === "real" && <p className="mt-1.5 text-[11.5px] text-faint">This happened in the real 2013 race. The numbers in it are the real ones; your simulated race may differ.</p>}
+    {!!s.sources?.length && (
+      <div className="mt-1.5 flex flex-wrap gap-x-3 text-[11px] text-faint">
+        {s.sources.map((x) => <a key={x.url} href={x.url} target="_blank" rel="noreferrer" className="text-gold hover:underline">{x.label}</a>)}
+      </div>
+    )}
   </article>
 );
 
@@ -93,7 +104,7 @@ function Front({ e, close }: { e: Edition; close: () => void }) {
     <>
       <div className="grid grid-cols-3 gap-8">
         <div className="col-span-2">
-          <Body s={e.lead} big />
+          <Body s={e.lead} big sim />
           {r && isLatest && !e.decision && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <Button size="sm" variant="primary" disabled={left <= 0} title={left <= 0 ? "No appearances left today" : undefined} onClick={() => setNote(respond(e, "statement"))}>
@@ -114,9 +125,16 @@ function Front({ e, close }: { e: Edition; close: () => void }) {
         </aside>
       </div>
       <div className="mt-8 grid grid-cols-2 gap-8 border-t border-line pt-6">
-        <Body s={e.campaign} />
-        <Body s={e.opposition} />
+        <Body s={e.campaign} sim />
+        <Body s={e.opposition} sim />
       </div>
+      {!!e.record?.length && (
+        <div className="mt-8 border-t border-line pt-6">
+          <div className="flex items-center gap-2"><Label>From the 2013 record</Label><Tag kind="real" /></div>
+          <p className="mt-1 text-[11.5px] text-faint">What the real press reported around this point in the race, paraphrased and cited. Your race may have gone differently.</p>
+          <div className="mt-4 grid grid-cols-2 gap-6">{e.record.map((r) => <Body key={r.kicker + r.headline} s={r} />)}</div>
+        </div>
+      )}
     </>
   );
 }

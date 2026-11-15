@@ -36,7 +36,7 @@ const picks = () => Object.fromEntries(Object.entries(useGame.getState().moments
  * - a rival's poll points scale that rival's strength everywhere;
  * - money is scaled to the game (1:10) and comes out of cash.
  */
-export function applyShift(s: Shift, label: string, summary: string, source: "event" | "moment") {
+export function applyShift(s: Shift, label: string, summary: string, source: "event" | "moment", sources?: string[]) {
   const g = useGame.getState();
   const k = supportPerPoint(g.day);
   const sent: Record<number, number> = {};
@@ -49,7 +49,7 @@ export function applyShift(s: Shift, label: string, summary: string, source: "ev
   }
   const unions = s.groups?.union ?? 0;
   const money = Math.round((s.budget ?? 0) * ACTIVE.finance.scale);
-  const e = effectOf({ by: source, action: "plank", label, summary, sent, factions: unions ? { unions: unions * 0.8 } : {}, cost: Math.max(0, -money), raised: Math.max(0, money), paidFrom: "cash" });
+  const e = effectOf({ by: source, action: "plank", label, summary, sent, factions: unions ? { unions: unions * 0.8 } : {}, cost: Math.max(0, -money), raised: Math.max(0, money), paidFrom: "cash", sources });
   g.applyEffect(e, source);
 
   // Rivals: scale their strength by how far their share should move.
@@ -80,12 +80,12 @@ export function morningMoments(day: number) {
     // Only the rivals' part: the student's own closing push is theirs to make.
     const { [ME.id]: _own, ...rivals } = CASE.close.shift.poll ?? {};
     void _own;
-    applyShift({ poll: rivals }, "The final stretch", CASE.close.notes.map((n) => n.text).join(" "), "event");
+    applyShift({ poll: rivals }, "The final stretch", CASE.close.notes.map((n) => n.text).join(" "), "event", CASE.close.notes.flatMap((n) => n.sources));
     setMoment("__close", { status: "decided", day });
   }
   for (const d of momentOn(day)) {
     if (g.moments[d.id]) continue;
-    if (d.since) applyShift(d.since.shift, "What happened", d.since.notes.map((n) => n.text).join(" "), "event");
+    if (d.since) applyShift(d.since.shift, d.title, d.since.notes.map((n) => n.text).join(" "), "event", d.since.notes.flatMap((n) => n.sources));
     setMoment(d.id, { status: "pending", day });
     useGame.setState({ overlay: "moment", momentId: d.id });
   }

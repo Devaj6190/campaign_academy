@@ -29,6 +29,8 @@ export type Effect = {
   /** Donors this brought in, and the groups it asked (they tire of being asked). */
   gifts?: Gift[];
   asked?: [string, number][];
+  /** Case source ids, for changes that come from the real record (lib/scenario/moments). */
+  sources?: string[];
   /** False when the job went to someone without the skills for it. */
   fit: boolean;
   summary: string;

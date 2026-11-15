@@ -29,7 +29,7 @@ export async function publishEdition(kind: Kind = "daily") {
     const res = await fetch("/api/paper/write", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ facts: factsOf(ed) }) });
     const out = (await res.json()) as WriteResult;
     if (out.mode !== "live") return;
-    const pick = <T extends Story>(mine: T, theirs?: Story | null): T => (theirs ? { ...mine, kicker: theirs.kicker, headline: theirs.headline, body: theirs.body } : mine);
+    const pick = <T extends Story>(mine: T, theirs?: Story | null): T => (theirs && mine.tag !== "real" ? { ...mine, kicker: theirs.kicker, headline: theirs.headline, body: theirs.body } : mine);
     patch(ed.day, kind, (e) => ({
       ...e,
       mode: "live",
