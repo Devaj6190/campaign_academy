@@ -293,6 +293,7 @@ What it showed:
 | 15 Nov | After run 1: the target is grounding, not agreement. Report agreement on unrecognised masked cards and how often changed facts are followed | Memory alone gives 100% agreement |
 | 15 Nov | Memos skip the lines the card leaves out; masking also hides identifying figures and details; recall replies that are cut short still count | Found in run 1's transcripts |
 | 15 Nov | After run 3, the headline changes to: changed facts followed (with a reworded control), agreement where memory is wrong, and agreement on unrecognised twins. Twins, controls and a second changed version per decision are written before any of them runs | Masking cannot hide this race (27 of 27 recognised in run 2); tuning 1 did not move the changed-facts score. Devaj |
+| 15 Nov | Tuning frozen at commit bdd01be; the held-out set run once. No final N = 5 replay and no second free run | Out of time for the hackathon. Devaj |
 | 15 Nov | Tuning 2: the reason must name the facts it rests on. Kept, though it made no measurable difference | Run 5 |
 | 15 Nov | Changed and reworded cards drop the chips and are compared with the card without chips | Run 6: the chips, written for the real situation, contradicted the changed facts |
 | 15 Nov | Tuning 1: the campaigner is told the facts it is given are this campaign's facts, even where they differ from what it remembers (`GROUNDED` in `decider.ts`). It names no option and no outcome | Run 1: at three changed-facts cards it argued from memory, not the card |
