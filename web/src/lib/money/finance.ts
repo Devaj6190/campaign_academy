@@ -1,7 +1,7 @@
 import type { PollRecord } from "../engine/polls";
 import { addGifts, recover, trickleGifts } from "./donors";
 import { ENVELOPES, GAME, NYC, PAYMENT_DAYS, sum, TRICKLE, type Envelopes, type Money, type MoneyEvent, type Source } from "./rules";
-import { ME } from "../scenario";
+import { ACTIVE, ME } from "../scenario";
 
 // The campaign's books. Pure functions over the money state, so the store, the panels, Dana and the paper
 // all read the same numbers.
@@ -25,8 +25,11 @@ export const nextPaymentDay = (day: number) => PAYMENT_DAYS.find((d) => d > day)
 
 /** Spending limit (participants only) and how much room is left. */
 export function limitStatus(m: Money) {
-  if (m.participant === false) return { limit: null, left: Infinity, over: 0 };
-  return { limit: GAME.spendingLimit, left: GAME.spendingLimit - m.spentTotal, over: Math.max(0, m.spentTotal - GAME.spendingLimit) };
+  if (m.participant === false) return { limit: null, left: Infinity, over: 0, counted: m.spentTotal };
+  // Where the race sets aside a fixed allowance for staff and overheads, payroll is that allowance.
+  const F = ACTIVE.finance;
+  const counted = F.fixedAllowance ? m.spentTotal - m.payrollTotal + F.fixedAllowance * F.scale : m.spentTotal;
+  return { limit: GAME.spendingLimit, left: GAME.spendingLimit - counted, over: Math.max(0, counted - GAME.spendingLimit), counted };
 }
 
 /** Income over the last n days, by source. */
@@ -101,7 +104,7 @@ export function settle(b: Books, ended: number): { cash: number; money: Money; m
   let missedPayroll = false;
   if (cash >= b.payroll) {
     cash -= b.payroll;
-    m = { ...m, spentTotal: m.spentTotal + b.payroll, missed: 0 };
+    m = { ...m, spentTotal: m.spentTotal + b.payroll, payrollTotal: m.payrollTotal + b.payroll, missed: 0 };
   } else {
     missedPayroll = true;
     m = { ...m, missed: m.missed + 1 };

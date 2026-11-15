@@ -100,6 +100,17 @@ function FlowTrigger({ open, side, label, value }: { open: boolean; side: "left"
   );
 }
 
+// A real moment waiting for a decision today.
+function MomentChip() {
+  const pending = useGame((s) => Object.entries(s.moments).find(([k, m]) => k !== "__close" && m.status === "pending")?.[0]);
+  if (!pending) return null;
+  return (
+    <button onClick={() => useGame.setState({ overlay: "moment", momentId: pending })} className="flex h-8 items-center gap-1.5 rounded-md border border-warm/40 bg-warm/10 px-2.5 text-[12px] whitespace-nowrap text-warm transition-colors hover:bg-warm/20">
+      <span className="size-1.5 rounded-full bg-warm" />Decide today
+    </button>
+  );
+}
+
 // The Ledger arrives here, never as a popup: the latest headline, with a dot until it has been read.
 function PaperChip() {
   const e = useGame((s) => s.editions[s.editions.length - 1]);
@@ -127,6 +138,7 @@ function Clock() {
   const inPoll = CANDIDATES.filter((c) => (poll[c.id] ?? 0) > 0).sort((a, b) => (a.id === ME.id ? -1 : b.id === ME.id ? 1 : (poll[b.id] ?? 0) - (poll[a.id] ?? 0)));
   return (
     <div className="flex items-center justify-end gap-4">
+      <MomentChip />
       <PaperChip />
       <div className="hidden w-60 xl:block" title={`${latest.pollster}, day ${latest.day}: ${latest.n.toLocaleString("en-US")} likely voters, margin of error ±${latest.moe}`}>
         <div className="tnum mb-1 flex justify-between gap-2 font-mono text-[11px]">

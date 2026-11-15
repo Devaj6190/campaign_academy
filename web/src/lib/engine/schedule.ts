@@ -66,7 +66,7 @@ function rivalIncome(today: number) {
     const income = Math.round(def.income * (0.8 + hash(today * 13, WHO.indexOf(who) * 2 + 3) * 0.4));
     setRival(who, (r) => {
       const matchable = r.matchable + Math.round(income * def.smallShare);
-      const owed = def.participant && PAYMENT_DAYS.includes(today) ? Math.max(0, Math.min(GAME.publicCap, matchable * NYC.ratio) - r.matchPaid) : 0;
+      const owed = def.participant && !(def.matchDenied && today >= def.matchDenied) && PAYMENT_DAYS.includes(today) ? Math.max(0, Math.min(GAME.publicCap, matchable * NYC.ratio) - r.matchPaid) : 0;
       return { cash: r.cash + income + owed, raised: r.raised + income + owed, matchable, matchPaid: r.matchPaid + owed };
     });
   }

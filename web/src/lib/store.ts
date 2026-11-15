@@ -12,6 +12,7 @@ import { ACTIVE, ME, RIVAL_LIST } from "./scenario";
 import { tacticOutcome, type Deliverer } from "./engine/tactic";
 import { electionResult, type ElectionResult } from "./engine/election";
 import type { Edition } from "./paper/edition";
+import type { MomentState } from "./scenario/moments";
 import { addGifts } from "./money/donors";
 import { avgIncome, burn, settle } from "./money/finance";
 import { ASKS, ENVELOPE_OF, START_MONEY, type Envelope, type Money } from "./money/rules";
@@ -24,13 +25,13 @@ export const DAY_END = 1320; // 22:00
 export const SPEEDS = [0.5, 1, 2, 4];
 
 type Line = { who: "me" | "them" | "note"; text: string };
-type Overlay = "paper" | "manifesto" | "calendar" | "tactic" | "election" | null;
+type Overlay = "paper" | "manifesto" | "calendar" | "tactic" | "election" | "moment" | null;
 export type Toast = { id: number; staff: string; text: string };
 export type Draft = { text: string; up: string[]; down: string[] };
 
 /** One change to the world, stamped with when it happened. Every view that explains "why" reads this. */
 /** knock: how other groups moved because of this one (relations.ts), credited to the group that caused it. */
-export type LedgerEntry = { id: number; day: number; min: number; source: "staff" | "candidate" | "manifesto" | "tactic" | "rival" | "debate"; effect: Effect; knock: Record<string, { delta: number; from: string }> };
+export type LedgerEntry = { id: number; day: number; min: number; source: "staff" | "candidate" | "manifesto" | "tactic" | "rival" | "debate" | "event" | "moment"; effect: Effect; knock: Record<string, { delta: number; from: string }> };
 
 export type RivalState = { cash: number; raised: number; spent: number; matchable: number; matchPaid: number; strength: Record<number, number>; memory: string[]; plan: { day: number; status: "idle" | "planning" | "ready" | "landed"; moves: Effect[]; memo?: string; mode?: "live" | "rules" } };
 
@@ -77,6 +78,10 @@ type State = {
   /** Cole's poll at the end of each day, for trends and debates. */
   /** Election night: the result and how many districts have reported so far. */
   election: { result: ElectionResult; shown: number; done?: boolean } | null;
+  /** The real race's moments (lib/scenario/moments): which have come up and what the student did. */
+  moments: Record<string, MomentState>;
+  /** The moment the decision card shows. */
+  momentId: string | null;
   /** Every edition of The Five Borough Ledger so far, oldest first (lib/paper). */
   editions: Edition[];
   /** Which edition the paper shows: an index into editions, or null for the latest. */
@@ -225,6 +230,8 @@ export const useGame = create<State>((set, get) => ({
   election: null,
   editions: [],
   paperIndex: null,
+  moments: {},
+  momentId: null,
 
   applyEffect: (e, source) =>
     set((g) => {
@@ -307,6 +314,8 @@ export const useGame = create<State>((set, get) => ({
       news: { day: s.day + 1, opposition: [] },
     });
     void import("./engine/schedule").then((m) => m.overnight(s.day));
+    // The real race's run-up and moments for the new day (a real scenario only).
+    void import("./scenario/moments").then((m) => m.morningMoments(s.day + 1));
     void import("./money/run").then((m) => m.morning(books.missedPayroll));
   },
 
@@ -352,4 +361,5 @@ export const useGame = create<State>((set, get) => ({
 if (typeof window !== "undefined") queueMicrotask(() => {
   void import("./paper/run").then((m) => m.publishEdition());
   void import("./money/run").then((m) => m.morning(false));
+  void import("./scenario/moments").then((m) => m.morningMoments(1));
 });

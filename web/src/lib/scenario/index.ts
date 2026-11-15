@@ -25,6 +25,8 @@ export type RivalDef = {
   base: string;
   /** Game day they enter the race (absent: from day 1). */
   joins?: number;
+  /** Game day the Campaign Finance Board denied them matching funds (no payments after it). */
+  matchDenied?: number;
   profile: Profile;
   /** Groups they court, for the rule-based fallback and for where they are strong. */
   courts: string[];
@@ -50,6 +52,8 @@ export type Finance = {
   publicCap: number;
   spendingLimit: number;
   scale: number;
+  /** Real dollars already set aside under the limit for staff, rent and fixed costs; when set, payroll is that allowance and does not count again. */
+  fixedAllowance?: number;
   source: string;
   /** Day-one daily budgets (game scale). */
   envelopes: { ads: number; field: number; events: number };

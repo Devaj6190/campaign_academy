@@ -74,3 +74,6 @@ export function calibrate(sent: Record<number, number>) {
   const mean = ids.reduce((a, id) => a + W[id], 0) / Math.max(1, ids.length);
   for (const r of RIVAL_LIST) if (!ids.includes(r.id)) W[r.id] = mean;
 }
+
+/** How much district support it takes to move the student's citywide share by one point on this day. */
+export const supportPerPoint = (day: number) => 1 / Math.max(0.05, ME_K * (1 - undecidedShare(day)));

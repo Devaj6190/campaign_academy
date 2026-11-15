@@ -94,6 +94,7 @@ export const NYC2013: Scenario = {
       smallShare: 0.7,
       runsOn: "abolishing stop-and-frisk, and legalising marijuana to cut CUNY tuition",
       base: "the City Comptroller, with a following in Queens",
+      matchDenied: day("2013-08-05"), // the Board denied his matching funds on August 5 (wnyc-liu)
       profile: { skills: ALL, cost: 1.05, effect: 0.95, voice: "Combative comptroller whose campaign is under federal scrutiny.", salary: 0 },
       courts: ["immigrants", "students", "activists"],
       lean: (cd) => 0.08 + (race(cd).asian / 100) * 2.2 + (boro(cd) === 4 ? 0.12 : 0),
@@ -140,8 +141,10 @@ export const NYC2013: Scenario = {
     spendingLimit: 6_426_000,
     scale: 0.1,
     source: "https://www.nyccfb.info/candidate-services/limits-thresholds/2013/",
-    // Kept under the scaled $642,600 limit at the default pace (payroll + budgets for 30 days).
-    envelopes: { ads: 5000, field: 3600, events: 1900 },
+    // The case's $4.3M to spend is the room under the cap after staff, rent and fixed costs (about $2.1M).
+    fixedAllowance: 6_426_000 - 4_300_000,
+    // Small daily budgets: most of the real campaign's money went to television, which comes from its decisions.
+    envelopes: { ads: 1500, field: 1800, events: 700 },
   },
   story: {
     initials: "BdB",

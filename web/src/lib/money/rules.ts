@@ -96,6 +96,8 @@ export type Money = {
   payments: { day: number; amount: number }[];
   raisedTotal: number;
   spentTotal: number;
+  /** Payroll paid so far (inside spentTotal). */
+  payrollTotal: number;
   fines: { day: number; amount: number }[];
   matchStopped: boolean;
   /** Paydays missed in a row. */
@@ -125,6 +127,7 @@ export const START_MONEY: Money = {
   matchPaid: 0,
   payments: [],
   raisedTotal: 0,
+  payrollTotal: 0,
   // Day one's budgets were paid for before the game starts.
   spentTotal: START_ENVELOPES.ads + START_ENVELOPES.field + START_ENVELOPES.events,
   fines: [],

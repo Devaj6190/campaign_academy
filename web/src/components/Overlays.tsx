@@ -9,6 +9,7 @@ import { tacticRisk, type Deliverer } from "@/lib/engine/tactic";
 import { Avatar, Button, Dialog, Label, Meter } from "./ui";
 import { ShaderBackground } from "./ui21/dithering";
 import { PaperView } from "@/views/paper/Paper";
+import { MomentCard } from "./MomentCard";
 import { ACTIVE, colorOf, fullNameOf, ME, nameOf } from "@/lib/scenario";
 
 export function Overlays() {
@@ -21,6 +22,7 @@ export function Overlays() {
       <Dialog open={overlay === "manifesto"} onClose={close} side="right"><Manifesto /></Dialog>
       <Dialog open={overlay === "calendar"} onClose={close} className="max-w-[880px]"><Calendar /></Dialog>
       <Dialog open={overlay === "tactic"} onClose={close} className="max-w-[440px]"><Tactic close={close} /></Dialog>
+      <Dialog open={overlay === "moment"} onClose={close} className="max-w-[860px]"><MomentCard close={close} /></Dialog>
       <Dialog open={overlay === "election"} onClose={close} plate="plate-election" className="max-w-[520px]"><Election /></Dialog>
       <Toasts />
     </>

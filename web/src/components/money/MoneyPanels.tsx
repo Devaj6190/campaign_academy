@@ -9,7 +9,7 @@ import { approveProposal, dismissProposal } from "@/lib/money/run";
 import { ENVELOPES, GAME, NYC, SOURCE_NOTE, SOURCES, sum } from "@/lib/money/rules";
 import { useGame } from "@/lib/store";
 import { cn, money } from "@/lib/util";
-import { activeRivals, ME, nameOf, rivalDef } from "@/lib/scenario";
+import { ACTIVE, activeRivals, ME, nameOf, rivalDef } from "@/lib/scenario";
 
 // The campaign's money, in the three top-bar panels: what goes out (daily budgets), what comes in
 // (donors and public funds), and the books (runway, matching funds, the spending limit, filings, Dana).
@@ -169,8 +169,8 @@ export function FinancePanel() {
       {lim.limit !== null && (
         <>
           <Label className="mt-4 block">Spending limit</Label>
-          <Meter value={(m.spentTotal / lim.limit) * 100} color={lim.over ? "var(--color-neg)" : "var(--color-warm)"} className="mt-2" />
-          <div className="tnum mt-1 flex justify-between font-mono text-[11.5px] text-muted"><span>{money(m.spentTotal)} spent</span><span>limit {money(lim.limit)}</span></div>
+          <Meter value={(lim.counted / lim.limit) * 100} color={lim.over ? "var(--color-neg)" : "var(--color-warm)"} className="mt-2" />
+          <div className="tnum mt-1 flex justify-between font-mono text-[11.5px] text-muted"><span>{money(lim.counted)} counted{ACTIVE.finance.fixedAllowance ? " (incl. fixed costs)" : ""}</span><span>limit {money(lim.limit)}</span></div>
           {m.fines.length > 0 && <p className="mt-1 text-[12px] text-neg">Fined {money(m.fines.reduce((a, f) => a + f.amount, 0))} for overspending.</p>}
         </>
       )}
