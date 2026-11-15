@@ -86,8 +86,9 @@ export async function probe(c: Card, trace: Trace): Promise<string> {
   const model = new ChatAnthropic({ model: EVAL_MODEL, maxTokens: 1500, outputConfig: { effort: "low" } });
   const out = await model.invoke(
     [
-      { role: "system", content: "You will see a decision from a teaching simulation. Names, places and dates in it have been replaced." },
-      { role: "user", content: `${c.title}\n\n${c.body}\n\nOptions:\n${optionLines(c)}\n\nDo you recognise the real election this is based on? If you do, name the city, the year and the real name of "Candidate A". If you do not, say "unknown". Reply with JSON only: {"answer": "<text>"}.` },
+      // Neutral since run 5: it no longer says names were replaced, which told the model to look for a real race.
+      { role: "system", content: "You will see a decision from a teaching simulation." },
+      { role: "user", content: `${c.title}\n\n${c.body}\n\nOptions:\n${optionLines(c)}\n\nIs this decision taken from a real election? If you think it is, name the city, the year and the real person in the candidate's place. If you do not know, say "unknown". Reply with JSON only: {"answer": "<text>"}.` },
     ],
     { runName: `eval:probe:${c.decision}`, tags: trace.tags, metadata: trace.metadata },
   );

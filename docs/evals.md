@@ -170,6 +170,39 @@ What it showed:
 - **Tuning 1 made no clear difference.** One more changed-facts card was followed (positioning, once), which is within run-to-run noise at N = 3. Weiner and the hospital still kept the 2013 choice every time.
 - **Masked agreement fell** (13/18, against 15 and 16 in runs 1 and 2), mostly at budget. With every masked card recognised, this is not a memory effect; budget is the decision that moves most between runs.
 
+### Run 4: the new headline, with twins and controls, N = 3 (commit 75662fe, 15 November)
+
+Tuned agent (tuning 1). All seven conditions; two changed versions per decision.
+
+**Headline:**
+
+| Grounding score | Result |
+|---|---|
+| Changed facts followed (moved off the 2013 choice) | **26/36 (72%)**: 11/18 on the first versions, 15/18 on the second |
+| Control: same facts reworded, kept the card's choice | **17/18 (94%)** |
+| Where memory was wrong, the card got the real choice | **2/2** (both at the second ad) |
+| Twins the probe did not recognise | 0 of 18 |
+
+Plain agreement, for reference:
+
+| Decision | card | nochips | masked | changed (stuck) | reworded | recall | twin |
+|---|---|---|---|---|---|---|---|
+| positioning | 3/3 | 3/3 | 3/3 | 3/6 | 3/3 | 3/3 | 3/3 |
+| weiner | 3/3 | 3/3 | 2/3 | 1/6 | 3/3 | 3/3 | 1/3 |
+| hospital | 3/3 | 3/3 | 3/3 | 4/6 | 3/3 | 3/3 | 3/3 |
+| budget | 1/3 | 0/3 | 0/3 | 0/6 | 2/3 | 3/3 | 0/3 |
+| firstad | 3/3 | 3/3 | 3/3 | 2/6 | 3/3 | 3/3 | 3/3 |
+| base | 3/3 | 3/3 | 3/3 | 0/6 | 3/3 | 1/3 | 3/3 |
+| **all** | 16/18 | 15/18 | 14/18 | 10/36 | 17/18 | 16/18 | 13/18 |
+
+Adviser fidelity: 6 of 9 on the card and masked (Del Cecato 6/6, Hyers 0/3).
+
+What it showed:
+- **The agent follows the facts, not the wording.** Changed facts moved it off the 2013 choice 72% of the time, while the same facts in other words left its choice alone 94% of the time. That is the strongest grounding result so far. Positioning and the hospital are where memory holds on longest: they kept the 2013 choice on half or more of their changed cards.
+- **Where memory and the card disagree, the card wins.** At the second ad, memory picked the wrong option twice; the card picked the real one both times. At budget the reverse: memory knows the real choice (3/3), and the card mostly did not take it (1/3). Either way the agent is not just reading its memory.
+- **The twins were recognised too: 18 of 18.** The probe named the race from its shape: a fourth-place progressive citywide official, a council-leader front-runner, a late entrant with a scandal, a hospital protest. But that probe was leading: it told the model names had been replaced. It is neutral from run 5. Recognising the race when asked is not the same as deciding from memory: on twins the agent chose differently from the card at Weiner (1/3) and budget (0/3).
+- **The free run's six decisions all matched 2013** (section on the free run, once it finishes).
+
 ## 8. Decisions log
 
 | Date | Decision | Why |
