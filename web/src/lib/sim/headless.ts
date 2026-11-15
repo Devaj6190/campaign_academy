@@ -70,7 +70,7 @@ export function runCampaign(opts: RunOptions = {}): RunResult {
     const d = c.decisions[at - 1];
     if (!d) break;
     const option = picks[d.id] ?? d.options[0].id;
-    useCase.getState().decide(d.id, { option, why: "" });
+    useCase.getState().decide(d.id, { option });
     // The rivals plan for the stretch that starts now.
     if (opts.rivals !== false) for (const x of inRace()) for (const m of rulePlan(requestFor(x, studentDid())).moves) land(x, m);
   }
