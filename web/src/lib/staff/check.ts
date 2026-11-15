@@ -1,6 +1,6 @@
 import { useCase } from "../cases/store";
 import { isQuestion, runOffline } from "./offline";
-import { RunCtx, type RunEvent } from "./protocol";
+import { budgetIn, RunCtx, type RunEvent } from "./protocol";
 import { BASE_BUDGET, DAILY, runBookings, snapshot } from "./run";
 
 // Checks on the staff agents that need no API key (issue #41). Run with `npm run check:staff`.
@@ -27,9 +27,24 @@ const QUESTIONS = [
   "Where are we weakest?",
 ];
 
-async function offline(director: string, text: string) {
+/** An order's words, and the limit they state (null: none, so the default applies). */
+const BUDGETS: [string, number | null][] = [
+  ["Pitch reporters and run a small-dollar email. Under $15,000.", 15000],
+  ["Spend at most $20,000 on call time and a fundraiser", 20000],
+  ["Spend $30,000 on digital ads aimed at voters under 45", 30000],
+  ["Canvass Crown Heights this week with a $20k budget", 20000],
+  ["Run ads citywide, budget of 1.5 million, no more than $1m on TV", 1000000],
+  ["Keep it under 8,000 dollars", 8000],
+  ["Get the press talking about our plan to tax incomes over $500,000", null],
+  ["Raise $100k from past donors this week", null],
+  ["Book at most 3 events in Harlem", null],
+  ["Canvass voters under 45 in Queens", null],
+  ["Canvass Crown Heights this week", null],
+];
+
+async function offline(director: string, text: string, budget = BASE_BUDGET) {
   const events: RunEvent[] = [];
-  const ctx = new RunCtx({ director, text, snapshot: snapshot(), history: [], budget: BASE_BUDGET, runId: 1 }, (e) => events.push(e));
+  const ctx = new RunCtx({ director, text, snapshot: snapshot(), history: [], budget, runId: 1 }, (e) => events.push(e));
   await runOffline(ctx, 0);
   return { events, spent: ctx.spent };
 }
@@ -39,6 +54,8 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
   for (const t of ORDERS) if (isQuestion(t)) problems.push(`read as a question, but it is an order: "${t}"`);
   for (const t of QUESTIONS) if (!isQuestion(t)) problems.push(`read as an order, but it is a question: "${t}"`);
   report.push(`wording: ${ORDERS.length} orders and ${QUESTIONS.length} questions checked`);
+  for (const [t, want] of BUDGETS) if (budgetIn(t) !== want) problems.push(`budget read as ${budgetIn(t)}, should be ${want}: "${t}"`);
+  report.push(`budgets: ${BUDGETS.length} orders read for their own limit`);
 
   useCase.getState().restart();
   useCase.setState({ at: 1, step: 1 });
@@ -54,6 +71,11 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
     if (o.events.some((e) => e.t === "proposals")) problems.push(`${d}: an order was answered with options`);
     report.push(`${d}: question → ${n} options, $0 spent; order → ${o.events.filter((e) => e.t === "action").length} jobs, $${o.spent.toLocaleString("en-US")}`);
   }
+
+  // An order's own limit holds: a run given $20,000 works, and cannot spend past it.
+  const tight = await offline("fd", "Canvass Crown Heights and train volunteers. Under $20,000.", budgetIn("Under $20,000.")!);
+  if (tight.spent > 20000 || !tight.spent) problems.push(`budget: a $20,000 order spent $${tight.spent.toLocaleString("en-US")}`);
+  report.push(`budget: a $20,000 order spent $${tight.spent.toLocaleString("en-US")}`);
 
   // Scheduling: book through the run, then let the day come.
   useCase.getState().restart();

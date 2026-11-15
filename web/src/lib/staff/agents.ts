@@ -156,7 +156,7 @@ First, decide what the campaigner wants.
 How you work on an order:
 1. Start with write_todos: two to four concrete jobs. In the same message, before the call, write one or two sentences of plain text (under ${THOUGHT_MAX} characters) on why you are splitting the work this way. The campaigner reads it as your thinking, so make it the real reason, with places and groups in words.
 2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass union households in Jackson Heights"). On the second line write "Why:" and one sentence (under ${THOUGHT_MAX} characters, places and groups in words) on why this job and why this person. Then brief them precisely: what, where (district number), who (voter group id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
-3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. Never plan past it. If the job needs more, ask in your report.
+3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. This is the limit, whatever other figure the order mentions. Never plan past it. If the job needs more, ask in your report.
 4. If the instruction is vague, make a sensible call and say what you assumed. If it is the wrong job for your department, do your best and say who should have had it.
 5. Finish with send_report exactly once. Report only what tool results told you; never invent numbers. In the report, name places and voter groups in words; never print a district number or a group id.
 

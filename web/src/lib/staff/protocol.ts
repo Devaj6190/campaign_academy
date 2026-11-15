@@ -8,6 +8,29 @@ import { shortPlace, type Snapshot } from "./world";
 export type Ask = { amount: number; reason: string };
 /** One way to act on a question the campaigner asked: a short title, the order that carries it out, a rough cost. */
 export type Proposal = { title: string; order: string; cost: number; why: string };
+const AMOUNT = String.raw`\$?\s?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s?(k|m|thousand|million)?\b`;
+const LIMIT_BEFORE = new RegExp(String.raw`\b(?:under|below|within|at most|up to|no more than|not more than|less than|max(?:imum)?(?: of)?|cap(?:ped)?(?: (?:of|at))?|limit(?: of)?|budget(?: (?:of|is|:))?|spend(?:ing)?(?: (?:only|just|about|around))?)\s+${AMOUNT}`, "gi");
+const LIMIT_AFTER = new RegExp(String.raw`${AMOUNT}\s+(?:budget|max(?:imum)?|cap|limit|or less|at most|tops)\b`, "gi");
+
+/**
+ * The spending limit an order states in its own words ("under $15,000", "at most 20k", "spend $30,000", "a $5k
+ * budget"), in dollars, or null when it states none. Only an amount tied to a limit word counts: "tax incomes over
+ * $500,000" and "raise $100k" are not budgets. The smallest stated limit wins.
+ */
+export function budgetIn(text: string): number | null {
+  const found: number[] = [];
+  for (const re of [LIMIT_BEFORE, LIMIT_AFTER]) {
+    for (const m of text.matchAll(re)) {
+      // A bare small number is a count, not money ("at most 3 events"): it needs a $ sign, a unit, or four digits.
+      const raw = m[1].replace(/,/g, ""), unit = (m[2] ?? "").toLowerCase();
+      if (!m[0].includes("$") && !unit && raw.replace(/\..*/, "").length < 4) continue;
+      const n = Number(raw) * (unit === "k" || unit === "thousand" ? 1e3 : unit === "m" || unit === "million" ? 1e6 : 1);
+      if (Number.isFinite(n) && n > 0) found.push(Math.round(n));
+    }
+  }
+  return found.length ? Math.min(...found) : null;
+}
+
 /** How long a thought may be: one or two sentences. Asked of the model in words, and enforced when emitted. */
 export const THOUGHT_MAX = 200;
 export type PlanItem = { title: string; status: "pending" | "in-progress" | "completed" };

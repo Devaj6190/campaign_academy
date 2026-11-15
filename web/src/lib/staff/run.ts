@@ -7,7 +7,7 @@ import { useGame } from "../store";
 import { ACTIONS, BOOKING, type ActionId } from "../engine/catalog";
 import { resolve, type Effect } from "../engine/resolve";
 import { runOffline } from "./offline";
-import { RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
+import { budgetIn, RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
 import { bumpMorale, nextId, pushChat, useStaff, type ChatItem, type FeedItem } from "./store";
 import { PLACES, short, shortPlace, type Snapshot } from "./world";
@@ -237,7 +237,11 @@ function handle(director: string, runId: number, e: RunEvent) {
   }
 }
 
-export async function instruct(id: string, text: string, extra = 0, followOf?: string) {
+/**
+ * `extra` is the approved amount when this continues an earlier order (`followOf`). `own` is a budget that comes with
+ * the order from elsewhere (a picked option's price). Otherwise the order's own words set it, or the default does.
+ */
+export async function instruct(id: string, text: string, extra = 0, followOf?: string, own?: number) {
   const s = useStaff.getState();
   if (s.active[id]) {
     pushChat(id, { k: "note", text: `${cap(first(id))} is still on the last job. Wait for the report.` });
@@ -249,13 +253,16 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
     : c.k === "report" ? [{ who: "them" as const, text: c.text }]
     : c.k === "proposals" ? [{ who: "them" as const, text: `${c.text} Options: ${c.options.map((o, i) => `${i + 1}) ${o.title}`).join("; ")}.` }]
     : []);
-  pushChat(id, { k: "me", text, run: runId });
+  // The budget is what the order says, never more than the campaign has. An order that names no limit gets the default.
+  const stated = followOf ? null : (budgetIn(text) ?? own ?? null);
+  const budget = Math.max(0, Math.min(followOf ? extra : (stated ?? BASE_BUDGET), worldNow().w.budget));
+  pushChat(id, { k: "me", text, run: runId, budget: stated === null ? undefined : budget });
   pushChat(id, { k: "thoughts", run: runId, items: [], live: true });
   useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, origin: followOf ?? text, follow: !!followOf, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
   setBusy(id, "down");
   feed("you", `You → ${first(id)}: ${text}`);
 
-  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget: followOf ? extra : BASE_BUDGET, runId, followOf };
+  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget, runId, followOf };
   const on = (e: RunEvent) => handle(id, runId, e);
   try {
     const res = await fetch("/api/staff/instruct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
@@ -303,7 +310,8 @@ export function pick(id: string, index: number, option: number) {
   const item = useStaff.getState().chat[id]?.[index];
   if (item?.k !== "proposals" || item.picked !== undefined || !item.options[option]) return;
   useStaff.setState((s) => ({ chat: { ...s.chat, [id]: s.chat[id].map((c, i) => (i === index && c.k === "proposals" ? { ...c, picked: option } : c)) } }));
-  void instruct(id, item.options[option].order);
+  const o = item.options[option];
+  void instruct(id, o.order, 0, undefined, o.cost || undefined);
 }
 
 export function answerAsk(id: string, index: number, yes: boolean) {

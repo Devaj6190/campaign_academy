@@ -8,7 +8,8 @@ import type { Candidate, Profile } from "./roster";
 
 /** `run`: the instruction an item belongs to, in the instructed person's own chat. The war room groups by it. */
 export type ChatItem = (
-  | { k: "me"; text: string }
+  /** `budget`: the spending limit read from the order, when it stated one. */
+  | { k: "me"; text: string; budget?: number }
   | { k: "them"; text: string; suggest?: string }
   | { k: "receipt"; effect: Effect; by: string }
   | { k: "report"; text: string; ask: Ask | null; state: "open" | "approved" | "declined"; spent: number; raised: number }
