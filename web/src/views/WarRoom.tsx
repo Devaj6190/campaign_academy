@@ -10,7 +10,7 @@ import { ShaderBackground } from "@/components/ui21/dithering";
 import type { Staff } from "@/lib/data";
 import type { Effect } from "@/lib/engine/resolve";
 import { profileFor } from "@/lib/staff/roster";
-import { answerAsk, hire, letGo, loadCandidates, reassign } from "@/lib/staff/run";
+import { answerAsk, hire, letGo, loadCandidates, pick, reassign } from "@/lib/staff/run";
 import { useStaff, type ChatItem, type Run } from "@/lib/staff/store";
 import { FACTIONS_2013 } from "@/lib/cases/mayor2013-factions";
 import { currentCase, shortDate, shortMoney, staffMoney, useCase } from "@/lib/cases/store";
@@ -433,7 +433,7 @@ function OrderCard({ rows, id, latest, onSuggest }: { rows: Row[]; id: string; l
   const effects = rows.flatMap((r) => (r.c.k === "receipt" ? [r.c.effect] : []));
   // What the director says while working comes before the receipts; the report and coaching close the card.
   const said = rows.filter((r) => r.c.k === "them" || r.c.k === "note");
-  const closing = rows.filter((r) => r.c.k === "report" || r.c.k === "coach");
+  const closing = rows.filter((r) => r.c.k === "report" || r.c.k === "coach" || r.c.k === "proposals");
   const reported = closing.some((r) => r.c.k === "report");
   const staff = useGame((s) => s.staff);
   const misfits = effects.filter((e) => !e.fit).map((e) => { const p = staff.find((x) => x.id === e.by); return `${e.label} went to ${p ? short(p) : "someone"}`; });
@@ -465,7 +465,7 @@ function OrderCard({ rows, id, latest, onSuggest }: { rows: Row[]; id: string; l
       {/* Until the report is in, each action shows as it lands; after, they fold into the report's totals line. */}
       {!reported && !!effects.length && <div className="space-y-px border-l border-line pl-1.5">{effects.map((e, i) => <ReceiptLine key={i} e={e} />)}</div>}
       {closing.map((r) =>
-        r.c.k === "coach" ? <CoachLine key={r.i} c={r.c} misfits={misfits} /> : r.c.k === "report" ? <Reply key={r.i} c={r.c} index={r.i} id={id} effects={effects} /> : null,
+        r.c.k === "coach" ? <CoachLine key={r.i} c={r.c} misfits={misfits} /> : r.c.k === "report" ? <Reply key={r.i} c={r.c} index={r.i} id={id} effects={effects} /> : r.c.k === "proposals" ? <Proposals key={r.i} c={r.c} index={r.i} id={id} /> : null,
       )}
     </div>
   );
@@ -534,6 +534,39 @@ function Reply({ c, index, id, effects }: { c: Extract<ChatItem, { k: "report" }
   );
 }
 
+/** The director's answer to a question, and its options as cards. Picking one sends its order; nothing is spent before. */
+function Proposals({ c, index, id }: { c: Extract<ChatItem, { k: "proposals" }>; index: number; id: string }) {
+  const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
+  const done = c.picked !== undefined;
+  return (
+    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start">
+      <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft">{c.text}</div>
+      <div className="mt-2 w-full space-y-1.5">
+        {c.options.map((o, i) => {
+          const chosen = c.picked === i;
+          return (
+            <div key={i} className={cn("rounded-lg border p-2.5 transition-colors", chosen ? "border-gold bg-hover" : "border-line bg-raised", done && !chosen && "opacity-45")}>
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-[13px] font-medium">{chosen && <Check className="size-3.5 shrink-0 text-gold-bright" />}{o.title}</div>
+                  {o.why && <p className="mt-0.5 text-[11.5px] leading-snug text-muted">{o.why}</p>}
+                </div>
+                {!!o.cost && <span className="tnum shrink-0 font-mono text-[11px] text-warm">~{usd(o.cost)}</span>}
+              </div>
+              {!done && (
+                <Button size="sm" variant="primary" className="mt-2" onClick={() => pick(id, index, i)}>
+                  <Check className="size-3.5" />Do this
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {!done && <span className="mt-1 pl-1 text-[11px] text-faint">Nothing is spent until you pick one, or give your own order.</span>}
+    </motion.div>
+  );
+}
+
 const gradeOf =(c: { clarity: number; fit: number }) => (c.clarity >= 3 && c.fit === 1 ? "Strong delegation" : c.clarity >= 2 && c.fit >= 0.5 ? "Workable delegation" : "Weak delegation");
 
 /** Coaching in one line; the meters and the advice open on click, and on their own when the delegation was weak. */
@@ -573,6 +606,7 @@ function ChatRow({ c, index, id, latest, onSuggest }: { c: ChatItem; index: numb
     );
   if (c.k === "receipt") return <Receipt e={c.effect} />;
   if (c.k === "report") return <Report c={c} index={index} id={id} />;
+  if (c.k === "proposals") return <Proposals c={c} index={index} id={id} />;
   return <Coach c={c} />;
 }
 

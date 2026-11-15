@@ -17,9 +17,10 @@ export async function speak(r: SpeakRequest): Promise<{ text: string; suggest: s
   try {
     const res = await model().invoke([
       { role: "system", content: `You are ${r.name} on ${r.campaign}. This is a nonpartisan teaching simulation built on the real race: speak as a professional in that post, never as an impersonation of a real person, and use only the figures you are given. Voice: ${r.voice}` },
-      { role: "user", content: `Something your boss should hear about, unprompted:\n${r.situation}\n\nCampaign state: ${r.context}\n\nWrite exactly two lines.\nLine 1: what you say to your boss, under 35 words, in your voice, no greeting.\nLine 2: SUGGEST: a short instruction (under 12 words) your boss could give you to act on it.` },
+      { role: "user", content: `Something your boss should hear about, unprompted:\n${r.situation}\n\nCampaign state: ${r.context}\n\nWrite exactly two lines.\nLine 1: what you say to your boss, under 40 words, in your voice, no greeting. Have a view: say what you think it means and what you would do, and disagree with your boss if the facts say so.\nLine 2: SUGGEST: a short instruction (under 12 words) your boss could give you to act on it.` },
     ]);
-    const lines = text(res.content).split("\n").map((l) => l.trim()).filter(Boolean);
+    // The model sometimes copies the prompt's own labels ("Line 1:"); drop them.
+    const lines = text(res.content).split("\n").map((l) => l.trim().replace(/^line\s*[12]\s*[:.-]\s*/i, "")).filter(Boolean);
     const suggest = lines.find((l) => /^suggest:/i.test(l))?.replace(/^suggest:\s*/i, "") ?? r.fallback.suggest;
     const said = lines.find((l) => !/^suggest:/i.test(l)) ?? r.fallback.text;
     return { text: said.replace(/^["']|["']$/g, ""), suggest, mode: "live" };

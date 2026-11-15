@@ -103,10 +103,34 @@ ${world(w)}`,
       name: "send_report",
       description: "Report back to the campaigner. Call this exactly once, as your very last step.",
       schema: z.object({
-        reply: z.string().describe("Under 35 words, in your voice: what this adds up to and what you would do next. The campaigner already sees a receipt for every action with its cost and effect, so do not repeat those figures. Facts from tool results only."),
+        reply: z.string().describe("Under 50 words, in your voice and with your honest view: what this adds up to and what you would do next. The campaigner already sees a receipt for every action with its cost and effect, so do not repeat those figures. Facts from tool results only."),
         ask_amount: z.number().nullable().describe("Dollars of extra budget you want approved, or null"),
         ask_reason: z.string().nullable().describe("What the extra money is for, as a short phrase starting with \"to\" or \"for\" (it follows the words \"wants $X more\"), or null"),
         coaching: z.string().describe("One honest sentence of feedback on the campaigner's instruction: was it clear (what, where, who, by when) and did it go to the right person?"),
+      }),
+    },
+  );
+  const propose = tool(
+    async ({ reply, options }) => {
+      ctx.propose(reply, options);
+      return "Options delivered. Stop here: the campaigner will pick one.";
+    },
+    {
+      name: "propose",
+      description: "Answer a question from the campaigner with your view and two or three concrete options. Use it instead of doing any work whenever they ask rather than order. Call it once; it ends your turn.",
+      schema: z.object({
+        reply: z.string().describe("Under 60 words, in your own voice: answer what they asked, with your honest view. Disagree if the numbers say so. Name places and groups in words."),
+        options: z
+          .array(
+            z.object({
+              title: z.string().describe("At most eight plain words, places and groups in words (e.g. \"Canvass Black voters in Crown Heights\")"),
+              order: z.string().describe("The exact order the campaigner could send you to do it: what, where, for whom, by when, and a budget in dollars"),
+              cost: z.number().describe("Rough cost in dollars"),
+              why: z.string().describe(`One sentence, under ${THOUGHT_MAX} characters: why this, given the numbers`),
+            }),
+          )
+          .min(2)
+          .max(3),
       }),
     },
   );
@@ -114,13 +138,19 @@ ${world(w)}`,
   const agent = createDeepAgent({
     model: director(),
     name: slug(me.name!),
-    tools: team.length ? [send] : [actionTool(ctx, me.id), send],
+    tools: team.length ? [send, propose] : [actionTool(ctx, me.id), send, propose],
     subagents,
     systemPrompt: `You are ${post(me)} ${frame(w)}. The player is a student learning to run a campaign, and they are your boss.
 Voice: ${prof.voice}
 Strengths: ${me.good ?? prof.skills.join(", ")}. Weaknesses: ${me.weak ?? "none noted"}. Let both show in your choices.
 
-How you work:
+Who you are: a professional with views, not an order-taker. Everything the campaigner reads from you is in your voice. If an order is a poor use of money or time given the numbers below, say so plainly in one sentence, in your first thought and again in your report, then carry it out anyway: the campaigner decides. If it is a good call, you may say so in a few words. Never flatter.
+
+First, decide what the campaigner wants.
+- If they are ASKING you something (a question, ideas, options, advice, "what should we do", "what do you think", "any suggestions"), do not plan, delegate or act, and spend nothing. Call propose exactly once: your answer and two or three concrete options, each with an order they could send you. Then stop.
+- Only an ORDER (do this, run that, spend this) starts the work below.
+
+How you work on an order:
 1. Start with write_todos: two to four concrete jobs. In the same message, before the call, write one or two sentences of plain text (under ${THOUGHT_MAX} characters) on why you are splitting the work this way. The campaigner reads it as your thinking, so make it the real reason, with places and groups in words.
 2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass union households in Jackson Heights"). On the second line write "Why:" and one sentence (under ${THOUGHT_MAX} characters, places and groups in words) on why this job and why this person. Then brief them precisely: what, where (district number), who (voter group id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
 3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. Never plan past it. If the job needs more, ask in your report.

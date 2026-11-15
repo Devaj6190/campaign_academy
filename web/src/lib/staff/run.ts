@@ -191,6 +191,10 @@ function handle(director: string, runId: number, e: RunEvent) {
       patchRun((r) => { r.jobs = r.jobs.map((j) => (j.to === e.to && !j.done ? { ...j, done: true, summary: e.summary } : j)); });
       if (e.summary) pushChat(e.to, { k: "them", text: e.summary });
       break;
+    case "proposals":
+      pushChat(director, { k: "proposals", text: e.text, options: e.options, run: runId });
+      feed(director, `${cap(first(director))} answered with ${e.options.length} options.`);
+      break;
     case "report":
       pushChat(director, { k: "report", text: e.text, ask: e.ask, state: e.ask ? "open" : "approved", spent: e.spent, raised: e.raised, run: runId });
       if (current()?.follow) break; // an approved ask continues an order that was already graded
@@ -216,7 +220,11 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
     return;
   }
   const runId = Date.now() % 1e9;
-  const history: Line[] = (s.chat[id] ?? []).flatMap((c) => (c.k === "me" || c.k === "them" ? [{ who: c.k, text: c.text }] : c.k === "report" ? [{ who: "them" as const, text: c.text }] : []));
+  const history: Line[] = (s.chat[id] ?? []).flatMap((c) =>
+    c.k === "me" || c.k === "them" ? [{ who: c.k, text: c.text }]
+    : c.k === "report" ? [{ who: "them" as const, text: c.text }]
+    : c.k === "proposals" ? [{ who: "them" as const, text: `${c.text} Options: ${c.options.map((o, i) => `${i + 1}) ${o.title}`).join("; ")}.` }]
+    : []);
   pushChat(id, { k: "me", text, run: runId });
   pushChat(id, { k: "thoughts", run: runId, items: [], live: true });
   useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, origin: followOf ?? text, follow: !!followOf, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
@@ -264,6 +272,14 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
     setBusy(id);
     useStaff.setState((st) => { const active = { ...st.active }; delete active[id]; return { active }; });
   }
+}
+
+/** Turn one of a director's options into the order, as if the campaigner had typed it. */
+export function pick(id: string, index: number, option: number) {
+  const item = useStaff.getState().chat[id]?.[index];
+  if (item?.k !== "proposals" || item.picked !== undefined || !item.options[option]) return;
+  useStaff.setState((s) => ({ chat: { ...s.chat, [id]: s.chat[id].map((c, i) => (i === index && c.k === "proposals" ? { ...c, picked: option } : c)) } }));
+  void instruct(id, item.options[option].order);
 }
 
 export function answerAsk(id: string, index: number, yes: boolean) {

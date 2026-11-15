@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Effect } from "../engine/resolve";
-import type { Ask, PlanItem } from "./protocol";
+import type { Ask, PlanItem, Proposal } from "./protocol";
 import type { Candidate, Profile } from "./roster";
 
 // Staff-only state. The shared world (cash, sentiment, the roster itself) stays in the main game store;
@@ -13,6 +13,8 @@ export type ChatItem = (
   | { k: "receipt"; effect: Effect; by: string }
   | { k: "report"; text: string; ask: Ask | null; state: "open" | "approved" | "declined"; spent: number; raised: number }
   | { k: "coach"; clarity: number; fit: number; missing: string[]; text: string }
+  /** An answer to a question, with options. `picked` is the option the campaigner turned into an order. */
+  | { k: "proposals"; text: string; options: Proposal[]; picked?: number }
   | { k: "note"; text: string }
   // One instruction's thinking, director and staff in order. Kept in the chat so it is never dropped, and never
   // sent back to the agents as history. `live` until the run ends.

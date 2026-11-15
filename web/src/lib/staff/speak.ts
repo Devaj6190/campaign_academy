@@ -14,10 +14,13 @@ import { BOROS, PLACES, short, shortPlace } from "./world";
 // empty posts, idle staff, morale. The clock calls speakUp() as the days pass; it lets one remark through every GAP
 // days at most, and the same worry returns only after REPEAT days. With an API key the post says it in its own voice.
 
-const GAP = 8;
-const REPEAT = 30;
+const GAP = 3;
+const REPEAT = 14;
 
-type Trigger = { key: string; who: string; situation: string; text: string; suggest: string };
+type Trigger = { key: string; who: string; situation: string; text: string; suggest: string; moved?: boolean };
+
+/** Where the numbers stood the last time the staff spoke up about them. */
+let seen: { poll: number; groups: Record<string, number> } | null = null;
 
 const dayNow = () => { const s = useCase.getState(), c = worldNow().c; return Math.round((Date.parse(s.date) - Date.parse(c.briefingDate)) / 86_400_000) + 1; };
 
@@ -64,6 +67,16 @@ function triggers(day: number): Trigger[] {
   const quiet = !k.work.some((x) => x.date >= since && g.staff.some((p) => p.id === x.by));
   if (k.at >= 1 && quiet && has("cm") && Date.parse(k.date) - Date.parse(since) >= 10 * 86_400_000) out.push({ key: `idle-${k.at}`, who: "cm", situation: "No one on the staff has been given a job since the last decision.", text: "The staff have had no orders since your last decision. Tell a director what you want done.", suggest: "Sit down with union leaders this week and tell me where we stand" });
 
+  // The numbers moved: the campaign's standing, or one of the voter groups the case tracks.
+  const base = seen ?? { poll: mine, groups: { ...w.groups } };
+  const dPoll = mine - base.poll;
+  const groupMove = Object.entries(w.groups).map(([id, v]) => ({ id, d: v - (base.groups[id] ?? v) })).sort((a, b) => Math.abs(b.d) - Math.abs(a.d))[0];
+  const groupName = (id: string) => c.groups.find((g) => g.id === id)?.name ?? id;
+  if (Math.abs(dPoll) >= 1.5 && has(dPoll < 0 ? "com" : "cm"))
+    out.push({ key: `poll-${Math.round(mine)}`, who: dPoll < 0 ? "com" : "cm", situation: `The campaign's citywide standing has moved from ${pct(base.poll)} to ${pct(mine)} since the staff last looked.`, text: dPoll < 0 ? `We have slipped from ${pct(base.poll)} to ${pct(mine)}. Something out there is working against us.` : `We are up from ${pct(base.poll)} to ${pct(mine)}. Now is the time to press, not coast.`, suggest: dPoll < 0 ? "Answer what is pulling us down with a press push this week" : "Double down where we are gaining this week", moved: true });
+  else if (groupMove && Math.abs(groupMove.d) >= 3 && has("fd"))
+    out.push({ key: `grp-${groupMove.id}-${Math.round(w.groups[groupMove.id])}`, who: "fd", situation: `Support among ${groupName(groupMove.id)} has moved ${groupMove.d > 0 ? "up" : "down"} by ${Math.abs(Math.round(groupMove.d))} points, to ${pct(w.groups[groupMove.id])}.`, text: `${groupName(groupMove.id)} moved ${groupMove.d > 0 ? "our way" : "away from us"}: ${pct(w.groups[groupMove.id])} now.`, suggest: `Canvass ${groupName(groupMove.id)} where they live this week`, moved: true });
+
   // Morale.
   const low = Object.entries(s.morale).filter(([id]) => has(id)).sort((a, b) => a[1] - b[1])[0];
   const who = low && g.staff.find((p) => p.id === low[0]);
@@ -75,10 +88,17 @@ function triggers(day: number): Trigger[] {
 export async function speakUp() {
   if (waiting() || finished()) return;
   const day = dayNow();
+  if (seen === null) { const { c, w } = worldNow(); seen = { poll: w.poll[c.follow] ?? 0, groups: { ...w.groups } }; }
   const last = useStaff.getState().spoken._last;
   if (last !== undefined && day - last < GAP) return;
   const t = triggers(day)[0];
   if (!t) return;
+  await say(t, day);
+}
+
+/** One staffer says one thing, in their own voice when there is a key, with a suggested order. */
+async function say(t: Trigger, day: number) {
+  if (t.moved) { const { c, w } = worldNow(); seen = { poll: w.poll[c.follow] ?? 0, groups: { ...w.groups } }; }
   const g = useGame.getState();
   const p = g.staff.find((x) => x.id === t.who);
   if (!p?.name) return;
@@ -107,4 +127,44 @@ export async function speakUp() {
   pushChat(p.id, { k: "them", text: said.text, suggest: said.suggest || undefined });
   const who = short(p);
   feed(p.id, `${who[0].toUpperCase()}${who.slice(1)}: "${said.text}"`, "warm");
+}
+
+/** The post that owns a kind of decision. A vacant post hands it to the Campaign Manager. */
+const OWNER: Record<string, string> = { delegating: "cm", budgeting: "fin", "voter-groups": "com", policy: "pol" };
+
+/**
+ * Staff react to events as they happen, not only as days pass: a decision the campaigner just made, and a new lead
+ * story in the morning paper. Each speaks once per event, through the same say() as everything else. Mount once.
+ */
+export function watch() {
+  const offCase = useCase.subscribe((s, p) => {
+    const made = Object.keys(s.picks).find((id) => !(id in p.picks));
+    if (!made) return;
+    const { c } = worldNow();
+    const d = c.decisions.find((x) => x.id === made);
+    const o = d?.options.find((x) => x.id === s.picks[made].option);
+    if (!d || !o) return;
+    if (useStaff.getState().spoken[`decided-${d.id}`] !== undefined) return; // once per decision
+    useStaff.setState((st) => ({ spoken: { ...st.spoken, [`decided-${d.id}`]: dayNow() } }));
+    const g = useGame.getState();
+    const owner = OWNER[d.skill] ?? "cm";
+    const who = g.staff.some((x) => x.id === owner && x.name) ? owner : "cm";
+    void say({ key: `decided-${d.id}`, who, situation: `The campaigner has just decided "${d.title}" and chose: ${o.label}. ${o.detail}`, text: `On "${d.title}": ${o.label}. Fine. Here is what that means for my side of the campaign.`, suggest: "" }, dayNow());
+  });
+  let editions = 0;
+  let offPaper: (() => void) | undefined;
+  let stopped = false;
+  void import("../paper/run").then(({ usePaper }) => {
+    if (stopped) return;
+    editions = usePaper.getState().editions.length;
+    offPaper = usePaper.subscribe((s) => {
+      if (s.editions.length <= editions) { editions = s.editions.length; return; }
+      editions = s.editions.length;
+      const lead = s.editions.at(-1)?.lead;
+      if (!lead || useStaff.getState().spoken[`news-${lead.key}`] !== undefined) return;
+      useStaff.setState((st) => ({ spoken: { ...st.spoken, [`news-${lead.key}`]: dayNow() } }));
+      void say({ key: `news-${lead.key}`, who: "com", situation: `This morning's paper leads with: ${lead.text}`, text: "Did you see the front page? We should have a line on it before lunch.", suggest: "Answer this morning's front page with a press pitch today" }, dayNow());
+    });
+  });
+  return () => { stopped = true; offCase(); offPaper?.(); };
 }

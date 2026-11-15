@@ -6,6 +6,8 @@ import type { Snapshot } from "./world";
 // The wire format between /api/staff/instruct and the browser: one JSON event per line.
 
 export type Ask = { amount: number; reason: string };
+/** One way to act on a question the campaigner asked: a short title, the order that carries it out, a rough cost. */
+export type Proposal = { title: string; order: string; cost: number; why: string };
 /** How long a thought may be: one or two sentences. Asked of the model in words, and enforced when emitted. */
 export const THOUGHT_MAX = 200;
 export type PlanItem = { title: string; status: "pending" | "in-progress" | "completed" };
@@ -23,6 +25,8 @@ export type RunEvent =
   | { t: "delegate"; to: string; job: string }
   | { t: "action"; effect: Effect }
   | { t: "job-done"; to: string; summary: string }
+  /** The campaigner asked rather than ordered: an answer in the director's voice and two or three ways to act on it. Nothing is spent. */
+  | { t: "proposals"; text: string; options: Proposal[] }
   | { t: "report"; text: string; ask: Ask | null; coaching: string; clarity: number; fit: number; missing: string[]; spent: number; raised: number }
   | { t: "error"; text: string }
   | { t: "done" };
@@ -70,6 +74,18 @@ export class RunCtx {
     this.effects.push(effect);
     this.emit({ t: "action", effect });
     return { ok: true, text: `${effect.summary} Cost $${effect.cost.toLocaleString("en-US")}. Budget left $${this.left.toLocaleString("en-US")}.` };
+  }
+
+  /** Answer a question with options instead of acting. It counts as the reply, so no report follows. */
+  propose(text: string, options: Proposal[]) {
+    if (this.reported) return;
+    this.reported = true;
+    const m = this.req.snapshot.scale.money;
+    const clean = options
+      .filter((o) => o.title?.trim() && o.order?.trim())
+      .slice(0, 3)
+      .map((o) => ({ title: o.title.trim().slice(0, 60), order: o.order.trim().slice(0, 240), why: (o.why ?? "").trim().slice(0, THOUGHT_MAX), cost: Math.max(0, Math.round((o.cost || 0) / (100 * m)) * 100 * m) }));
+    this.emit({ t: "proposals", text: text.trim(), options: clean });
   }
 
   report(text: string, ask: Ask | null, coaching: string) {

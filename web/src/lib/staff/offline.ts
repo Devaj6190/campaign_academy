@@ -61,12 +61,45 @@ function pickFaction(w: Snapshot, text: string, action: ActionId) {
   return [...w.factions].filter((f) => f.size >= 20).sort((a, b) => a.feel - b.feel)[0]?.id ?? w.factions[0].id;
 }
 
+/** A question rather than an order: the campaigner wants options, not work. */
+export const isQuestion = (text: string) =>
+  /\?\s*$/.test(text.trim()) || /^\s*(what|which|where|who|how|should|could|would|can|any)\b/i.test(text) || /\b(ideas?|suggest(ions?)?|options?|advice|thoughts|recommend|what do you think)\b/i.test(text);
+
+/** Without a model: two or three options from the post's usual work, aimed where the campaign is weakest. */
+function offlineProposals(ctx: RunCtx, first: string) {
+  const { req } = ctx;
+  const w = req.snapshot;
+  const actions = [...new Set([...pickActions(req.text, req.director), ...(DEFAULTS[req.director] ?? [])])].slice(0, 3);
+  const options = actions.map((a) => {
+    const act = ACTIONS[a];
+    const cd = act.needs.district ? pickDistricts(w, req.text)[0] : undefined;
+    const fid = act.needs.faction || act.group ? pickFaction(w, req.text, a) : undefined;
+    const group = fid ? w.factions.find((f) => f.id === fid)?.name : undefined;
+    const place = cd ? shortPlace(cd) : undefined;
+    const cost = act.cost * w.scale.money * 3;
+    const where = [place && `in ${place}`, group && `for ${group}`].filter(Boolean).join(" ");
+    return {
+      title: cap(`${act.label.toLowerCase()} ${where}`.trim()),
+      order: `${act.label} ${where} this week. Budget $${cost.toLocaleString("en-US")}.`.replace(/\s+/g, " "),
+      cost,
+      why: act.about,
+    };
+  });
+  ctx.propose(`${cap(first)} here. You asked, so here's what I'd put on the table. Pick one and I'll get moving.`, options);
+}
+
 export async function runOffline(ctx: RunCtx, pace = 1) {
   const { req, emit } = ctx;
   const w = req.snapshot;
   const me = w.staff.find((s) => s.id === req.director);
   if (!me?.name) return emit({ t: "done" }); // the post is vacant now
   const first = short(me);
+  if (!req.followOf && isQuestion(req.text)) {
+    emit({ t: "start", mode: "offline" });
+    await sleep(600 * pace);
+    offlineProposals(ctx, first);
+    return emit({ t: "done" });
+  }
   const team = describeTeam(w, req.director);
   const basis = req.followOf ?? req.text;
   const actions = pickActions(basis, req.director);
