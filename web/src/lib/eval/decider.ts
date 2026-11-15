@@ -62,7 +62,8 @@ export async function decideLive(c: Card, trace: Trace): Promise<Choice> {
     {
       name: "decide",
       description: c.ask === "decide" ? "Make the decision. Call once." : "Say which option you argue for. Call once.",
-      schema: z.object({ why: z.string().describe("Two or three sentences, in your own voice: why this option, from what you know."), option: z.enum(keys) }),
+      // Tuning 2 (after run 5): the reason must name the facts it rests on, from what the agent was given.
+      schema: z.object({ why: z.string().describe("Two or three sentences, in your own voice. Name the facts from the card, the map, the voter groups or the paper that your choice rests on, and the one fact that would most change your mind."), option: z.enum(keys) }),
     },
   );
   const agent = createDeepAgent({
