@@ -55,15 +55,15 @@ export function Profile() {
             <div className="mt-9 grid grid-cols-4 divide-x divide-line rounded-xl border border-line bg-surface">
               {stats.map(([k, v, sub]) => (
                 <div key={k} className="px-5 py-4">
-                  <Label>{k}</Label>
-                  <div className="tnum mt-1.5 font-mono text-[22px] font-medium tracking-tight">{v}</div>
-                  <div className="text-[11.5px] text-faint">{sub}</div>
+                  <Label className="text-[13px]">{k}</Label>
+                  <div className="tnum mt-2 font-mono text-[36px] leading-none font-medium tracking-tight">{v}</div>
+                  <div className="mt-2 text-[13px] text-muted">{sub}</div>
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-[11.5px] text-faint">Polling and money follow your decisions so far and are simulated. Everything else on this page is from the record.</p>
+            <p className="mt-2 text-[13px] text-muted">Polling and money are simulated. The rest of this page is from the record.</p>
 
-            <div className="mt-8"><Claims c={c} items={me.about} /></div>
+            <div className="mt-8"><Claims big c={c} items={me.about} /></div>
 
             <div className="mt-10"><PlatformSection c={c} step={step} picks={picks} /></div>
             <div className="mt-10"><PlankDesk /></div>
@@ -77,23 +77,24 @@ export function Profile() {
       </section>
 
       <Inspector>
-        <Section title="The race, as your campaign stands">
-          <div className="space-y-3">
+        <Section big title="The race now">
+          <div className="space-y-3.5">
             {[...race.map((x) => [x.name, x.poll, x.id === c.follow] as const), ["Undecided or others", undecided, false] as const].map(([n, v, mine]) => (
               <div key={n}>
-                <div className="flex justify-between text-[13px]"><span className={cn(!mine && "text-soft")}>{n}</span><span className="tnum font-mono text-[12px]">{Math.round(v)}%</span></div>
+                <div className="flex items-baseline justify-between text-[15px]"><span className={cn(mine ? "font-medium text-gold-bright" : "text-soft")}>{n}</span><span className={cn("tnum font-mono text-[18px]", mine && "text-gold-bright")}>{Math.round(v)}%</span></div>
                 <Meter value={v * 2} color={mine ? "var(--color-warm)" : "rgb(255 255 255 / .35)"} className="mt-1.5" />
               </div>
             ))}
           </div>
+          <p className="mt-3 text-[13px] text-muted">As your campaign stands. Simulated.</p>
         </Section>
-        <Section title="Opponents">
+        <Section big title="Opponents">
           <div className="space-y-2">
             {rivals.map((o) => (
               <div key={o.id} className="rounded-lg border border-line bg-raised p-3">
-                <div className="text-[13px] font-medium">{o.name}</div>
-                <div className="text-[11.5px] text-muted">{o.standing}</div>
-                {lastMove(o.id) && <div className="mt-1.5 text-[11.5px] leading-snug text-soft">Latest move (simulated): {lastMove(o.id)!.replace(`${o.name}: `, "")}</div>}
+                <div className="text-[16px] font-medium">{o.name}</div>
+                <div className="text-[13px] text-muted">{o.standing}</div>
+                {lastMove(o.id) && <div className="mt-1.5 text-[13px] leading-snug text-soft">Latest move (simulated): {lastMove(o.id)!.replace(`${o.name}: `, "")}</div>}
               </div>
             ))}
           </div>
