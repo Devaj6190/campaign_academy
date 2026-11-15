@@ -36,7 +36,7 @@ flowchart LR
 1. **Briefing.** The race on a real date: who is running, the rules, the money, the polls.
 2. **Decision.** A real moment the campaign faced, on its real date. The clock stops and a decision card opens. What the world did since your last decision is real: rivals enter, scandals break, courts rule.
 3. **You decide.** The campaign's advisers argue for different options. Each option shows a small preview of what it will move, up or down, and nothing more. Once you have chosen you see what the real campaign did at that point.
-4. **The calendar runs.** Days pass towards the next decision. You give the staff work in plain language and they plan it, hand it down and report back. You can send the candidate out in person, and add planks to the platform. The other candidates make moves of their own. On mornings with news the clock pauses for the paper.
+4. **The calendar runs.** Days pass towards the next decision. You give the staff work in plain language and they plan it, hand it down and report back. You can send the candidate out in person, and add planks to the platform. The other candidates make moves of their own. On mornings with news the clock pauses and the paper's notice glows until you read it or put it aside.
 5. **Election night.** On primary day the count comes in across the city's Assembly Districts. Then the debrief: your result against the threshold you needed, the certified real result, and, decision by decision, how the real campaign's choices turned out.
 
 ---
@@ -110,7 +110,7 @@ A case is a data file. Adding a case means researching and writing one more file
 | **Map** | The city: where your campaign is stronger or weaker, which districts your last decision moved, the candidate's own appearances, and on primary day the count as it comes in |
 | **Factions** | The voter groups the polls reported: how large each is, where you stand with it, what it is likely to want, and which groups pull together or against each other |
 
-The top bar holds the money (spent, left under the cap, raised), the poll, the date and the clock. Hovering the poll lists what each rival is doing, and it glows when one of them has done something you have not read. The morning paper opens from the sidebar and on mornings with news.
+The top bar holds the money (spent, left under the cap, raised), the poll, the date and the clock. Hovering the poll lists what each rival is doing, and it glows when one of them has done something you have not read. The morning paper opens from the sidebar. On a morning with news the clock pauses and a notice glows in the corner until you open the paper or put it aside.
 
 ---
 

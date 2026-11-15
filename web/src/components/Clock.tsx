@@ -7,22 +7,22 @@ import { currentCase, longDate, useCase } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 import { DecisionStep } from "@/views/CaseView";
-import { usePaper } from "./Paper";
+import { announce, usePaper } from "@/lib/paper/run";
 import { Dialog, Label } from "./ui";
 
 // The clock's controls for the top bar, the timer behind them, and the card that opens when a decision arrives.
 
-/** What follows a step of the clock: the paper on a morning with news, election night on the map when the campaign is over. */
+/** What follows a step of the clock: the paper's notice on a morning with news, election night on the map when the campaign is over. */
 function land(r: ReturnType<typeof tick>) {
-  if (r === "event") usePaper.getState().set(true);
+  if (r === "event") announce();
   if (r === "arrived" && finished()) useGame.setState({ view: "map", district: null });
 }
 
-/** Keeps the days passing while the clock is running. Time waits while the paper is open. Mount once. */
+/** Keeps the days passing while the clock is running. Time waits while the paper is open or its notice is unanswered. Mount once. */
 export function useTicker() {
   const running = useCase((s) => s.running);
   const speed = useCase((s) => s.speed);
-  const paper = usePaper((s) => s.open);
+  const paper = usePaper((s) => s.open || s.unread);
   useEffect(() => {
     if (!running || paper) return;
     // Each day that passes, the staff get the chance to speak up; speakUp decides whether anyone has something to say.
