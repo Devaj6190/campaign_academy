@@ -12,6 +12,11 @@ export async function POST(request: Request) {
     return Response.json({ ok: true });
   } catch (err) {
     console.error("[photon] send failed:", err);
-    return Response.json({ ok: false, error: err instanceof Error ? err.message.slice(0, 200) : "send failed" }, { status: 502 });
+    const msg = err instanceof Error ? err.message : String(err);
+    // Free and Pro Photon projects text only numbers registered as the project's users.
+    const error = /target not allowed/i.test(msg)
+      ? "Photon only texts numbers added as users of the project: add this number under Users at app.photon.codes, then try again."
+      : msg.slice(0, 200) || "send failed";
+    return Response.json({ ok: false, error }, { status: 502 });
   }
 }
