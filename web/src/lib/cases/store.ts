@@ -180,8 +180,12 @@ export function popShare(cd: number): number {
  * tracked groups count at the citywide figure.
  */
 export function supportIn(cd: number): number | null {
-  if (!districtBy(cd)?.demo) return null;
   const { c, w } = worldNow();
+  return supportUnder(cd, c, w);
+}
+
+function supportUnder(cd: number, c: Case, w: World): number | null {
+  if (!districtBy(cd)?.demo) return null;
   const raw = (id: number) => {
     const race = districtBy(id)!.demo!.race;
     let sum = 0, covered = 0;
@@ -198,4 +202,34 @@ export function supportIn(cd: number): number | null {
   const mean = people ? total / people : 0;
   const local = useCase.getState().work.reduce((a, x) => a + (x.districts[cd] ?? 0), 0);
   return Math.max(0, Math.min(100, raw(cd) * (mean ? (w.poll[c.follow] ?? mean) / mean : 1) + local));
+}
+
+/** The map filter that colours districts by what one decision moved. */
+export const decisionFilter = (id: string) => `decision:${id}`;
+
+/** The decision a map filter names, once the student has made it: what they chose and what it changed. Simulated. */
+export function decisionOf(filter: string): { d: Decision; label: string; change: Shift } | null {
+  if (!filter.startsWith("decision:")) return null;
+  const { caseId, picks } = useCase.getState(), c = currentCase(caseId);
+  const d = c.decisions.find((x) => x.id === filter.slice("decision:".length));
+  if (!d || !picks[d.id]) return null;
+  return { d, label: d.options.find((o) => o.id === picks[d.id].option)?.label ?? "", change: changeAt(c, picks, d) };
+}
+
+/** The latest decision the student has made, if any. */
+export function lastDecided(): Decision | undefined {
+  const { caseId, picks } = useCase.getState();
+  return [...currentCase(caseId).decisions].reverse().find((d) => picks[d.id]);
+}
+
+/**
+ * How far a decision moved the student's support in each district, in points, by district number: support as it
+ * stands, less support with that decision's change taken back out. A district moves when the decision moved a voter
+ * group that lives there, or the citywide figure. Simulated.
+ */
+export function movedBy(change: Shift): Record<number, number> {
+  const { c, w } = worldNow();
+  const less = (base: Record<string, number>, x?: Record<string, number>) => Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v - (x?.[k] ?? 0)]));
+  const before: World = { ...w, poll: less(w.poll, change.poll), groups: less(w.groups, change.groups) };
+  return Object.fromEntries(DISTRICTS.filter((d) => d.demo && !d.park).map((d) => [d.cd, (supportUnder(d.cd, c, w) ?? 0) - (supportUnder(d.cd, c, before) ?? 0)]));
 }

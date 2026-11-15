@@ -4,7 +4,7 @@ import { ArrowDown, ArrowRight, ArrowUp, Check, ChevronDown, ExternalLink, Map a
 import { useState } from "react";
 import { Button, Label, Meter, Section } from "@/components/ui";
 import { run } from "@/lib/cases/clock";
-import { changeAt, currentCase, useCase, worldAt } from "@/lib/cases/store";
+import { changeAt, currentCase, decisionFilter, useCase, worldAt } from "@/lib/cases/store";
 import type { Advice, Case, Claim, Decision, Judgment, Shift, Skill, World } from "@/lib/cases/types";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
@@ -221,7 +221,7 @@ export function AdviceCard({ c, a, option, full }: { c: Case; a: Advice; option?
   );
 }
 
-function Changes({ c, s }: { c: Case; s: Shift }) {
+export function Changes({ c, s }: { c: Case; s: Shift }) {
   const rows: [string, string, boolean][] = [];
   if (s.budget) rows.push(["Money left to spend", usd(s.budget), s.budget > 0]);
   for (const [id, v] of Object.entries(s.poll ?? {})) if (v) rows.push([id === c.follow ? "Your poll standing" : `${c.candidates.find((x) => x.id === id)?.name ?? id} in the polls`, `${pts(v)} points`, id === c.follow ? v > 0 : v < 0]);
@@ -301,7 +301,7 @@ export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: num
         <>
           <Section big title="What changed">
             <Changes c={c} s={changeAt(c, picks, d)} />
-            <Button className="mt-4" onClick={() => { useCase.setState({ card: false }); useGame.getState().go("map"); }}><MapIcon className="size-3.5" /> See it on the map</Button>
+            <Button className="mt-4" onClick={() => { useCase.setState({ card: false }); useGame.getState().select({ filter: decisionFilter(d.id), district: null }); useGame.getState().go("map"); }}><MapIcon className="size-3.5" /> See it on the map</Button>
           </Section>
           <Section big title="What the real campaign did">
             <p className="text-[13px] text-muted">{d.taken === null ? "Not one of your options" : d.taken === pick.option ? "The same call you made" : "A different call"}</p>

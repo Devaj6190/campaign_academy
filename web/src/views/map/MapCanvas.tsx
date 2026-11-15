@@ -5,7 +5,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import adResult from "@/lib/cases/mayor2013-ad.json";
 import type { NightRow } from "@/lib/cases/night";
-import { censusShare, cityShare, mapValue, supportIn, useCase, worldNow } from "@/lib/cases/store";
+import { censusShare, cityShare, decisionOf, mapValue, movedBy, supportIn, useCase, worldNow } from "@/lib/cases/store";
 import { DISTRICTS } from "@/lib/geo";
 import { useGame } from "@/lib/store";
 
@@ -91,16 +91,20 @@ export function MapCanvas({ onHover, onSelect, layer = "campaign", night }: { on
     for (const r of n.rows) m.setFeatureState({ source: "real", id: r.ad }, { in: reported.has(r.ad), s: r.share });
   };
 
-  // Paint each district: the campaign's support there, or, under a group filter, how many of that group live there
-  // against the group's citywide share (census).
+  // Paint each district: the campaign's support there; under a group filter, how many of that group live there
+  // against the group's citywide share (census); under a decision filter, how far that decision moved it, scaled so
+  // the district that moved most sits at the end of the colour scale.
   const paint = () => {
     const m = map.current;
     if (!m || !ready.current) return;
     const g = worldNow().c.groups.find((x) => x.id === useGame.getState().filter && x.census);
     const avg = g ? cityShare(g.census!) : 0;
+    const dec = decisionOf(useGame.getState().filter);
+    const moved = dec ? movedBy(dec.change) : null;
+    const most = moved ? Math.max(0.05, ...Object.values(moved).map(Math.abs)) : 1;
     for (const d of DISTRICTS) {
       if (d.park) continue;
-      const v = g ? 47.5 + (censusShare(d.cd, g.census!) - avg) * 0.9 : mapValue(supportIn(d.cd) ?? 0);
+      const v = moved ? 47.5 + ((moved[d.cd] ?? 0) / most) * 27.5 : g ? 47.5 + (censusShare(d.cd, g.census!) - avg) * 0.9 : mapValue(supportIn(d.cd) ?? 0);
       m.setFeatureState({ source: "districts", id: d.cd }, { v, op: 0.6 });
     }
   };
