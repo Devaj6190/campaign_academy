@@ -24,9 +24,13 @@ export const useMemos = create<{ byDecision: Record<string, Entry> }>(() => ({ b
 const put = (id: string, e: Entry) => useMemos.setState((s) => ({ byDecision: { ...s.byDecision, [id]: e } }));
 
 /** The two filled posts that write on a decision of this kind. */
-function writers(d: Decision) {
+export function writers(d: Decision) {
   const staff = useGame.getState().staff;
-  const filled = (id: string) => staff.find((p) => p.id === id && p.name);
+  // A post whose real holder is already named among this card's advisers (on record or predicted) has its say there:
+  // a simulated memo from the same post arguing otherwise would contradict the card (Devaj's review). The next post
+  // writes instead.
+  const onRecord = new Set(d.advice.filter((a) => a.name).map((a) => a.name));
+  const filled = (id: string) => staff.find((p) => p.id === id && p.name && !onRecord.has(p.name));
   const order = [...WRITERS[d.skill], "cm", "com", "fd", "fin"];
   return [...new Set(order)].map(filled).filter((p): p is NonNullable<typeof p> => !!p).slice(0, 2);
 }
@@ -63,7 +67,7 @@ export async function writeMemos(index: number) {
     const decision = memoDecision(d);
     const req: MemoRequest = {
       decision,
-      option: assign(p.id, decision.options, first?.option),
+      option: assign(d.id, p.id, decision.options, first?.option),
       director: { id: p.id, role: p.role, name: p.name, onRecord: p.onRecord, good: p.good, weak: p.weak },
       voice: profileOf(w, p.id).voice,
       campaign,
