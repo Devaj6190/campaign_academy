@@ -143,7 +143,8 @@ export function Popover({ trigger, children, align = "center", className }: { tr
               className,
             )}
           >
-            {children}
+            {/* Using a control inside pins it open, so a native menu or a drag that leaves the panel does not close it. */}
+            <div onPointerDown={() => setPinned(true)}>{children}</div>
           </motion.div>
         )}
       </AnimatePresence>

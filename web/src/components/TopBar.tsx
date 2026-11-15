@@ -1,6 +1,8 @@
 "use client";
 
 import { PollChart } from "./PollChart";
+import { PlanLines } from "./Plan";
+import { lineOf } from "@/lib/cases/allocation";
 import { ArrowDownRight, ArrowUpRight, ListChecks, Swords } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
@@ -94,10 +96,19 @@ function useLedger() {
     if (v) rows.push({ label: d.title, v });
   }
   const sum = (xs: Entry[]) => xs.reduce((a, r) => a + r.v, 0);
-  // Staff jobs and the candidate's own appearances between decisions. What they raise pays for that work and stops there (see staffMoney).
-  const staff = staffMoney(useCase((s) => s.work));
-  if (staff.spent) rows.push({ label: "Work between decisions", v: -staff.spent });
-  if (staff.raised) rows.push({ label: "Raised between decisions", v: staff.raised });
+  // Work between decisions: each line of the weekly plan, then staff orders and the candidate's own appearances.
+  // What it raises is listed by source; what pays for no work is over the cap and cannot be spent (see staffMoney).
+  const work = useCase((s) => s.work);
+  const staff = staffMoney(work);
+  const by = (key: (x: (typeof work)[number]) => string, v: (x: (typeof work)[number]) => number) => {
+    const m = new Map<string, number>();
+    for (const x of work) if (v(x)) m.set(key(x), (m.get(key(x)) ?? 0) + v(x));
+    return [...m];
+  };
+  for (const [label, v] of by((x) => (x.plan ? `Weekly plan: ${lineOf(x.plan).label}` : "Orders and appearances"), (x) => x.cost)) rows.push({ label, v: -v });
+  for (const [label, v] of by((x) => `Raised: ${x.label}`, (x) => x.raised)) rows.push({ label, v });
+  const over = work.reduce((a, x) => a + x.raised, 0) - staff.raised;
+  if (over > 0) rows.push({ label: "Raised over the cap, not spendable", v: -over });
   if (upTo >= n && c.close.shift.budget) {
     // The closing stretch is paid only as far as the money lasts.
     const cost = -c.close.shift.budget;
@@ -117,8 +128,8 @@ function Money() {
   const { left, out, inc, spent, raised } = useLedger();
   return (
     <div className="flex h-14 items-stretch">
-      <Popover trigger={(o) => <FlowTrigger open={o} side="left" label="Spending" value={spent} />} className="w-[340px]">
-        <FlowPanel kind="losses" title="Spending" rows={out} total={spent} />
+      <Popover trigger={(o) => <FlowTrigger open={o} side="left" label="Spending" value={spent} />} className="max-h-[80vh] w-[380px] overflow-y-auto">
+        <FlowPanel kind="losses" title="Spending" rows={out} total={spent}><PlanLines side="out" /></FlowPanel>
       </Popover>
       {/* The money plate drops below the bar, like a seal hung from a rail. */}
       <div className="relative w-[208px]" title="What you have left to spend under the cap (simulated)">
@@ -139,8 +150,8 @@ function Money() {
           </Changed>
         </div>
       </div>
-      <Popover align="end" trigger={(o) => <FlowTrigger open={o} side="right" label="Income" value={raised} />} className="w-[340px]">
-        <FlowPanel kind="gains" title="Income" rows={inc} total={raised} />
+      <Popover align="end" trigger={(o) => <FlowTrigger open={o} side="right" label="Income" value={raised} />} className="max-h-[80vh] w-[380px] overflow-y-auto">
+        <FlowPanel kind="gains" title="Income" rows={inc} total={raised}><PlanLines side="in" /></FlowPanel>
       </Popover>
     </div>
   );
@@ -163,10 +174,11 @@ function FlowTrigger({ open, side, label, value }: { open: boolean; side: "left"
   );
 }
 
-function FlowPanel({ kind, title, rows, total }: { kind: "losses" | "gains"; title: string; rows: Entry[]; total: number }) {
+function FlowPanel({ kind, title, rows, total, children }: { kind: "losses" | "gains"; title: string; rows: Entry[]; total: number; children?: React.ReactNode }) {
   const color = kind === "losses" ? "var(--color-neg)" : "var(--color-pos)";
   return (
     <div className="p-4">
+      {children}
       <div className="mb-3 flex items-baseline justify-between">
         <Label>{title} so far</Label>
         <span className="tnum font-mono text-[13px] text-soft">{shortMoney(total)}</span>

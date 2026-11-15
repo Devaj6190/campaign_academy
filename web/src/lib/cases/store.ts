@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { DISTRICTS, districtBy } from "../geo";
 import type { BookingKind } from "../engine/catalog";
+import { DEFAULT_ALLOCATION, type Allocation, type LineId } from "./allocation";
 import { CASES } from "./index";
 import { effectOf, simulate, type Case, type Decision, type Shift, type World } from "./types";
 
@@ -28,6 +29,8 @@ export type Work = {
   groups: Record<string, number>;
   factions: Record<string, number>;
   districts: Record<number, number>;
+  /** The line of the weekly plan that bought it (lib/cases/allocation), if it was not an order or an appearance. */
+  plan?: LineId;
 };
 
 /** One appearance on the candidate's calendar. `done` says what happened when the day came. */
@@ -50,13 +53,16 @@ type CaseState = {
   /** The candidate's calendar (lib/staff/run runBookings does them on their day). */
   bookings: Booking[];
   book: (b: Omit<Booking, "id">) => void;
+  /** The weekly spending plan, set with the top bar's sliders (lib/cases/allocation, spent by lib/sim/spend). */
+  allocation: Allocation;
+  allot: (line: LineId, patch: Partial<Allocation[LineId]>) => void;
   go: (step: number) => void;
   decide: (decision: string, pick: Pick) => void;
   addWork: (w: Omit<Work, "id" | "date">) => void;
   restart: () => void;
 };
 
-const fresh = () => ({ step: 0, at: 0, date: CASES[0].briefingDate, running: false, card: false, picks: {}, work: [], bookings: [] });
+const fresh = () => ({ step: 0, at: 0, date: CASES[0].briefingDate, running: false, card: false, picks: {}, work: [], bookings: [], allocation: structuredClone(DEFAULT_ALLOCATION) });
 
 export const useCase = create<CaseState>((set) => ({
   caseId: CASES[0].id,
@@ -66,6 +72,7 @@ export const useCase = create<CaseState>((set) => ({
   decide: (decision, pick) => set((s) => ({ picks: { ...s.picks, [decision]: pick } })),
   addWork: (w) => set((s) => ({ work: [...s.work, { ...w, id: s.work.length + 1, date: s.date }] })),
   book: (b) => set((s) => ({ bookings: [...s.bookings, { ...b, id: s.bookings.length + 1 }] })),
+  allot: (line, patch) => set((s) => ({ allocation: { ...s.allocation, [line]: { ...s.allocation[line], ...patch } } })),
   restart: () => set(fresh()),
 }));
 

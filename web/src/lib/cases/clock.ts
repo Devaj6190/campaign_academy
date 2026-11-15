@@ -1,5 +1,6 @@
 import { currentCase, useCase } from "./store";
 import { runBookings } from "../staff/run";
+import { spendPlan } from "../sim/spend";
 import type { Case } from "./types";
 
 // The campaign clock. It runs on the case's real calendar, one day at a time, between decisions. It never runs past
@@ -46,8 +47,10 @@ export function tick(): "arrived" | "event" | undefined {
   const date = nextDay(s.date);
   // Whatever is on the candidate's calendar for the new day happens as it starts, before the next day can begin, so
   // Skip runs each day's bookings on their own day. Election day itself holds no campaign events.
-  if (date >= dateOf(c, s.at + 1)) { const r = arrive(); if (useCase.getState().date < c.electionDate) runBookings(); return r; }
+  // The weekly plan is spent first, so the call time it books fills the candidate's day before his appearances do.
+  if (date >= dateOf(c, s.at + 1)) { const r = arrive(); if (useCase.getState().date < c.electionDate) { spendPlan(); runBookings(); } return r; }
   useCase.setState({ date });
+  spendPlan();
   runBookings();
   return isEventDay(c, date) ? "event" : undefined;
 }

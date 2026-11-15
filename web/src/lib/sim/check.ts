@@ -1,4 +1,6 @@
+import { DEFAULT_ALLOCATION, type Allocation } from "../cases/allocation";
 import { CASES } from "../cases/index";
+import type { Work } from "../cases/store";
 import { realPath } from "../cases/types";
 import { runCampaign, TYPICAL_STAFF, type StaffPlan } from "./headless";
 
@@ -8,6 +10,7 @@ import { runCampaign, TYPICAL_STAFF, type StaffPlan } from "./headless";
 // 2. The same inputs always give the same world, and changing an input changes it.
 // 3. Every decision has an option that costs nothing, so a campaign out of money can still go on.
 // 4. The weakest choice at every decision, with no staff, misses the runoff: choices can lose as well as win.
+// 5. The weekly spending plan moves the world (#33): Bronx doors move Bronx districts, and donor dinners cool liberals.
 
 export const TOLERANCE = 2;
 
@@ -49,6 +52,15 @@ export function checkEngine(): { problems: string[]; report: string[] } {
     const place = w.top.findIndex((t) => t.id === c.follow);
     report.push(`${c.id} weakest choices, no staff: ${c.follow} ${w.world.poll[c.follow].toFixed(1)}%, place ${place + 1}`);
     if (place <= 1) problems.push(`${c.id}: the weakest choice at every decision still makes the top two (${c.follow} ${w.world.poll[c.follow].toFixed(1)}%); no play can lose`);
+
+    // 5. The weekly plan (the top bar's sliders) reaches the world through the engine, not just the ledger.
+    const plan = (patch: Partial<Allocation>) => runCampaign({ allocation: { ...DEFAULT_ALLOCATION, ...patch } });
+    const total = (r: ReturnType<typeof runCampaign>, f: (x: Work) => number) => r.work.reduce((a, x) => a + f(x), 0);
+    const bronx = (x: Work) => Object.entries(x.districts).reduce((a, [cd, v]) => a + (Math.floor(+cd / 100) === 2 ? v : 0), 0);
+    const base = plan({}), doors = plan({ doors: { n: 4, to: "2" } }), dinners = plan({ dinners: { n: 2 } });
+    report.push(`${c.id} weekly plan: default ${base.world.poll[c.follow].toFixed(1)}%, Bronx doors ${doors.world.poll[c.follow].toFixed(1)}%, two donor dinners ${dinners.world.poll[c.follow].toFixed(1)}%`);
+    if (total(doors, bronx) <= total(base, bronx)) problems.push(`${c.id}: four Bronx canvasses a week did not move the Bronx`);
+    if (total(dinners, (x) => x.factions.liberal ?? 0) >= total(base, (x) => x.factions.liberal ?? 0)) problems.push(`${c.id}: donor dinners did not cool liberal voters`);
   }
   return { problems, report };
 }
