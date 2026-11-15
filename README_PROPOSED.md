@@ -116,7 +116,7 @@ The honest summary: the agents are grounded in the evidence they are given, but 
 
 Devank wrote to about 60 political science professors and students while we built it. *(TODO: how many replied, and how many tried it.)*
 
-**A Princeton professor** replied with two points to be careful about:
+**Prof. Samuel S.-H. Wang** (Princeton Neuroscience Institute, founder of the Princeton Election Consortium) replied with two points to be careful about:
 
 - **Paid media is the big unknown.** How effective advertising is remains uncertain, and issue positions may matter less than people expect.
 - **Budgeting matters,** because different kinds of campaign material cost different amounts.
@@ -163,7 +163,15 @@ An AI-powered tool a political science student would use every week of a course,
 
 ### Peri: Forward Deployed Challenge
 
-> **Draft, needs a decision.** This track asks for a real business or student organization we consulted during the hackathon, with the name and role of the person consulted and one piece of evidence. The professor's feedback is our strongest evidence, but this track needs names, so it can't stay anonymous here. Options: name the professor and department with their permission, or name a student organization or class that tried the tool.
+| | |
+|---|---|
+| **Organization** | Princeton University |
+| **Person consulted** | Prof. Samuel S.-H. Wang, Princeton Neuroscience Institute; founder of the Princeton Election Consortium |
+| **Evidence** | His email reply of 14 November 2026 (see [Validation](#validation)): *"the big unknown is how effective advertising and other paid media are"* |
+
+- **Real-world need.** Courses on campaigns teach from the outside. The professor's two cautions, paid media and budgeting, are about exactly the calls students never get to make.
+- **What we built around it.** Every action has its own price, the student sets a weekly spending plan across doors, rallies, press, mail and digital ads, and the effect of each kind of spending is fitted to the record and labelled as simulated, not presented as known.
+- **Usability.** It runs in a browser with no setup for the student, and with no API key it falls back to rules, so a class can use it today.
 
 ### Gemini (MLH Best Use of Gemini API)
 
