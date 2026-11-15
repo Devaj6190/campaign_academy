@@ -6,7 +6,7 @@ import { STAFF_MODEL } from "../staff/agents";
 // Claude. With neither key the routes keep the template and the rules. Everything outside the paper stays on Claude.
 
 /** The Gemini model for the paper. A fast one: the edition is written while the student reads the template. */
-export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 export type Writer = "gemini" | "claude";
 
 /** Is any model available to write the paper? */
