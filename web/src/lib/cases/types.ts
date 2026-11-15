@@ -19,8 +19,12 @@ export type Source = {
   kind: "data" | "filing" | "reporting" | "analysis" | "campaign" | "book";
 };
 
-/** One statement and where it comes from. `estimate` marks anything derived rather than recorded. */
-export type Claim = { text: string; sources: string[]; estimate?: boolean };
+/**
+ * One statement and where it comes from. `estimate` marks anything derived rather than recorded.
+ * `short` says the same thing in fewer words, for screens that show the full text behind "Read more". It may not
+ * add a fact or a number (`checkCase` checks the numbers).
+ */
+export type Claim = { text: string; sources: string[]; estimate?: boolean; short?: string };
 
 /** A conclusion someone else drew. Never the tool's own verdict. */
 export type Judgment = Claim & { who: string };
@@ -53,7 +57,7 @@ export type Option = {
  * `predicted`: written for this exercise from the person's role and documented record. Not a quotation.
  * A real name appears only where the record names that person in that role.
  */
-export type Advice = { name?: string; role: string; argues: string; says: string; basis: "on-record" | "predicted"; sources: string[] };
+export type Advice = { name?: string; role: string; argues: string; says: string; /** As `Claim.short`, for `says`. */ short?: string; basis: "on-record" | "predicted"; sources: string[] };
 
 export type Decision = {
   id: string;
@@ -105,7 +109,7 @@ export type Plank = {
  * `outside` marks an event from beyond the city. It is never shown as a label; it only keeps the item off the lead.
  * `estimate` marks a tie to the race that is our inference, not the source's: shown as an estimate, never moves numbers.
  */
-export type Press = { date: string; outlet: string; summary: string; source: string; impact?: number; outside?: boolean; estimate?: boolean };
+export type Press = { date: string; outlet: string; summary: string; /** As `Claim.short`, for `summary`. */ short?: string; source: string; impact?: number; outside?: boolean; estimate?: boolean };
 
 /** One point on the money timeline, from a public filing. */
 export type Filing = { date: string; candidate: string; raised: number; spent: number; cash: number; source: string; estimate?: boolean };

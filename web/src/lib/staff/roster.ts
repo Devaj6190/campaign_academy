@@ -36,7 +36,7 @@ export const ROLE_SKILLS: Record<string, Skill[]> = {
   "Call-time Manager": ["finance"],
   "Events Lead": ["events"],
   "Press Secretary": ["press", "comms"],
-  "Digital Lead": ["digital"],
+  "Digital Director": ["digital"],
 };
 
 const TURF: Record<string, number[]> = { "Organizer, Queens": [4], "Organizer, Brooklyn": [3], "Organizer, Bronx": [2] };

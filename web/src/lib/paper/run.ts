@@ -49,7 +49,7 @@ export function publish() {
   const s = useCase.getState();
   if (editions.some((e) => e.date === s.date)) return;
   const { c, w } = worldNow();
-  const ed = buildEdition({ c, w, today: s.date, step: s.at, work: s.work, since: editions.at(-1)?.date ?? null, groupWork: factionWork(), id: uid++ });
+  const ed = buildEdition({ c, w, today: s.date, step: s.at, work: s.work, since: editions.at(-1)?.date ?? null, groupWork: factionWork(), id: uid++, lastPoll: editions.findLast((e) => e.polled)?.date ?? null });
   usePaper.setState({ editions: [...editions, ed] });
   void rewrite(ed);
 }

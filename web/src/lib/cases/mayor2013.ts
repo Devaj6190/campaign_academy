@@ -7,6 +7,8 @@ import type { Case, Claim, Source } from "./types";
 const src = (id: string, title: string, publisher: string, date: string | undefined, url: string, kind: Source["kind"]): Source => ({ id, title, publisher, date, url, kind });
 const c = (text: string, ...sources: string[]): Claim => ({ text, sources });
 const est = (text: string, ...sources: string[]): Claim => ({ text, sources, estimate: true });
+/** Adds the short version shown on screen; the full sentence stays behind "Read more". */
+const sh = (short: string, x: Claim): Claim => ({ ...x, short });
 
 const sources: Source[] = [
   src("boe-cert", "Statement and Return Report for Certification, Primary Election 2013, Democratic Mayor, Citywide", "Board of Elections in the City of New York", "2013-09-30", "https://www.vote.nyc/sites/default/files/downloads/pdf/results/2013/2013SeptemberPrimaryElection/01011000000Citywide%20Democratic%20Mayor%20Citywide%20Recap.pdf", "data"),
@@ -45,6 +47,7 @@ const sources: Source[] = [
   src("newsone-0826", "Bill Thompson Attacks Rival In New Ad", "NewsOne", "2013-08-26", "https://newsone.com/2698746/bill-thompson-stop-and-frisk-2/", "reporting"),
   src("spb-hyers", "Summary of a Washington Post profile of Bill Hyers", "SaintPetersBlog", undefined, "https://saintpetersblog.com/must-read-profile-of-charlie-crists-new-campaign-manager", "reporting"),
   src("gg-walzak", "In Communications Move, de Blasio Chooses Campaign Over City Hall", "Gotham Gazette", "2016-10-24", "https://www.gothamgazette.com/city/6589-in-communications-move-de-blasio-chooses-campaign-over-city-hall", "reporting"),
+  src("huff-digital", "Bill de Blasio Is Starting To Look A Lot Like Someone Else We Know", "HuffPost", "2013-09-25", "https://www.huffpost.com/entry/bill-de-blasio-digital-campaign_n_3963606", "reporting"),
   src("gqr", "Congratulations to Bill de Blasio", "Greenberg Quinlan Rosner", "2013-09-16", "https://www.gqrr.com/news/congratulations-to-bill-de-blasio-2", "campaign"),
   // Outside events a published source ties to this race (research pass, 15 November 2026; each page loaded and read).
   src("wfuv-0425", "Democrats in Mayor Race Spar Over Issues of Public Safety", "WFUV", "2013-04-25", "https://wfuv.org/content/democrats-mayor-race-spar-over-issues-public-safety", "reporting"),
@@ -77,20 +80,20 @@ export const mayor2013: Case = {
   threshold: 40,
 
   briefing: [
-    c("Bill de Blasio, the city's Public Advocate, announces outside his home in Park Slope, Brooklyn. He says twelve years under Mayor Bloomberg have left the middle class behind.", "dna-launch"),
-    c("Christine Quinn leads every public poll with 35 to 37 percent of Democrats. De Blasio, Bill Thompson and John Liu are bunched between 9 and 14.", "q-0522", "m-0214"),
+    sh("De Blasio launches in Brooklyn, saying Bloomberg left the middle class behind.", c("Bill de Blasio, the city's Public Advocate, announces outside his home in Park Slope, Brooklyn. He says twelve years under Mayor Bloomberg have left the middle class behind.", "dna-launch")),
+    sh("Quinn leads every poll at 35 to 37 percent. De Blasio, Thompson and Liu sit at 9 to 14.", c("Christine Quinn leads every public poll with 35 to 37 percent of Democrats. De Blasio, Bill Thompson and John Liu are bunched between 9 and 14.", "q-0522", "m-0214")),
     c("If nobody reaches 40 percent, the top two meet in a runoff.", "cfb-ao"),
-    c("Candidates who take public matching funds may spend no more than $6,426,000 on the primary. The city matches small donations from residents six to one, up to $3,534,300.", "cfb-limits"),
-    c("Quinn has $5.3 million on hand. De Blasio's campaign says that with expected matching funds it is already close to the spending limit.", "dna-0114"),
+    sh("Spending cap: $6,426,000. The city matches small donations six to one.", c("Candidates who take public matching funds may spend no more than $6,426,000 on the primary. The city matches small donations from residents six to one, up to $3,534,300.", "cfb-limits")),
+    sh("Quinn has $5.3 million. De Blasio's campaign says it is already near the limit.", c("Quinn has $5.3 million on hand. De Blasio's campaign says that with expected matching funds it is already close to the spending limit.", "dna-0114")),
     c("The mayor is leaving after three terms and is not on the ballot.", "cbs-exit"),
   ],
 
   candidates: [
-    { id: "deblasio", name: "Bill de Blasio", standing: "Public Advocate, low double digits in the polls", about: [c("In October 2012 he proposed raising the city income tax on incomes above $500,000 to pay for full-day pre-kindergarten and after-school programmes.", "chalk-prek")] },
-    { id: "quinn", name: "Christine Quinn", standing: "Speaker of the City Council, front-runner", about: [c("The best funded candidate, and first in every poll at this date.", "dna-0114", "m-0214"), c("Later coverage reports protests and resentment over her support for allowing the mayor a third term.", "wnyc-lucky")] },
-    { id: "thompson", name: "Bill Thompson", standing: "Former Comptroller, the party's 2009 nominee", about: [c("Lost to Bloomberg in 2009 by fewer than 50,000 votes. The only Black candidate among the leading contenders.", "wnyc-thompson", "q-0626")] },
-    { id: "liu", name: "John Liu", standing: "City Comptroller", about: [c("About 9 percent in early polls, with just over $2 million on hand.", "q-0522", "dna-0114"), c("On August 5 the Campaign Finance Board denied his campaign public matching funds.", "wnyc-liu")] },
-    { id: "weiner", name: "Anthony Weiner", standing: "Former congressman, not yet running", about: [c("Resigned from Congress in 2011. He enters this race by video on May 22 with $4.8 million in his campaign account.", "cbs-weiner")] },
+    { id: "deblasio", name: "Bill de Blasio", standing: "Public Advocate, low double digits in the polls", about: [sh("Proposed taxing incomes above $500,000 to fund pre-kindergarten and after-school programmes.", c("In October 2012 he proposed raising the city income tax on incomes above $500,000 to pay for full-day pre-kindergarten and after-school programmes.", "chalk-prek"))] },
+    { id: "quinn", name: "Christine Quinn", standing: "Speaker of the City Council, front-runner", about: [c("The best funded candidate, and first in every poll at this date.", "dna-0114", "m-0214"), sh("Resented for backing the mayor's third term, later coverage reports.", c("Later coverage reports protests and resentment over her support for allowing the mayor a third term.", "wnyc-lucky"))] },
+    { id: "thompson", name: "Bill Thompson", standing: "Former Comptroller, the party's 2009 nominee", about: [sh("Lost to Bloomberg in 2009 by under 50,000 votes. The only leading Black candidate.", c("Lost to Bloomberg in 2009 by fewer than 50,000 votes. The only Black candidate among the leading contenders.", "wnyc-thompson", "q-0626"))] },
+    { id: "liu", name: "John Liu", standing: "City Comptroller", about: [c("About 9 percent in early polls, with just over $2 million on hand.", "q-0522", "dna-0114"), sh("Denied public matching funds on August 5.", c("On August 5 the Campaign Finance Board denied his campaign public matching funds.", "wnyc-liu"))] },
+    { id: "weiner", name: "Anthony Weiner", standing: "Former congressman, not yet running", about: [sh("Resigned from Congress in 2011. Enters on May 22 with $4.8 million.", c("Resigned from Congress in 2011. He enters this race by video on May 22 with $4.8 million in his campaign account.", "cbs-weiner"))] },
   ],
 
   // Each plank is dated to when it was first on record; a plank that answered a decision waits for that decision.
@@ -234,7 +237,7 @@ export const mayor2013: Case = {
       situation: [
         c("Quinn leads with 35 to 37 percent. You, Thompson and Liu are bunched between 9 and 14.", "q-0522", "m-0214"),
         c("The mayor is not running after three terms.", "cbs-exit"),
-        c("Your media consultant's reading is that your rivals are aiming their messages at the middle class.", "tpm-brand"),
+        sh("Your media consultant: rivals are all aiming at the middle class.", c("Your media consultant's reading is that your rivals are aiming their messages at the middle class.", "tpm-brand")),
       ],
       constraints: { daysLeft: 226, notes: ["Spending cap for the primary: $6,426,000"] },
       options: [
@@ -244,14 +247,14 @@ export const mayor2013: Case = {
         { id: "prek", label: "One signature policy", detail: "Run on schools and pre-kindergarten and leave the incumbent's record alone.", preview: { up: ["Poll standing", "White voters"], down: [] }, effect: { poll: { deblasio: 1 }, groups: { white: 2 } } },
       ],
       advice: [
-        { name: "John Del Cecato", role: "Media consultant", argues: "break", basis: "on-record", sources: ["tpm-brand"], says: "Proposed the tale of two cities as the frame, to make you the clear progressive while rivals compete for the same middle-class ground." },
-        { role: "Finance director", argues: "manager", basis: "predicted", sources: [], says: "Donors and editorial boards reward a steady hand. A manager's pitch keeps doors open that a break from the mayor closes." },
-        { role: "Field director", argues: "boroughs", basis: "predicted", sources: [], says: "You live in Brooklyn and the front-runner is from Manhattan. Borough fairness is a message volunteers can carry door to door." },
+        { name: "John Del Cecato", role: "Media consultant", argues: "break", basis: "on-record", sources: ["tpm-brand"], short: "Proposed the tale of two cities, to make you the clear progressive.", says: "Proposed the tale of two cities as the frame, to make you the clear progressive while rivals compete for the same middle-class ground." },
+        { role: "Finance director", argues: "manager", basis: "predicted", sources: [], short: "Donors and editorial boards reward a steady hand.", says: "Donors and editorial boards reward a steady hand. A manager's pitch keeps doors open that a break from the mayor closes." },
+        { role: "Field director", argues: "boroughs", basis: "predicted", sources: [], short: "Borough fairness is a message volunteers can carry door to door.", says: "You live in Brooklyn and the front-runner is from Manhattan. Borough fairness is a message volunteers can carry door to door." },
       ],
       taken: "break",
       did: [
-        c("Early in 2013 media consultant John Del Cecato met Bill and Chirlane de Blasio to build the message and proposed the tale of two cities. The aim was to make de Blasio the clear progressive and to differ from rivals' middle-class framing.", "tpm-brand"),
-        c("The launch speech argued the Bloomberg years had left the middle class behind, while giving the mayor credit on public health.", "dna-launch"),
+        sh("Del Cecato proposed the tale of two cities, to make de Blasio the clear progressive.", c("Early in 2013 media consultant John Del Cecato met Bill and Chirlane de Blasio to build the message and proposed the tale of two cities. The aim was to make de Blasio the clear progressive and to differ from rivals' middle-class framing.", "tpm-brand")),
+        sh("The launch speech said the Bloomberg years left the middle class behind.", c("The launch speech argued the Bloomberg years had left the middle class behind, while giving the mayor credit on public health.", "dna-launch")),
       ],
       followed: [
         c("Nothing moved for six months. He polled 14, 14, 11, 10, 10 and 10 percent among Democrats from February to mid-July.", "q-0522", "q-0626", "q-0715"),
@@ -270,16 +273,16 @@ export const mayor2013: Case = {
       skill: "delegating",
       since: {
         notes: [
-          c("Anthony Weiner enters the race by video with $4.8 million. That day's poll: Quinn 25, Weiner 15, de Blasio 10, Thompson 10.", "cbs-weiner", "q-0522"),
-          c("You raised $240,000 in the last filing period. Thompson raised $600,000 and Quinn $510,000.", "dna-0514"),
-          c("After the Boston Marathon bombing, a forum turned on whether to keep Police Commissioner Ray Kelly. Quinn would keep him; you would not.", "wfuv-0425"),
+          sh("Weiner enters with $4.8 million. Poll: Quinn 25, Weiner 15, you 10, Thompson 10.", c("Anthony Weiner enters the race by video with $4.8 million. That day's poll: Quinn 25, Weiner 15, de Blasio 10, Thompson 10.", "cbs-weiner", "q-0522")),
+          sh("You raised $240,000. Thompson raised $600,000 and Quinn $510,000.", c("You raised $240,000 in the last filing period. Thompson raised $600,000 and Quinn $510,000.", "dna-0514")),
+          sh("A forum turns on Police Commissioner Kelly. Quinn would keep him; you would not.", c("After the Boston Marathon bombing, a forum turned on whether to keep Police Commissioner Ray Kelly. Quinn would keep him; you would not.", "wfuv-0425")),
         ],
         shift: { poll: { deblasio: -2, quinn: -10, thompson: -1, liu: -3, weiner: 15 } },
       },
       situation: [
-        c("Coverage says the new entrant's talk of middle-class struggles is crowding out your message.", "wnyc-lucky"),
-        c("Your campaign has already reached the most it can claim in matching funds for the primary.", "dna-0514"),
-        c("There are 111 days to the primary. As late as mid-July, 47 percent of Democrats will still not know enough about you to have a view.", "q-0715"),
+        sh("Coverage says Weiner's middle-class talk is crowding out your message.", c("Coverage says the new entrant's talk of middle-class struggles is crowding out your message.", "wnyc-lucky")),
+        sh("You have already claimed the most you can in matching funds.", c("Your campaign has already reached the most it can claim in matching funds for the primary.", "dna-0514")),
+        sh("As late as mid-July, 47 percent of Democrats will not know enough to rate you.", c("There are 111 days to the primary. As late as mid-July, 47 percent of Democrats will still not know enough about you to have a view.", "q-0715")),
       ],
       constraints: { daysLeft: 111 },
       options: [
@@ -289,14 +292,14 @@ export const mayor2013: Case = {
         { id: "early", label: "Spend early on name recognition", detail: "Start paid advertising months ahead of plan so voters know who you are before the summer.", preview: { up: ["Poll standing"], down: [TV] }, effect: { poll: { deblasio: 3 }, budget: -700_000 } },
       ],
       advice: [
-        { name: "Bill Hyers", role: "Campaign manager", argues: "hold", basis: "on-record", sources: ["spb-hyers", "gg-walzak"], says: "When the candidate, trailing, considered speeding up and spending more to raise his name recognition, he recommended staying with the plan." },
-        { role: "Communications aide", argues: "attack", basis: "predicted", sources: [], says: "He is taking your oxygen every day. A direct contrast gets you into every story written about him." },
-        { role: "Pollster", argues: "early", basis: "predicted", sources: [], says: "Nearly half of Democrats cannot rate you. You cannot win an argument with voters who do not know your name." },
+        { name: "Bill Hyers", role: "Campaign manager", argues: "hold", basis: "on-record", sources: ["spb-hyers", "gg-walzak"], short: "Recommended staying with the plan when the candidate considered spending more.", says: "When the candidate, trailing, considered speeding up and spending more to raise his name recognition, he recommended staying with the plan." },
+        { role: "Communications aide", argues: "attack", basis: "predicted", sources: [], short: "A direct contrast gets you into every story written about him.", says: "He is taking your oxygen every day. A direct contrast gets you into every story written about him." },
+        { role: "Pollster", argues: "early", basis: "predicted", sources: [], short: "You cannot win over voters who do not know your name.", says: "Nearly half of Democrats cannot rate you. You cannot win an argument with voters who do not know your name." },
       ],
       taken: "hold",
       did: [
-        c("On the day Weiner entered, de Blasio's spokesman said only that the race was now wide open.", "cbs-weiner"),
-        c("A later profile of campaign manager Bill Hyers says de Blasio, trailing, considered speeding up and spending more, and Hyers recommended staying with the plan.", "spb-hyers"),
+        sh("His spokesman said only that the race was now wide open.", c("On the day Weiner entered, de Blasio's spokesman said only that the race was now wide open.", "cbs-weiner")),
+        sh("De Blasio considered spending more. Hyers recommended staying with the plan.", c("A later profile of campaign manager Bill Hyers says de Blasio, trailing, considered speeding up and spending more, and Hyers recommended staying with the plan.", "spb-hyers")),
       ],
       followed: [
         c("Weiner rose to 25 or 26 percent by mid-July, then fell: 16 on July 29 and 10 on August 13.", "q-0715", "q-0724", "q-0813"),
@@ -315,8 +318,8 @@ export const mayor2013: Case = {
       skill: "policy",
       since: { notes: [c("Thompson has won the teachers' union endorsement and risen to 16 percent. Weiner now leads some polls.", "q-0626", "m-0725")], shift: { poll: { weiner: 10, quinn: -3, thompson: 1, liu: 1 } } },
       situation: [
-        c("The state university is considering selling Long Island College Hospital in Brooklyn and has diverted ambulances from it. A judge has ordered the hospital kept running.", "dna-arrest", "bkpaper-lich"),
-        c("The protest is organised with 1199 SEIU, which has endorsed you, and the state nurses' association, which has not endorsed anyone yet.", "dna-arrest", "npq-lich"),
+        sh("The state university may sell Long Island College Hospital. A judge has ordered it kept running.", c("The state university is considering selling Long Island College Hospital in Brooklyn and has diverted ambulances from it. A judge has ordered the hospital kept running.", "dna-arrest", "bkpaper-lich")),
+        sh("Organised with 1199 SEIU, which endorsed you, and the nurses, who have endorsed nobody.", c("The protest is organised with 1199 SEIU, which has endorsed you, and the state nurses' association, which has not endorsed anyone yet.", "dna-arrest", "npq-lich")),
         c("Two rivals, Liu and Weiner, will also be there. Organisers plan civil disobedience.", "npq-lich"),
         c("You hold citywide office as Public Advocate.", "dna-launch"),
       ],
@@ -328,12 +331,12 @@ export const mayor2013: Case = {
         { id: "statement", label: "Send a statement of support", detail: "Keep the day for other campaigning.", preview: { up: ["White voters"], down: ["Union households"] }, effect: { groups: { white: 1, union: -2 } } },
       ],
       advice: [
-        { role: "Labor liaison", argues: "arrest", basis: "predicted", sources: [], says: "The union that endorsed you is putting its own members on the line today. They will remember who stood with them and who stepped back." },
-        { role: "Campaign counsel", argues: "courts", basis: "predicted", sources: [], says: "You hold an office with standing to sue. A court order keeps the hospital open; a photograph does not." },
-        { role: "Communications aide", argues: "speak", basis: "predicted", sources: [], says: "Be there and be heard, but a mayoral candidate in handcuffs is a story you do not control." },
+        { role: "Labor liaison", argues: "arrest", basis: "predicted", sources: [], short: "The union will remember who stood with them and who stepped back.", says: "The union that endorsed you is putting its own members on the line today. They will remember who stood with them and who stepped back." },
+        { role: "Campaign counsel", argues: "courts", basis: "predicted", sources: [], short: "A court order keeps the hospital open; a photograph does not.", says: "You hold an office with standing to sue. A court order keeps the hospital open; a photograph does not." },
+        { role: "Communications aide", argues: "speak", basis: "predicted", sources: [], short: "A mayoral candidate in handcuffs is a story you do not control.", says: "Be there and be heard, but a mayoral candidate in handcuffs is a story you do not control." },
       ],
       taken: "arrest",
-      did: [c("De Blasio was one of fifteen people arrested outside the state university chancellor's office in Manhattan, with a Council member, two nurses' union leaders and nine hospital employees. The charge was disorderly conduct and all were released within hours. Liu and Weiner moved back into the crowd and were not arrested.", "bkpaper-lich", "dna-arrest", "npq-lich")],
+      did: [sh("De Blasio was one of fifteen arrested. Liu and Weiner stepped back and were not.", c("De Blasio was one of fifteen people arrested outside the state university chancellor's office in Manhattan, with a Council member, two nurses' union leaders and nine hospital employees. The charge was disorderly conduct and all were released within hours. Liu and Weiner moved back into the crowd and were not arrested.", "bkpaper-lich", "dna-arrest", "npq-lich"))],
       followed: [c("He polled 10 percent five days later, 15 on July 24 and 21 on July 29. Weiner's new admissions fall in the same weeks, so no source separates the effect of the arrest.", "q-0715", "q-0724", "q-0813")],
       saidAfter: [{ who: "Ruth McCambridge, Nonprofit Quarterly", ...c("The optics mattered, and the event could carry symbolic weight in endorsement decisions still to come.", "npq-lich") }],
     },
@@ -343,9 +346,9 @@ export const mayor2013: Case = {
       title: "Eight weeks left. How do you split the money?",
       skill: "budgeting",
       situation: [
-        c("Every candidate in the public financing programme has the same $6,426,000 limit for the primary.", "cfb-limits"),
-        c("You are at 10 percent and fourth. Nearly half of Democrats do not know enough about you to rate you.", "q-0715"),
-        c("Outside money is in play for a rival: the teachers' union will spend more than $2.5 million supporting Thompson.", "wnyc-thompson"),
+        sh("Every publicly financed candidate has the same $6,426,000 limit.", c("Every candidate in the public financing programme has the same $6,426,000 limit for the primary.", "cfb-limits")),
+        sh("You are fourth at 10 percent. Nearly half of Democrats cannot rate you.", c("You are at 10 percent and fourth. Nearly half of Democrats do not know enough about you to rate you.", "q-0715")),
+        sh("The teachers' union will spend more than $2.5 million for Thompson.", c("Outside money is in play for a rival: the teachers' union will spend more than $2.5 million supporting Thompson.", "wnyc-thompson")),
       ],
       constraints: { daysLeft: 57, notes: ["What you spend now cannot be spent in August"] },
       options: [
@@ -355,14 +358,14 @@ export const mayor2013: Case = {
         { id: "tvnow", label: "Start television now at low weight", detail: "Lift your name recognition in July, at the cost of a thinner August.", preview: { up: ["Poll standing"], down: [TV] }, effect: { poll: { deblasio: 4 }, budget: -900_000 } },
       ],
       advice: [
-        { name: "Bill Hyers", role: "Campaign manager", argues: "alltv", basis: "predicted", sources: ["cfb-exp"], says: "The city is several separate constituencies and only television reaches all of them at once. Under a cap, a dollar of mail is a dollar off the air." },
-        { role: "Mail consultant", argues: "mail", basis: "predicted", sources: [], says: "Primary turnout is small and the voter file tells you who they are. Mail talks to them and nobody else." },
-        { role: "Pollster", argues: "tvnow", basis: "predicted", sources: [], says: "You are fourth with eight weeks left. Voters who meet you in late August may already have chosen someone." },
+        { name: "Bill Hyers", role: "Campaign manager", argues: "alltv", basis: "predicted", sources: ["cfb-exp"], short: "Only television reaches every constituency. A dollar of mail is a dollar off the air.", says: "The city is several separate constituencies and only television reaches all of them at once. Under a cap, a dollar of mail is a dollar off the air." },
+        { role: "Mail consultant", argues: "mail", basis: "predicted", sources: [], short: "Primary turnout is small. Mail talks to those voters and nobody else.", says: "Primary turnout is small and the voter file tells you who they are. Mail talks to them and nobody else." },
+        { role: "Pollster", argues: "tvnow", basis: "predicted", sources: [], short: "Voters who meet you in late August may already have chosen someone.", says: "You are fourth with eight weeks left. Voters who meet you in late August may already have chosen someone." },
       ],
       taken: "alltv",
       did: [
-        c("The campaign's filings record about $3.88 million as television advertising out of about $5.65 million paid out between January 1 and September 10, 2013. One payment of $1,767 is coded as a campaign mailing.", "cfb-exp"),
-        c("The first large television payment, $1.1 million, is dated August 6. Further payments of about $760,000, $950,000 and $1 million follow on August 14, 21 and 28.", "cfb-exp"),
+        sh("About $3.88 million of $5.65 million paid out went to television. One $1,767 payment was mail.", c("The campaign's filings record about $3.88 million as television advertising out of about $5.65 million paid out between January 1 and September 10, 2013. One payment of $1,767 is coded as a campaign mailing.", "cfb-exp")),
+        sh("The first large television payment, $1.1 million, is dated August 6.", c("The first large television payment, $1.1 million, is dated August 6. Further payments of about $760,000, $950,000 and $1 million follow on August 14, 21 and 28.", "cfb-exp")),
       ],
       followed: [c("He went from 15 percent on July 24 to 30 on August 13, 36 on August 28 and 43 on September 3 among likely voters.", "q-0724", "q-0813", "q-0828", "q-0903")],
       saidAfter: [{ who: "Maurice Carroll, Quinnipiac poll director, on September 3", ...c("Singled out the television commercial as the image of the campaign.", "q-0903") }],
@@ -374,18 +377,18 @@ export const mayor2013: Case = {
       skill: "delegating",
       since: {
         notes: [
-          c("On July 23 Weiner admitted to further explicit messages sent after he left Congress. He fell from first to fourth within a week.", "dna-0723", "q-0813"),
+          sh("Weiner admits to further explicit messages and falls from first to fourth.", c("On July 23 Weiner admitted to further explicit messages sent after he left Congress. He fell from first to fourth within a week.", "dna-0723", "q-0813")),
           c("Liu was denied public matching funds on August 5.", "wnyc-liu"),
-          c("After the Zimmerman verdict in Florida, Thompson sharpened his attack on stop-and-frisk to win Black voters leaving Weiner.", "aj-trayvon"),
-          c("Citing Detroit's bankruptcy, Mayor Bloomberg told voters to pick a mayor who would refuse retroactive raises for city workers.", "fa-detroit"),
-          c("Polls of likely voters at the end of July: Quinn 26 or 27, with you, Thompson and Weiner between 15 and 21.", "q-0813", "m-0725"),
+          sh("Thompson sharpens his attack on stop-and-frisk to win Black voters leaving Weiner.", c("After the Zimmerman verdict in Florida, Thompson sharpened his attack on stop-and-frisk to win Black voters leaving Weiner.", "aj-trayvon")),
+          sh("Bloomberg tells voters to pick a mayor who refuses retroactive raises.", c("Citing Detroit's bankruptcy, Mayor Bloomberg told voters to pick a mayor who would refuse retroactive raises for city workers.", "fa-detroit")),
+          sh("End of July: Quinn 26 or 27. You, Thompson and Weiner at 15 to 21.", c("Polls of likely voters at the end of July: Quinn 26 or 27, with you, Thompson and Weiner between 15 and 21.", "q-0813", "m-0725")),
         ],
         shift: { poll: { deblasio: 6, quinn: 5, thompson: 10, weiner: -9, liu: -1 }, groups: { black: 3, white: 5, hispanic: 4, union: 3 } },
       },
       situation: [
         c("You need to finish in the top two to reach a runoff, or pass 40 percent to avoid one.", "cfb-ao"),
         c("A federal court ruling on stop-and-frisk is expected any day.", "dna-0812"),
-        c("In mid-July nearly half of Democrats did not know enough about you to rate you.", "q-0715"),
+        sh("In mid-July nearly half of Democrats could not rate you.", c("In mid-July nearly half of Democrats did not know enough about you to rate you.", "q-0715")),
       ],
       constraints: { daysLeft: 33, notes: ["A first flight of television costs about $1.1 million"] },
       options: [
@@ -395,14 +398,14 @@ export const mayor2013: Case = {
         { id: "wait", label: "Hold all television for the last two weeks", detail: "Stay dark now and concentrate the buy at the end.", preview: { up: [], down: [] }, effect: {} },
       ],
       advice: [
-        { name: "John Del Cecato", role: "Media consultant", argues: "family", basis: "on-record", sources: ["tpm-brand"], says: "Had the idea after the candidate's son drew press attention at the launch, and persuaded the candidate to pay for the ad and run it." },
-        { role: "Research director", argues: "contrast", basis: "predicted", sources: [], says: "The front-runner has never had to defend her record on air. Voters who want change need to hear why she is not it." },
-        { role: "Communications aide", argues: "bio", basis: "predicted", sources: [], says: "Putting a child in front of a campaign invites criticism. Voters are choosing a mayor, so let them meet him." },
+        { name: "John Del Cecato", role: "Media consultant", argues: "family", basis: "on-record", sources: ["tpm-brand"], short: "Had the idea after the candidate's son drew press attention at the launch.", says: "Had the idea after the candidate's son drew press attention at the launch, and persuaded the candidate to pay for the ad and run it." },
+        { role: "Research director", argues: "contrast", basis: "predicted", sources: [], short: "The front-runner has never had to defend her record on air.", says: "The front-runner has never had to defend her record on air. Voters who want change need to hear why she is not it." },
+        { role: "Communications aide", argues: "bio", basis: "predicted", sources: [], short: "A child in the ad invites criticism. Let voters meet the candidate.", says: "Putting a child in front of a campaign invites criticism. Voters are choosing a mayor, so let them meet him." },
       ],
       taken: "family",
       did: [
-        c("On August 8 the campaign released its first television ad, a 30-second spot in which the candidate's 15-year-old son says his father is the only Democrat who will break from the Bloomberg years and end a stop-and-frisk era.", "vin-ad"),
-        c("Del Cecato said he had the idea after the son drew attention at the January launch, and that he persuaded de Blasio to pay for and run it. The campaign prepared for criticism by listing other candidates who had featured their children.", "tpm-brand"),
+        sh("On August 8 the first ad came out: his 15-year-old son speaks for him.", c("On August 8 the campaign released its first television ad, a 30-second spot in which the candidate's 15-year-old son says his father is the only Democrat who will break from the Bloomberg years and end a stop-and-frisk era.", "vin-ad")),
+        sh("Del Cecato persuaded de Blasio to pay for the ad and run it.", c("Del Cecato said he had the idea after the son drew attention at the January launch, and that he persuaded de Blasio to pay for and run it. The campaign prepared for criticism by listing other candidates who had featured their children.", "tpm-brand")),
       ],
       followed: [
         c("On August 12 a federal judge ruled the police department's stop-and-frisk practices unconstitutional. De Blasio pledged not to appeal.", "dna-0812"),
@@ -420,12 +423,12 @@ export const mayor2013: Case = {
       date: "2013-08-19",
       title: "The second ad, and whose voters you go after",
       skill: "voter-groups",
-      since: { notes: [c("On August 12 a federal judge ruled stop-and-frisk unconstitutional and ordered a monitor. Thompson promised to work with the monitor without backing the Council's oversight bills.", "dna-0812")], shift: { poll: { deblasio: 2, quinn: -3, thompson: 2, weiner: -6 } } },
+      since: { notes: [sh("A federal judge rules stop-and-frisk unconstitutional and orders a monitor.", c("On August 12 a federal judge ruled stop-and-frisk unconstitutional and ordered a monitor. Thompson promised to work with the monitor without backing the Council's oversight bills.", "dna-0812"))], shift: { poll: { deblasio: 2, quinn: -3, thompson: 2, weiner: -6 } } },
       situation: [
-        c("Among Black likely voters the August 13 poll has Thompson 39, de Blasio 22, Quinn 18. Among white likely voters: de Blasio 39, Quinn 31, Thompson 12.", "q-0813"),
+        sh("Black voters: Thompson 39, you 22, Quinn 18. White voters: you 39, Quinn 31, Thompson 12.", c("Among Black likely voters the August 13 poll has Thompson 39, de Blasio 22, Quinn 18. Among white likely voters: de Blasio 39, Quinn 31, Thompson 12.", "q-0813")),
         c("60 percent of likely primary voters call stop-and-frisk excessive.", "q-0813"),
-        c("Thompson has taken a restrained line on the policy, praising parts of it and pledging to keep it as a tool under an inspector general.", "newsone-0826"),
-        c("Coverage describes Thompson as counting on being the only Black candidate to carry him into a runoff.", "wnyc-thompson"),
+        sh("Thompson would keep stop-and-frisk as a tool under an inspector general.", c("Thompson has taken a restrained line on the policy, praising parts of it and pledging to keep it as a tool under an inspector general.", "newsone-0826")),
+        sh("Coverage says Thompson is counting on being the only Black candidate.", c("Coverage describes Thompson as counting on being the only Black candidate to carry him into a runoff.", "wnyc-thompson")),
       ],
       constraints: { daysLeft: 22, notes: ["A second flight costs about $1.7 million", "The closing week will need about $1 million more"] },
       options: [
@@ -435,14 +438,14 @@ export const mayor2013: Case = {
         { id: "repeat", label: "Keep the first ad on air", detail: "A smaller buy, and no direct contrast with any rival.", preview: { up: ["Poll standing", "Black voters", "White voters"], down: [TV] }, effect: { poll: { deblasio: 3 }, groups: { black: 3, white: 2 }, budget: -1_200_000 } },
       ],
       advice: [
-        { name: "Greenberg Quinlan Rosner", role: "Polling firm", argues: "frisk", basis: "predicted", sources: ["q-0813", "gqr"], says: "Six in ten primary voters call the policy excessive, and the candidate they assume owns the issue has not taken the sharp position." },
-        { role: "Field director", argues: "jobs", basis: "predicted", sources: [], says: "At the doors people ask about rent and work. The ruling already made your point on policing for you." },
-        { role: "Manhattan organiser", argues: "manhattan", basis: "predicted", sources: [], says: "The Speaker's voters are the easiest to move, and you may need the former Comptroller's supporters in a runoff." },
+        { name: "Greenberg Quinlan Rosner", role: "Polling firm", argues: "frisk", basis: "predicted", sources: ["q-0813", "gqr"], short: "Six in ten primary voters call the policy excessive.", says: "Six in ten primary voters call the policy excessive, and the candidate they assume owns the issue has not taken the sharp position." },
+        { role: "Field director", argues: "jobs", basis: "predicted", sources: [], short: "At the doors people ask about rent and work.", says: "At the doors people ask about rent and work. The ruling already made your point on policing for you." },
+        { role: "Manhattan organiser", argues: "manhattan", basis: "predicted", sources: [], short: "The Speaker's voters are the easiest to move.", says: "The Speaker's voters are the easiest to move, and you may need the former Comptroller's supporters in a runoff." },
       ],
       taken: "frisk",
       did: [
-        c("On August 19 the campaign released a second ad on stop-and-frisk. A campaign email said he was the only candidate who would end the stop-and-frisk era.", "dk-ad2"),
-        c("Thompson answered with his own ad saying de Blasio's ad lied about his position, citing a newspaper fact-check that called the claim misleading. De Blasio's campaign stood by its ad.", "newsone-0826"),
+        sh("On August 19 the campaign released a second ad, on stop-and-frisk.", c("On August 19 the campaign released a second ad on stop-and-frisk. A campaign email said he was the only candidate who would end the stop-and-frisk era.", "dk-ad2")),
+        sh("Thompson's ad said it lied about his position. De Blasio's campaign stood by it.", c("Thompson answered with his own ad saying de Blasio's ad lied about his position, citing a newspaper fact-check that called the claim misleading. De Blasio's campaign stood by its ad.", "newsone-0826")),
       ],
       followed: [
         c("Among Black likely voters: de Blasio 34, Thompson 25 on August 28, then de Blasio 47, Thompson 25 on September 3.", "q-0828", "q-0903"),
@@ -463,16 +466,16 @@ export const mayor2013: Case = {
   },
 
   press: [
-    { date: "2013-01-14", outlet: "DNAinfo", summary: "Mayoral hopefuls reported six months of fundraising. Quinn held the largest reserve; de Blasio's campaign said it was nearing the spending limit once matching funds were counted.", source: "dna-0114", impact: 2 },
-    { date: "2013-04-25", outlet: "WFUV", summary: "Ten days after the Boston Marathon bombing, a Democratic forum opened on counterterrorism and turned into a fight over Police Commissioner Ray Kelly. Quinn would keep him; de Blasio, Thompson and Liu would not.", source: "wfuv-0425", impact: 2, outside: true },
-    { date: "2013-05-22", outlet: "CBS New York", summary: "Weiner entered by video with a large war chest. De Blasio's spokesman said the race was wide open.", source: "cbs-weiner", impact: 4 },
-    { date: "2013-07-10", outlet: "DNAinfo", summary: "De Blasio was arrested for disorderly conduct at a protest over the possible sale of a Brooklyn hospital.", source: "dna-arrest", impact: 2 },
-    { date: "2013-07-24", outlet: "DNAinfo", summary: "After Weiner's new admissions, de Blasio and Albanese called for him to leave the race; Quinn said that was for Weiner and the voters.", source: "dna-0724", impact: 5 },
-    { date: "2013-08-06", outlet: "Bloomberg News", summary: "Citing Detroit's bankruptcy, Mayor Bloomberg warned that the next mayor must hold down pension and health costs and refuse retroactive raises. Liu and de Blasio had not ruled them out.", source: "fa-detroit", impact: 2, outside: true },
-    { date: "2013-08-08", outlet: "Al Jazeera", summary: "After the Zimmerman verdict in Florida, Thompson sharpened his attack on stop-and-frisk in a Brooklyn church, a bid for Black voters leaving Weiner.", source: "aj-trayvon", impact: 3, outside: true },
-    { date: "2013-08-08", outlet: "VIN News", summary: "De Blasio's first television ad, featuring his teenage son, presented him as the one Democrat who would break from the incumbent and end stop-and-frisk.", source: "vin-ad", impact: 5 },
-    { date: "2013-08-12", outlet: "DNAinfo", summary: "A federal judge ruled stop-and-frisk unconstitutional. Quinn, de Blasio and Liu pledged to drop any appeal.", source: "dna-0812", impact: 5 },
-    { date: "2013-08-13", outlet: "The Nation", summary: "The Nation cast de Blasio's \"tale of two cities\" campaign as an early test of a national argument among Democrats over inequality.", source: "nation-0813", impact: 2, outside: true, estimate: true },
+    { date: "2013-01-14", outlet: "DNAinfo", short: "Quinn holds the largest reserve. De Blasio's campaign says it is nearing the spending limit.", summary: "Mayoral hopefuls reported six months of fundraising. Quinn held the largest reserve; de Blasio's campaign said it was nearing the spending limit once matching funds were counted.", source: "dna-0114", impact: 2 },
+    { date: "2013-04-25", outlet: "WFUV", short: "A forum fight over Police Commissioner Kelly: Quinn would keep him; de Blasio, Thompson and Liu would not.", summary: "Ten days after the Boston Marathon bombing, a Democratic forum opened on counterterrorism and turned into a fight over Police Commissioner Ray Kelly. Quinn would keep him; de Blasio, Thompson and Liu would not.", source: "wfuv-0425", impact: 2, outside: true },
+    { date: "2013-05-22", outlet: "CBS New York", short: "Weiner enters by video with a large war chest.", summary: "Weiner entered by video with a large war chest. De Blasio's spokesman said the race was wide open.", source: "cbs-weiner", impact: 4 },
+    { date: "2013-07-10", outlet: "DNAinfo", short: "De Blasio is arrested at a protest over a Brooklyn hospital.", summary: "De Blasio was arrested for disorderly conduct at a protest over the possible sale of a Brooklyn hospital.", source: "dna-arrest", impact: 2 },
+    { date: "2013-07-24", outlet: "DNAinfo", short: "De Blasio and Albanese call on Weiner to quit. Quinn says that is for Weiner and the voters.", summary: "After Weiner's new admissions, de Blasio and Albanese called for him to leave the race; Quinn said that was for Weiner and the voters.", source: "dna-0724", impact: 5 },
+    { date: "2013-08-06", outlet: "Bloomberg News", short: "Bloomberg warns the next mayor to refuse retroactive raises. Liu and de Blasio had not ruled them out.", summary: "Citing Detroit's bankruptcy, Mayor Bloomberg warned that the next mayor must hold down pension and health costs and refuse retroactive raises. Liu and de Blasio had not ruled them out.", source: "fa-detroit", impact: 2, outside: true },
+    { date: "2013-08-08", outlet: "Al Jazeera", short: "Thompson sharpens his attack on stop-and-frisk, a bid for Black voters leaving Weiner.", summary: "After the Zimmerman verdict in Florida, Thompson sharpened his attack on stop-and-frisk in a Brooklyn church, a bid for Black voters leaving Weiner.", source: "aj-trayvon", impact: 3, outside: true },
+    { date: "2013-08-08", outlet: "VIN News", short: "De Blasio's first ad, featuring his teenage son, promises a break from the incumbent.", summary: "De Blasio's first television ad, featuring his teenage son, presented him as the one Democrat who would break from the incumbent and end stop-and-frisk.", source: "vin-ad", impact: 5 },
+    { date: "2013-08-12", outlet: "DNAinfo", short: "A judge rules stop-and-frisk unconstitutional. Quinn, de Blasio and Liu pledge no appeal.", summary: "A federal judge ruled stop-and-frisk unconstitutional. Quinn, de Blasio and Liu pledged to drop any appeal.", source: "dna-0812", impact: 5 },
+    { date: "2013-08-13", outlet: "The Nation", short: "The Nation casts de Blasio's campaign as a test of a national argument over inequality.", summary: "The Nation cast de Blasio's \"tale of two cities\" campaign as an early test of a national argument among Democrats over inequality.", source: "nation-0813", impact: 2, outside: true, estimate: true },
     { date: "2013-08-26", outlet: "NewsOne", summary: "Thompson released an ad accusing de Blasio's stop-and-frisk ad of misrepresenting his position.", source: "newsone-0826", impact: 3 },
   ],
 

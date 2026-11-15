@@ -1,15 +1,17 @@
 "use client";
 
-import { ArrowDownRight, ArrowUpRight, ListChecks } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ListChecks, Swords } from "lucide-react";
 import { motion } from "motion/react";
-import { longDate, shortMoney, staffMoney, useCase, useCaseNow } from "@/lib/cases/store";
-import { effectOf } from "@/lib/cases/types";
+import { useEffect, useState } from "react";
+import { longDate, shortDate, shortMoney, staffMoney, useCase, useCaseNow } from "@/lib/cases/store";
+import { effectOf, type Case } from "@/lib/cases/types";
+import { Cite, More } from "@/views/CaseView";
 import type { View } from "@/lib/data";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 import { ClockControls } from "./Clock";
 import { SidebarBody } from "./Sidebar";
-import { Label, Meter, Popover } from "./ui";
+import { Label, Meter, Popover, Tag } from "./ui";
 
 // The sections of the tool, in the order a student meets them: the case first, then the material behind it. Add new views here.
 const VIEWS: [View, string][] = [["case", "Case"], ["profile", "Profile"], ["war", "War room"], ["map", "Map"], ["factions", "Factions"]];
@@ -47,7 +49,7 @@ function Nav() {
       </div>
       <nav aria-label="Sections" className="flex items-stretch self-stretch">
         {VIEWS.map(([k, name]) => (
-          <button key={k} onClick={() => go(k)} aria-current={view === k ? "page" : undefined} className={cn("relative px-3.5 font-display text-[12.5px] font-medium tracking-[0.09em] whitespace-nowrap uppercase transition-colors", view === k ? "text-gold-bright" : "text-muted hover:text-fg")}>
+          <button key={k} onClick={() => go(k)} aria-current={view === k ? "page" : undefined} className={cn("relative px-3 font-display text-[12.5px] min-[1440px]:px-3.5 font-medium tracking-[0.09em] whitespace-nowrap uppercase transition-colors", view === k ? "text-gold-bright" : "text-muted hover:text-fg")}>
             {/* Where you are: a faint wash, a gold line on the bar's edge and a diamond on it. It slides between tabs. */}
             {view === k && (
               <motion.span layoutId="nav" className="absolute inset-0" transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
@@ -176,20 +178,100 @@ function FlowPanel({ kind, title, rows, total }: { kind: "losses" | "gains"; tit
   );
 }
 
+/** A simulated rival move counts as eventful when it takes at least this many poll points from the student. A first guess:
+ *  with the rules fallback a rival's ad buy costs about 0.08 to 0.13 and a door canvass about 0.02. */
+const RIVAL_HIT = 0.1;
+/** The most items listed under one rival. */
+const RIVAL_ITEMS = 3;
+
+type RivalItem = { key: string; date: string; text: string; /** The press item's short version, shown until "Read more". */ short?: string; source?: string; eventful: boolean };
+
+// What each rival has been doing, newest first. Two layers, as everywhere: the record (the case's press items that
+// name the rival, held back until the day after they ran, as in the paper) and the simulation (the moves the rival
+// campaigns make against yours, lib/cases/rivals).
+// ponytail: a press item belongs to a rival when its text has their surname. Tag press items by candidate in the case file if this ever misfiles one.
+function useRivals() {
+  const { c, today } = useCaseNow();
+  const work = useCase((s) => s.work);
+  const rivals = c.candidates.filter((x) => x.id !== c.follow).map((x) => {
+    const surname = x.name.split(" ").pop()!;
+    const record: RivalItem[] = c.press.filter((p) => p.date < today && p.summary.includes(surname)).map((p) => ({ key: `p:${p.date}:${p.source}`, date: p.date, text: p.summary, short: p.short, source: p.source, eventful: true }));
+    const moves: RivalItem[] = work.filter((k) => k.by === x.id && k.note).map((k) => ({ key: `w:${k.id}`, date: k.date, text: k.note!.replace(`${x.name}: `, "").replace(/^./, (ch) => ch.toUpperCase()), eventful: -(k.poll[c.follow] ?? 0) >= RIVAL_HIT }));
+    return { ...x, items: [...record, ...moves].sort((a, b) => b.date.localeCompare(a.date)) };
+  });
+  // The newest thing worth a look. The strip glows until the student has opened the list on it.
+  const newest = rivals.flatMap((r) => r.items).filter((i) => i.eventful).sort((a, b) => b.date.localeCompare(a.date) || b.key.localeCompare(a.key))[0]?.key ?? null;
+  return { c, rivals, newest };
+}
+
 // Your campaign and the two candidates nearest the top, as the polls stand on your path through the case.
+// Hover it for what the rival campaigns are doing; it glows when one of them has done something you have not read.
 function Standing() {
   const { c, w } = useCaseNow();
+  const { rivals, newest } = useRivals();
+  const [seen, setSeen] = useState<string | null>(null);
+  const glow = !!newest && newest !== seen;
   const all = c.candidates.map((x) => ({ id: x.id, name: x.id === c.follow ? "You" : x.name.split(" ").pop()!, v: Math.round(w.poll[x.id] ?? 0), mine: x.id === c.follow })).sort((a, b) => b.v - a.v);
   const top = all.slice(0, 3).some((x) => x.mine) ? all.slice(0, 3) : [...all.slice(0, 2), all.find((x) => x.mine)!];
   return (
-    <div className="hidden w-40 min-[1440px]:block" title="Poll standing on your path through the case (simulated)">
-      <div className="tnum mb-1.5 flex justify-between font-mono text-[11px] leading-none">
-        {top.map((x) => <span key={x.id} className={x.mine ? "text-warm" : "text-muted"}>{x.name} {x.v}</span>)}
+    <div className="h-9">
+      <Popover align="end" className="w-[440px]" trigger={(o) => (
+        <button aria-label={glow ? "Your rivals: something new" : "Your rivals"} className={cn("flex h-full items-center rounded-md px-2.5 transition-colors min-[1440px]:-mx-2.5", o && "bg-gold/10", glow && "signal")} title="Poll standing on your path through the case (simulated). Hover for what your rivals are doing.">
+          {/* Below 1440px there is no room for the poll strip; the list still opens from this mark. */}
+          <Swords className="size-4 text-gold min-[1440px]:hidden" />
+          <span className="hidden w-40 min-[1440px]:block">
+            <span className="tnum mb-1.5 flex justify-between font-mono text-[11px] leading-none">
+              {top.map((x) => <span key={x.id} className={x.mine ? "text-warm" : "text-muted"}>{x.name} {x.v}</span>)}
+            </span>
+            <span className="flex h-[5px] gap-px overflow-hidden">
+              {top.map((x) => <span key={x.id} className={cn("transition-[width] duration-500", x.mine ? "bg-warm" : "bg-white/35")} style={{ width: `${x.v}%` }} />)}
+              <span className="flex-1 bg-white/[0.07]" />
+            </span>
+          </span>
+        </button>
+      )}>
+        <RivalsPanel c={c} rivals={rivals} onOpen={() => setSeen(newest)} />
+      </Popover>
+    </div>
+  );
+}
+
+function RivalsPanel({ c, rivals, onOpen }: { c: Case; rivals: ReturnType<typeof useRivals>["rivals"]; onOpen: () => void }) {
+  // Opening the list is reading it: the strip stops glowing.
+  useEffect(onOpen, [onOpen]);
+  // The text pass (docs/ui-text-pass.md). Closed, the list is each rival's latest item in its short version, so it
+  // fits without scrolling. "Read more" brings the standing line, the earlier items and the original wording.
+  const [full, setFull] = useState(false);
+  const stamp = (i: RivalItem) => <span className="flex shrink-0 items-center gap-2"><span className="tnum font-mono text-[13px] text-muted">{shortDate(i.date)}</span><Tag kind={i.source ? "real" : "sim"} /></span>;
+  return (
+    <div className="max-h-[72vh] overflow-y-auto p-4">
+      <Label className="text-[20px] leading-tight font-semibold text-gold-bright">What your rivals are doing</Label>
+      <div className="mt-3 space-y-2">
+        {rivals.map((o) => {
+          const items = o.items.slice(0, full ? RIVAL_ITEMS : 1);
+          return (
+            <div key={o.id} className="rounded-lg border border-line bg-raised px-3.5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-display text-[18px] leading-tight font-medium">{o.name}</span>
+                {!full && items[0] && stamp(items[0])}
+              </div>
+              {full && <div className="mt-0.5 text-[13px] text-muted">{o.standing}</div>}
+              {items.length ? (
+                <ul className={cn("space-y-3", full ? "mt-2.5 border-t border-line pt-2.5" : "mt-1.5")}>
+                  {items.map((i) => (
+                    <li key={i.key} className="text-[16px] leading-snug text-soft">
+                      {full && <div className="mb-1">{stamp(i)}</div>}
+                      <div className={cn(!full && "line-clamp-3")}>{full ? i.text : (i.short ?? i.text)}{i.source && <Cite c={c} id={i.source} />}</div>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="mt-1.5 text-[14px] text-muted">Nothing reported yet.</p>}
+            </div>
+          );
+        })}
       </div>
-      <div className="flex h-[5px] gap-px overflow-hidden">
-        {top.map((x) => <div key={x.id} className={cn("transition-[width] duration-500", x.mine ? "bg-warm" : "bg-white/35")} style={{ width: `${x.v}%` }} />)}
-        <div className="flex-1 bg-white/[0.07]" />
-      </div>
+      {rivals.some((o) => o.items.length) && <More on={full} set={setFull} />}
+      <p className="mt-3 border-t border-line pt-3 text-[13px] text-muted">{full ? "The candidates are real. Items marked simulated are the moves each rival campaign makes in answer to yours." : "The candidates are real. Simulated items are each rival's moves against yours."}</p>
     </div>
   );
 }
@@ -199,11 +281,12 @@ function Day() {
   const { c, today, daysLeft } = useCaseNow();
   const span = Math.max(1, Math.round((Date.parse(c.electionDate) - Date.parse(c.briefingDate)) / 86_400_000));
   const date = new Date(today).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  // Below 1440px the year is dropped (it is in the title and on the Case tab) to make room for the rivals mark.
   return (
-    <div className="w-[168px]" title={`${longDate(today)}. Primary on ${longDate(c.electionDate)}.`}>
+    <div className="w-[128px] min-[1440px]:w-[168px]" title={`${longDate(today)}. Primary on ${longDate(c.electionDate)}.`}>
       <div className="flex items-baseline justify-between gap-2 leading-none whitespace-nowrap">
         <span className="font-display text-[10px] font-medium tracking-[0.1em] text-muted uppercase">{daysLeft ? `${daysLeft} days left` : "Primary day"}</span>
-        <span className="tnum font-mono text-[13px]">{date}</span>
+        <span className="tnum font-mono text-[13px]"><span className="min-[1440px]:hidden">{shortDate(today)}</span><span className="hidden min-[1440px]:inline">{date}</span></span>
       </div>
       <Meter value={(1 - daysLeft / span) * 100} className="mt-2" />
     </div>
