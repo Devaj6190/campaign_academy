@@ -6,7 +6,7 @@ import { effectOf, simulate, type Case, type Decision, type Shift, type World } 
 // Where the student is in a case, what they chose, and the work done between decisions. The case file is never
 // written; the student's world is always derived from their picks by `simulate`, with the work layer on top.
 
-export type Pick = { option: string; why: string };
+export type Pick = { option: string };
 
 /**
  * One piece of work done between decisions: a staff job, or a rival's move. Simulated. `poll` is citywide points

@@ -126,5 +126,4 @@ One deep case first, then four that each add a different lesson. The shortlist a
 
 - How strong staff work and rival moves should be next to the decisions. The current sizes are first guesses.
 - Whether the student can replay the same race from another campaign's side.
-- How the student's reasoning at each decision is used afterwards.
 - The named user: high school or college, in class or solo.
