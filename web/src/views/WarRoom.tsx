@@ -22,17 +22,21 @@ import { Cite } from "./CaseView";
 // The room is real 3D: a stepped stone fan lying on a tilted floor, like a chamber seen from the gallery.
 // You stand on the round dais at the point of the fan, direct reports on the step below, their people on the floor.
 // Everything is placed in floor coordinates (x across, y toward the camera, z up) and the browser does the projection.
-const W = 900, H = 640;
-/** Where the point of the fan sits on the canvas, and how far the floor leans back. */
-const APEX = 214, TILT = 52;
+const W = 900, H = 680;
+/** Where the point of the fan sits on the canvas, how far the floor leans back, and how far back the camera stands. */
+const APEX = 222, TILT = 52, ZOOM = 0.8;
 /** A level: the radius people stand at, how high its surface is, and how tall its people are drawn. */
 const LEVELS = [
-  { r: 0, z: 140, h: 108, label: 150 },
-  { r: 310, z: 70, h: 116, label: 112 },
-  { r: 450, z: 0, h: 124, label: 96 },
+  { r: 0, z: 140, h: 108, label: 170 },
+  { r: 340, z: 70, h: 116, label: 134 },
+  { r: 520, z: 0, h: 124, label: 110 },
 ];
-/** The stone: a dais, a step and the floor, each a slice of pie opening toward the camera. `half` is half its angle. */
-const DAIS = 86, STEP = { r: 400, half: 72 }, FLOOR = { r: 625, half: 76 };
+/** The marble: a dais, a step and the floor, each a slice of pie opening toward the camera. `half` is half its angle. */
+const DAIS = 86, STEP = { r: 430, half: 72 }, FLOOR = { r: 690, half: 76 };
+/** The floor is itself a low plinth standing on the ground of the hall. */
+const GROUND = -26;
+/** Wires run along the foot of a wall before turning out to a person, so they never cross. */
+const RAIL = 20;
 type Pt = { a: number; t: number };
 const YOU: Pt = { a: 0, t: 0 };
 /** A point on the floor plan: `r` out from the point of the fan, `a` degrees off the line toward the camera. */
@@ -50,14 +54,16 @@ function layout(staff: Staff[]) {
   return pos;
 }
 
-// A wire on the stone from a boss to a report, drawn on the report's level: straight out from the dais for a direct
-// report, and from the foot of the step, under the boss, across the floor for their people. Reversed for the way back.
+// A wire on the marble from a boss to a report, drawn on the report's level. A direct report's runs straight out from
+// the dais. For their people it comes down the step under the boss, runs along the foot of the step, and turns out to
+// the person: every wire shares that one rail, so none cross. Reversed for the way back.
 function wire(a: Pt, b: Pt, up = false) {
-  const end = LEVELS[b.t].r - 20;
+  const end = LEVELS[b.t].r - 44;
   if (b.t === 1) return up ? `M${xy(end, b.a)}L${xy(DAIS, b.a)}` : `M${xy(DAIS, b.a)}L${xy(end, b.a)}`;
-  const pts = [xy(STEP.r, a.a), xy(STEP.r + 45, a.a), xy(end - 45, b.a), xy(end, b.a)];
-  if (up) pts.reverse();
-  return `M${pts[0]}C${pts[1]},${pts[2]},${pts[3]}`;
+  const rail = STEP.r + RAIL, right = b.a > a.a;
+  return up
+    ? `M${xy(end, b.a)}L${xy(rail, b.a)}A${rail} ${rail} 0 0 ${right ? 1 : 0} ${xy(rail, a.a)}L${xy(STEP.r, a.a)}`
+    : `M${xy(STEP.r, a.a)}L${xy(rail, a.a)}A${rail} ${rail} 0 0 ${right ? 0 : 1} ${xy(rail, b.a)}L${xy(end, b.a)}`;
 }
 
 // Standing figures, one cut-out per post in /art/staff, all facing the front. Bodies are generated. Walzak and Singleton
@@ -116,41 +122,42 @@ export function WarRoom() {
     mx.set(((e.clientX - r.left) / r.width) * 2 - 1);
     my.set(((e.clientY - r.top) / r.height) * 2 - 1);
   };
-  // One sheet of stone at a given height. Stacked a few pixels apart, the sheets make the walls of the steps.
-  const sheet = (z: number, children: React.ReactNode, key?: string) => (
-    <svg key={key} viewBox="-700 -150 1400 850" className="pointer-events-none absolute overflow-visible" style={{ left: -700, top: -150, width: 1400, height: 850, transform: `translateZ(${z}px)` }} aria-hidden>
+  // One sheet of marble at a given height, sized to what it holds (`r` is how far out it reaches).
+  const sheet = (z: number, r: number, children: React.ReactNode, key?: string) => (
+    <svg key={key} viewBox={`${-r} -150 ${2 * r} ${r + 160}`} className="pointer-events-none absolute overflow-visible" style={{ left: -r, top: -150, width: 2 * r, height: r + 160, transform: `translateZ(${z}px)` }} aria-hidden>
       {children}
     </svg>
   );
-  const courses = (from: number, to: number, d: string, key: string) =>
-    Array.from({ length: Math.round((to - from) / 7) }, (_, i) => sheet(from + i * 7, <path d={d} fill={i % 2 ? "#120f0a" : "#0d0b08"} stroke="var(--color-gold-deep)" strokeOpacity={0.22} strokeWidth={0.8} />, key + i));
+  // A wall: plain sheets stacked a few pixels apart, lighter toward the top where the light reaches.
+  const wall = (from: number, to: number, r: number, d: string, key: string) => {
+    const n = Math.round((to - from) / 6);
+    return Array.from({ length: n }, (_, i) => { const v = Math.round(34 + (i / n) * 58); return sheet(from + i * 6, r, <path d={d} fill={`rgb(${v} ${Math.round(v * 0.92)} ${Math.round(v * 0.8)})`} />, key + i); });
+  };
   const circle = `M${DAIS} 0A${DAIS} ${DAIS} 0 1 0 ${-DAIS} 0A${DAIS} ${DAIS} 0 1 0 ${DAIS} 0Z`;
-  // The ring on the stone under each pair of feet carries the state.
+  // The top of a level: marble, darker away from the light, with a gold inlay round the edge.
+  const top = (d: string) => (
+    <>
+      <path d={d} fill="url(#marble)" />
+      <path d={d} fill="url(#marble-shade)" stroke="var(--color-gold-bright)" strokeOpacity={0.85} strokeWidth={2.5} />
+    </>
+  );
+  // The ring on the marble under each pair of feet carries the state.
   const ringOf = (id: string) => (id === person ? "#fff" : misfit[id] ? "var(--color-neg)" : busy[id] || active[id] ? "var(--color-warm)" : "var(--color-gold)");
   const rings = (t: number) =>
     [...(t === 0 ? [{ id: "you" }] : []), ...staff.filter((p) => pos[p.id].t === t)].map((p) => {
       const q = at(LEVELS[t].r, pos[p.id].a), c = ringOf(p.id), lit = c !== "var(--color-gold)";
       return (
         <g key={p.id} transform={`translate(${q.x} ${q.y})`}>
-          <circle r="26" fill="#000" opacity="0.6" />
-          <circle r="36" fill="none" stroke={c} strokeWidth={p.id === person ? 3.4 : lit ? 2.4 : 1.4} strokeOpacity={lit ? 1 : 0.4} className={cn(!!active[p.id] && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 6px ${c})` } : undefined} />
+          <circle r="28" fill="#000" opacity="0.55" />
+          <circle r="40" fill="none" stroke={c} strokeWidth={p.id === person ? 3.6 : lit ? 2.6 : 1.6} strokeOpacity={lit ? 1 : 0.55} className={cn(!!active[p.id] && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 6px ${c})` } : undefined} />
         </g>
       );
     });
+  const tone = (p: Staff) => { const state = busy[p.id]; return { stroke: misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "var(--color-gold)", opacity: misfit[p.id] || (state && state !== "work") ? 1 : state ? 0.6 : 0.55, width: state || misfit[p.id] ? 3 : 2 }; };
   const wires = (t: number) =>
     staff.filter((p) => pos[p.id].t === t).map((p) => {
-      const state = busy[p.id];
-      return (
-        <path
-          key={p.id}
-          d={wire(pos[p.boss ?? "you"], pos[p.id])}
-          fill="none"
-          strokeWidth={state || misfit[p.id] ? 2.6 : 1.8}
-          stroke={misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "var(--color-gold)"}
-          strokeOpacity={misfit[p.id] ? 1 : state === "work" ? 0.5 : state ? 1 : 0.38}
-          className={cn(state === "down" && "edge-flow", state === "up" && "edge-flow up")}
-        />
-      );
+      const k = tone(p);
+      return <path key={p.id} d={wire(pos[p.boss ?? "you"], pos[p.id])} fill="none" strokeLinejoin="round" strokeWidth={k.width} stroke={k.stroke} strokeOpacity={k.opacity} className={cn(busy[p.id] === "down" && "edge-flow", busy[p.id] === "up" && "edge-flow up")} />;
     });
   // Work in transit: a spark runs along the wire when a job is handed over, and back with the report.
   const sparks = (t: number) =>
@@ -160,16 +167,15 @@ export function WarRoom() {
       const up = child.id === k.from;
       return <Spark key={k.id} d={wire(pos[child.boss ?? "you"], pos[child.id], up)} up={up} />;
     });
-  // The wire from a director's feet to the foot of their step, where the wires to their people begin.
-  const drops = staff.filter((p) => staff.some((c) => c.boss === p.id)).map((p) => (
-    <path key={p.id} d={`M${xy(LEVELS[1].r + 22, pos[p.id].a)}L${xy(STEP.r, pos[p.id].a)}`} stroke="var(--color-gold)" strokeOpacity={0.38} strokeWidth={1.8} />
-  ));
-  const stone = (d: string) => (
-    <>
-      <path d={d} fill="url(#stone)" />
-      <path d={d} fill="url(#stone-shade)" stroke="var(--color-gold)" strokeOpacity={0.8} strokeWidth={2} />
-    </>
-  );
+  const bosses = staff.filter((p) => staff.some((c) => c.boss === p.id));
+  const dirs = staff.filter((p) => !p.boss);
+  // A wire's run down a wall: a strip standing on the plan at `r`, `a`, from height `z` up one step.
+  const drop = (key: string, r: number, a: number, z: number) => {
+    const q = at(r, a);
+    return <i key={key} className="pointer-events-none absolute w-[2px] bg-gold opacity-60" style={{ left: q.x, top: q.y, height: LEVELS[1].z, transformOrigin: "50% 100%", transform: `translate(-50%, -100%) translateZ(${z}px) rotateX(-90deg)` }} />;
+  };
+  // Something standing in the hall behind the fan, facing the camera: the back wall and its columns.
+  const upright = (x: number, y: number, w: number, h: number): React.CSSProperties => ({ left: x, top: y, width: w, height: h, transformOrigin: "50% 100%", transform: `translate(-50%, -100%) translateZ(${GROUND}px) rotateX(${-TILT}deg)` });
 
   return (
     <div className="flex h-full">
@@ -180,30 +186,43 @@ export function WarRoom() {
             <ShaderBackground />
           </motion.div>
           <Fit w={W} h={H}>
-            {/* The hall behind: back wall, columns and the light from above, fading out into the page. */}
-            <div className="pointer-events-none absolute [mask-image:radial-gradient(ellipse_40%_58%_at_50%_42%,black_40%,transparent)]" style={{ left: -110, top: -70, width: 1120, height: 506, backgroundImage: `url(${ART}room.jpg)`, backgroundSize: "100% 100%" }} />
             <div className="absolute inset-0" style={{ perspective: 2400, perspectiveOrigin: "50% 36%" }}>
               <motion.div className="absolute inset-0" style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}>
-                <div className="absolute" style={{ left: W / 2, top: APEX, transform: `rotateX(${TILT}deg)`, transformStyle: "preserve-3d" }}>
+                <div className="absolute" style={{ left: W / 2, top: APEX, transform: `scale3d(${ZOOM}, ${ZOOM}, ${ZOOM}) rotateX(${TILT}deg)`, transformStyle: "preserve-3d" }}>
+                  {/* The hall: its ground, the back wall with the light on it, and a row of columns. */}
                   {sheet(
-                    0,
+                    GROUND,
+                    1100,
                     <>
                       <defs>
                         <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3" /></filter>
-                        <pattern id="stone" patternUnits="userSpaceOnUse" width="440" height="200"><image href={`${ART}stone.jpg`} width="440" height="200" preserveAspectRatio="none" /></pattern>
-                        {/* Light falls on the dais; the stone darkens away from it. */}
-                        <radialGradient id="stone-shade" gradientUnits="userSpaceOnUse" cx="0" cy="0" r={FLOOR.r}><stop offset="0" stopColor="#070605" stopOpacity="0" /><stop offset="0.6" stopColor="#070605" stopOpacity="0.5" /><stop offset="1" stopColor="#070605" stopOpacity="0.9" /></radialGradient>
+                        <pattern id="marble" patternUnits="userSpaceOnUse" x="-700" y="-150" width="1400" height="850"><image href={`${ART}marble.jpg`} width="1400" height="850" preserveAspectRatio="none" /></pattern>
+                        {/* Light falls on the dais; the marble darkens away from it. */}
+                        <radialGradient id="marble-shade" gradientUnits="userSpaceOnUse" cx="0" cy="0" r={FLOOR.r}><stop offset="0" stopColor="#070605" stopOpacity="0" /><stop offset="0.65" stopColor="#070605" stopOpacity="0.35" /><stop offset="1" stopColor="#070605" stopOpacity="0.8" /></radialGradient>
+                        <radialGradient id="ground-shade" gradientUnits="userSpaceOnUse" cx="0" cy="200" r="1000"><stop offset="0.35" stopColor="#070605" stopOpacity="0.55" /><stop offset="1" stopColor="#070605" /></radialGradient>
                       </defs>
-                      {stone(pie(FLOOR.r, FLOOR.half))}
-                      {wires(2)}
-                      {sparks(2)}
-                      {rings(2)}
+                      <rect x="-1100" y="-150" width="2200" height="1260" fill="url(#marble)" />
+                      <rect x="-1100" y="-150" width="2200" height="1260" fill="url(#ground-shade)" />
                     </>,
                   )}
-                  {courses(7, LEVELS[1].z, pie(STEP.r, STEP.half), "s")}
-                  {sheet(LEVELS[1].z, <>{stone(pie(STEP.r, STEP.half))}{wires(1)}{drops}{sparks(1)}{rings(1)}</>)}
-                  {courses(LEVELS[1].z + 7, LEVELS[0].z, circle, "d")}
-                  {sheet(LEVELS[0].z, <>{stone(circle)}{rings(0)}</>)}
+                  <div className="pointer-events-none absolute [mask-image:linear-gradient(90deg,transparent,black_22%,black_78%,transparent)]" style={{ ...upright(0, -150, 1500, 560), backgroundImage: `linear-gradient(#0000 55%, #070605e6), url(${ART}room.jpg)`, backgroundSize: "100% 100%" }} />
+                  {[-560, -400, -240, 240, 400, 560].map((x) => (
+                    <div key={x} className="pointer-events-none absolute" style={{ ...upright(x, -128, 46, 520), opacity: 1 - Math.abs(x) / 900 }}>
+                      <i className="absolute inset-x-1 top-5 bottom-4 bg-[linear-gradient(90deg,#0f0d09,#7a6d55_32%,#4a4233_55%,#15120d)]" />
+                      <i className="absolute inset-x-0 top-0 h-5 bg-[linear-gradient(90deg,#5a4520,#f3d999_35%,#8c6b2e)]" />
+                      <i className="absolute inset-x-0 bottom-0 h-4 bg-[linear-gradient(90deg,#15120d,#6b5f48_35%,#1c1812)]" />
+                    </div>
+                  ))}
+                  {/* The fan itself: the floor as a low plinth, the step, the dais. */}
+                  {wall(GROUND + 6, 0, FLOOR.r + 10, pie(FLOOR.r, FLOOR.half), "f")}
+                  {sheet(0, FLOOR.r + 10, <>{top(pie(FLOOR.r, FLOOR.half))}{wires(2)}{sparks(2)}{rings(2)}</>)}
+                  {wall(6, LEVELS[1].z, STEP.r + 10, pie(STEP.r, STEP.half), "s")}
+                  {sheet(LEVELS[1].z, STEP.r + 10, <>{top(pie(STEP.r, STEP.half))}{wires(1)}{bosses.map((p) => <path key={p.id} d={`M${xy(LEVELS[1].r + 44, pos[p.id].a)}L${xy(STEP.r, pos[p.id].a)}`} stroke="var(--color-gold)" strokeOpacity={0.55} strokeWidth={2} />)}{sparks(1)}{rings(1)}</>)}
+                  {wall(LEVELS[1].z + 6, LEVELS[0].z, DAIS + 10, circle, "d")}
+                  {sheet(LEVELS[0].z, DAIS + 10, <>{top(circle)}{dirs.map((p) => <path key={p.id} d={`M${xy(44, pos[p.id].a)}L${xy(DAIS, pos[p.id].a)}`} stroke="var(--color-gold)" strokeOpacity={0.55} strokeWidth={2} />)}{rings(0)}</>)}
+                  {/* Each wire's run down the wall it crosses. */}
+                  {dirs.map((p) => drop("d" + p.id, DAIS, pos[p.id].a, LEVELS[1].z))}
+                  {bosses.map((p) => drop("s" + p.id, STEP.r, pos[p.id].a, 0))}
                   <Node at={YOU} name="You" role="The campaigner" you />
                   {staff.map((p) => (
                     <Node key={p.id} at={pos[p.id]} name={p.name} role={p.role} figure={figureFor(p, !!hires[p.id])} shadow={p.id === "cm" && !hires[p.id]} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} selected={p.id === person} unread={unread[p.id]} onClick={() => pick(p.id)} />
@@ -290,20 +309,20 @@ function Node({ at: where, name, role, figure, shadow, job, misfit, morale, you,
         head, because the floor row stands in front. Yours is beside you.
       */}
       <span
-        className={cn("absolute flex flex-col items-center [text-shadow:0_1px_4px_#000,0_0_2px_#000,0_0_8px_#000]", where.t === 2 ? "top-full left-1/2 origin-top" : where.t === 1 ? "bottom-full left-1/2 mb-1.5" : "top-1/3 left-full ml-2 items-start text-left")}
-        style={{ width: lv.label, marginLeft: where.t === 0 ? undefined : -lv.label / 2, transform: where.t === 2 ? `rotateX(${TILT}deg) translateZ(2px) translateY(34px) scaleY(1.62)` : undefined }}
+        className={cn("absolute flex flex-col items-center [text-shadow:0_1px_4px_#000,0_0_2px_#000,0_0_8px_#000]", where.t === 2 ? "top-full left-1/2 origin-top" : where.t === 1 ? "bottom-full left-1/2 mb-1.5" : "top-1/4 left-full ml-3 items-start text-left")}
+        style={{ width: lv.label, marginLeft: where.t === 0 ? undefined : -lv.label / 2, transform: where.t === 2 ? `rotateX(${TILT}deg) translateZ(2px) translateY(46px) scaleY(1.62)` : undefined }}
       >
-        <span className={cn("text-[16px] leading-tight font-medium", !name && "text-faint")}>{name ?? "Vacant"}</span>
+        <span className={cn("text-[20px] leading-tight font-medium", !name && "text-faint")}>{name ?? "Vacant"}</span>
         {/* A post shown by its title has no separate name to print. */}
-        {role !== name && <span className="text-[16px] leading-tight text-muted">{role}</span>}
+        {role !== name && <span className="text-[20px] leading-tight text-soft">{role}</span>}
         <AnimatePresence>
           {misfit && (
-            <motion.span key="misfit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("my-0.5 rounded bg-neg/30 px-1.5 text-[15px] leading-[20px] whitespace-nowrap text-neg", where.t === 1 && "order-first")}>
+            <motion.span key="misfit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("my-0.5 rounded bg-neg/30 px-1.5 text-[18px] leading-[23px] whitespace-nowrap text-neg", where.t === 1 && "order-first")}>
               Wrong person
             </motion.span>
           )}
           {job && (
-            <motion.span key="job" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("my-0.5 max-w-full truncate rounded bg-warm/25 px-1.5 text-[15px] leading-[20px] text-warm", where.t === 1 && "order-first")}>
+            <motion.span key="job" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("my-0.5 max-w-full truncate rounded bg-warm/25 px-1.5 text-[18px] leading-[23px] text-warm", where.t === 1 && "order-first")}>
               {job}
             </motion.span>
           )}
