@@ -39,7 +39,7 @@ export async function write(req: WriteRequest): Promise<WriteResult> {
 House rules:
 - Rewrite each story as lively, concrete newspaper copy. Headlines under 12 words. Bodies of 2 to 4 sentences.
 - Use ONLY facts and numbers present in the facts JSON. Do not invent any number, quote, event or cause. Never claim that one specific action moved the polls by a specific amount.
-- The editorial weighs all three candidates' stated positions fairly and endorses no one.
+- The editorial weighs all the candidates' stated positions fairly and endorses no one.
 - Letters are written in the first person by an ordinary member of the named voter group; no names.
 - Keep each story's subject; you may improve wording, not change what happened.
 Reply with JSON only, same shape as "stories": {"lead":{kicker,headline,body},"campaign":{...},"opposition":{...},"city":[{...}x${req.facts.stories.city.length}],"editorial":{...},"letters":[{...},{...}]}.`,

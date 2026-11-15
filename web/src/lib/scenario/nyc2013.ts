@@ -63,7 +63,7 @@ export const NYC2013: Scenario = {
       profile: { skills: ALL, cost: 1, effect: 1, voice: "Disciplined front-runner and Council Speaker, with the most money.", salary: 0 },
       courts: ["homeowners", "donors", "smallbiz", "seniors"],
       lean: (cd) => race(cd).white / 100 + (boro(cd) === 1 ? 0.45 : 0) + (g(cd)?.donors ?? 0) * 2,
-      estimates: ["perDay", "income", "smallShare", "lean"],
+      estimates: ["perDay", "income", "smallShare", "lean", "participant"],
     },
     {
       id: "thompson",
@@ -80,7 +80,7 @@ export const NYC2013: Scenario = {
       profile: { skills: ALL, cost: 1, effect: 1, voice: "The party's 2009 nominee: steady, establishment, careful.", salary: 0 },
       courts: ["unions", "seniors", "homeowners", "immigrants"],
       lean: (cd) => 0.15 + (race(cd).black / 100) * 1.8 + (g(cd)?.seniors ?? 0),
-      estimates: ["cash", "perDay", "income", "smallShare", "lean"],
+      estimates: ["cash", "perDay", "income", "smallShare", "lean", "participant"],
     },
     {
       id: "liu",
@@ -98,7 +98,7 @@ export const NYC2013: Scenario = {
       profile: { skills: ALL, cost: 1.05, effect: 0.95, voice: "Combative comptroller whose campaign is under federal scrutiny.", salary: 0 },
       courts: ["immigrants", "students", "activists"],
       lean: (cd) => 0.08 + (race(cd).asian / 100) * 2.2 + (boro(cd) === 4 ? 0.12 : 0),
-      estimates: ["perDay", "income", "smallShare", "lean"],
+      estimates: ["perDay", "income", "smallShare", "lean", "participant"],
     },
     {
       id: "weiner",
@@ -116,7 +116,7 @@ export const NYC2013: Scenario = {
       profile: { skills: ALL, cost: 1, effect: 1.05, voice: "Famous comeback candidate, combative and fast.", salary: 0 },
       courts: ["homeowners", "seniors", "transit", "renters"],
       lean: (cd) => 0.2 + (g(cd)?.homeowners ?? 0.4) * 0.6 + (boro(cd) === 3 || boro(cd) === 4 ? 0.15 : 0),
-      estimates: ["perDay", "income", "smallShare", "lean"],
+      estimates: ["perDay", "income", "smallShare", "lean", "participant"],
     },
   ],
   // January–February 2013 public polls (the case's opening; Weiner not yet running).
@@ -126,6 +126,8 @@ export const NYC2013: Scenario = {
   // The case's money left to spend under the cap ($4.3M), at the game's 1:10 scale.
   startCash: Math.round(C.start.budget * 0.1),
   momentWeight: 1.15,
+  // Minor candidates and write-ins: 691,801 - 653,556 = 38,245 votes, 5.53% (certified result).
+  others: 0.0553,
   dateOf: (d) => {
     const a = Date.parse(C.briefingDate), b = Date.parse(C.electionDate);
     return new Date(a + ((b - a) * (d - 1)) / 29);
@@ -154,7 +156,7 @@ export const NYC2013: Scenario = {
     tags: ["Public Advocate", "Pre-K paid for by the top earners", "Paid sick leave"],
     record: [
       { ...from("Proposed raising the city income tax on incomes over $500,000 to pay for full-day pre-K and after-school programmes (October 2012).", "chalk-prek"), ok: true, liked: "The Campaign for Children", not: "Mayor Bloomberg" },
-      { ...from("Pressed the Council Speaker to allow a vote on paid sick leave (January 2013).", "wnyc-lucky"), ok: true, liked: "Paid sick leave activists", not: "The Speaker's office" },
+      { ...from("Pressed the Council Speaker to allow a vote on paid sick leave (January 2013).", "wnyc-lucky"), ok: true, liked: "Paid sick leave activists", not: "" },
     ],
     problems: [
       from("Christine Quinn leads every public poll with 35 to 37 percent; de Blasio, Thompson and Liu are bunched between 9 and 14.", "q-0522"),

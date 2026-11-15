@@ -152,6 +152,7 @@ function Calendar() {
 function Tactic({ close }: { close: () => void }) {
   const run = useGame((s) => s.runTactic);
   const adsLeft = useGame((s) => s.money.envelopes.ads - s.money.spent.ads);
+  const comms = useGame((s) => s.staff.find((p) => p.id === "com")?.name ?? "Your communications director");
   const result = useGame((s) => s.tacticResult);
   const world = useGame();
   const [by, setBy] = useState<Deliverer>("com");
@@ -163,19 +164,19 @@ function Tactic({ close }: { close: () => void }) {
       <div className="p-7">
         <Label className={result === "backfired" ? "text-neg" : "text-pos"}>{result === "backfired" ? "It backfired" : "It worked, this time"}</Label>
         <h2 className="mt-2 font-serif text-[30px] leading-tight tracking-tight">{result === "backfired" ? "Voters read it as an attack" : "The contrast landed"}</h2>
-        <p className="mt-3 text-[13px] leading-relaxed text-soft">{result === "backfired" ? "The Ledger calls it the first negative ad of the race. Seniors down 6, and two volunteer shifts have cancelled." : "Seniors up 3. Going negative a second time will carry more risk."}</p>
+        <p className="mt-3 text-[13px] leading-relaxed text-soft">{result === "backfired" ? "The Ledger calls it the first negative ad of the race, and some volunteers have cancelled shifts. The next poll will show how far seniors moved." : "It landed this time. The next poll will show whether it moved seniors. Going negative again will carry more risk."}</p>
         <div className="mt-6 flex justify-end"><Button variant="primary" onClick={close}>Continue</Button></div>
       </div>
     );
   return (
     <div className="p-7">
-      <div className="flex items-center gap-2.5"><Avatar name="Leo Santos" size={26} /><span className="text-[12.5px] text-muted">Leo Santos proposes</span></div>
+      <div className="flex items-center gap-2.5"><Avatar name={comms} size={26} /><span className="text-[12.5px] text-muted">{comms} proposes</span></div>
       <h2 className="mt-4 font-serif text-[30px] leading-[1.1] tracking-tight">{ACTIVE.story.tactic.title}</h2>
       <p className="mt-2 text-[13px] text-muted">{ACTIVE.story.tactic.note}</p>
       <dl className="mt-5 space-y-2 text-[13px]">
         <div className="flex justify-between"><dt className="text-muted">Cost</dt><dd className="tnum font-mono">$8,000 <span className="text-faint">from today&apos;s Ads budget (${Math.max(0, adsLeft).toLocaleString("en-US")} left)</span></dd></div>
-        <div className="flex justify-between"><dt className="text-muted">If it lands</dt><dd className="text-pos">+3 with seniors</dd></div>
-        <div className="flex justify-between"><dt className="text-muted">If it reads as an attack</dt><dd className="text-neg">−6 with seniors, lost volunteers</dd></div>
+        <div className="flex justify-between"><dt className="text-muted">If it lands</dt><dd className="text-pos">Seniors may warm to you</dd></div>
+        <div className="flex justify-between"><dt className="text-muted">If it reads as an attack</dt><dd className="text-neg">Seniors cool, volunteers drop out</dd></div>
       </dl>
       <div className="mt-5 flex items-center gap-1.5 text-[12px]">
         <span className="mr-1 text-muted">Who delivers it</span>
@@ -246,7 +247,7 @@ function Toasts() {
       <AnimatePresence>
         {toasts.map((t) => {
           const p = staff.find((x) => x.id === t.staff)!;
-          return <ToastCard key={t.id} name={p.name ?? p.role} role={p.role} text={t.text} onClose={() => dismiss(t.id)} onOpen={() => { dismiss(t.id); useGame.setState((s) => ({ view: "war", person: t.staff, unread: { ...s.unread, [t.staff]: false } })); }} />;
+          return <ToastCard key={t.id} name={p.name ?? p.role} role={p.onRecord ? `${p.role} · real person, simulated words` : p.role} text={t.text} onClose={() => dismiss(t.id)} onOpen={() => { dismiss(t.id); useGame.setState((s) => ({ view: "war", person: t.staff, unread: { ...s.unread, [t.staff]: false } })); }} />;
         })}
       </AnimatePresence>
     </div>

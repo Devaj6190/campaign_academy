@@ -75,6 +75,8 @@ export type Scenario = {
   /** Fitted: how strongly the student's choices at real moments land in this engine (rivals campaign every night here,
    *  which the case's own fit did not have). Chosen so the real campaign's choices finish near the real result. */
   momentWeight?: number;
+  /** Share of the vote that goes to candidates the game does not model (real: write-ins and minor candidates). */
+  others?: number;
   /** Optional real date for each game day. */
   dateOf?: (day: number) => Date;
   finance: Finance;

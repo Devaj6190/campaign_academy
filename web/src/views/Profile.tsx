@@ -71,7 +71,7 @@ export function Profile() {
                       </span>
                       <div>
                         <div className="text-[13px]">{r.text}<Src s={r} /></div>
-                        <div className="text-[11.5px] text-faint">Liked by {r.liked.toLowerCase()} · not by {r.not.toLowerCase()}</div>
+                        <div className="text-[11.5px] text-faint">Liked by {r.liked.toLowerCase()}{r.not ? ` · not by ${r.not.toLowerCase()}` : ""}</div>
                       </div>
                     </li>
                   ))}

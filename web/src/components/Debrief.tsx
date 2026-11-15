@@ -33,7 +33,7 @@ export function Debrief() {
     const top = Object.keys(rows[0]?.shares ?? {}).sort((a, c) => rows.reduce((s, d) => s + (d.shares[c] ?? 0), 0) - rows.reduce((s, d) => s + (d.shares[a] ?? 0), 0))[0];
     const rb = RESULT_2013.byBorough[b as 1];
     const rtop = Object.entries(rb).filter(([k]) => k !== "total").sort((a, c) => c[1] - a[1])[0][0];
-    return { b, yours: pct(mine, tot), yourTop: top, real: pct(rb[ME.id], rb.total), realTop: rtop };
+    return { b, yours: Math.round(pct(mine, tot) * (1 - (ACTIVE.others ?? 0)) * 10) / 10, yourTop: top, real: pct(rb[ME.id], rb.total), realTop: rtop };
   });
   const planks = realPlanksAt(ME.id, 30, Object.fromEntries(MOMENTS.map((m) => [m.id, { status: "decided" }])));
 
@@ -90,7 +90,7 @@ export function Debrief() {
               ))}
             </tbody>
           </table>
-          <p className="mt-1.5 text-[11.5px] text-faint">Real figures: the Board of Elections&apos; certified borough recaps (<a href={RESULT_2013.source} target="_blank" rel="noreferrer" className="underline">source</a>). Yours: the simulation.</p>
+          <p className="mt-1.5 text-[11.5px] text-faint">Real figures: the Board of Elections&apos; certified borough recaps (<a href={RESULT_2013.source} target="_blank" rel="noreferrer" className="underline">source</a>). Yours: the simulation, with the real 5.5% for minor candidates held back as in the count.</p>
         </section>
 
         <section>

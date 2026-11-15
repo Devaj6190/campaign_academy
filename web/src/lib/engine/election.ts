@@ -44,7 +44,9 @@ export function electionResult(w: World) {
 
   const totals: Record<string, number> = Object.fromEntries(ids.map((id) => [id, byDistrict.reduce((a, r) => a + r.shares[id], 0)]));
   const all = Object.values(totals).reduce((a, b) => a + b, 0) || 1;
-  const pct: Record<string, number> = Object.fromEntries(ids.map((id) => [id, Math.round((totals[id] / all) * 1000) / 10]));
+  // Minor candidates the game does not model take their real share, so shares and the runoff line match the real count.
+  const keep = 1 - (ACTIVE.others ?? 0);
+  const pct: Record<string, number> = Object.fromEntries(ids.map((id) => [id, Math.round((totals[id] / all) * keep * 1000) / 10]));
   const ranked = [...ids].sort((a, b) => totals[b] - totals[a]);
   // Below the threshold, the top two meet in a runoff. The eliminated vote splits between them in proportion
   // to how the finalists did where those voters live (a simulated runoff, labelled as such).

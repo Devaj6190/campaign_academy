@@ -104,7 +104,7 @@ export function FinancePanel() {
   const join = g.joinPublicFinancing;
   const filings = [
     { name: ME.short, raised: m.raisedTotal + m.matchPaid, spent: m.spentTotal, cash: g.cash, note: m.participant === false ? "not in public financing" : "in public financing" },
-    ...activeRivals(g.day).map((id) => ({ name: nameOf(id), raised: g.rivals[id].raised, spent: g.rivals[id].spent, cash: g.rivals[id].cash, note: rivalDef(id).participant ? "in public financing" : "not in public financing" })),
+    ...activeRivals(g.day).map((id) => ({ name: nameOf(id), raised: g.rivals[id].raised, spent: g.rivals[id].spent, cash: g.rivals[id].cash, note: `${rivalDef(id).participant ? "in public financing" : "not in public financing"}${rivalDef(id).estimates?.includes("participant") ? " (estimate)" : ""}` })),
   ];
   return (
     <div className="max-h-[78vh] overflow-y-auto p-4">

@@ -6,7 +6,7 @@ import { profileFor } from "./roster";
 import { feed } from "./run";
 import { pushChat, useStaff } from "./store";
 import { PLACES } from "./world";
-import { CANDIDATES, ME } from "../scenario";
+import { ACTIVE, CANDIDATES, ME } from "../scenario";
 
 // Staff speak up unprompted when something in the world deserves it. Each kind of worry fires at most once
 // every few days, and only when nobody is mid-conversation with that person.
@@ -25,7 +25,7 @@ function triggers(): Trigger[] {
     if (runway < left + 4) out.push({ key: "runway", who: "fin", situation: `At the current burn of $${(-net).toLocaleString("en-US")}/day the campaign runs out of money in ${runway} days, before election day.`, text: `At this burn we're broke by day ${g.day + runway}. I need call time and a dinner on the books.`, suggest: "Raise $40k this week with call time and a donor dinner" });
   }
   if (!g.staff.find((p) => p.id === "ox")?.name && has("fd")) out.push({ key: "bronx", who: "fd", situation: "There is still no organizer in the Bronx, the biggest open area on the map.", text: "Still nobody in the Bronx. Every day without an organizer there is a day Hale gets for free.", suggest: "Canvass the open Bronx districts this weekend" });
-  if (!g.staff.find((p) => p.id === "pol")?.name && has("cm") && g.day >= 2) out.push({ key: "policy", who: "cm", situation: "The Policy Director post is still empty and the manifesto needs work.", text: "We need a Policy Director. The manifesto won't write itself, and the debate is on day 7.", suggest: "Plan the week around the debate on day 7" });
+  if (!g.staff.find((p) => p.id === "pol")?.name && has("cm") && g.day >= 2) out.push({ key: "policy", who: "cm", situation: "The Policy Director post is still empty and the manifesto needs work.", text: "We need a Policy Director. The platform won't write itself, and the first debate is coming.", suggest: "Plan the week around the first debate" });
   const cold = [...g.factions].sort((a, b) => a.feel - b.feel)[0];
   if (cold.feel < 30 && has("com")) out.push({ key: `cold-${cold.id}`, who: "com", situation: `${cold.name} are cold toward ${ME.short} (${Math.round(cold.feel)}/100).`, text: `${cold.name} have gone cold on us. I have an idea for how to reach them.`, suggest: `Reach ${cold.name.toLowerCase()} with a press pitch this week` });
   const slipping = PLACES.filter((p) => (g.sent[p.cd] ?? 50) < 40 && Math.floor(p.cd / 100) === 4).sort((a, b) => g.sent[a.cd] - g.sent[b.cd])[0];
@@ -40,7 +40,7 @@ export async function speakUp() {
   const pick = triggers()[0];
   const t: Trigger = pick ?? (() => {
     // Canned lines only when they are still true.
-    const quips = QUIPS.filter(([who, text]) => g.staff.some((p) => p.id === who && p.name) && !(/Bronx/.test(text) && g.staff.find((p) => p.id === "ox")?.name));
+    const quips = QUIPS.filter(([who]) => ACTIVE.kind === "fiction" || who !== "cm").filter(([who, text]) => g.staff.some((p) => p.id === who && p.name) && !(/Bronx/.test(text) && g.staff.find((p) => p.id === "ox")?.name));
     const [who, text] = quips[Math.floor(Math.random() * quips.length)] ?? QUIPS[3];
     return { key: `quip-${who}`, who, situation: text, text, suggest: "" };
   })();
