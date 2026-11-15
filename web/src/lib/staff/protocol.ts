@@ -6,6 +6,8 @@ import type { Snapshot } from "./world";
 // The wire format between /api/staff/instruct and the browser: one JSON event per line.
 
 export type Ask = { amount: number; reason: string };
+/** How long a thought may be: one or two sentences. Asked of the model in words, and enforced when emitted. */
+export const THOUGHT_MAX = 200;
 export type PlanItem = { title: string; status: "pending" | "in-progress" | "completed" };
 export type Line = { who: "me" | "them"; text: string };
 
@@ -15,6 +17,8 @@ export type RunRequest = { director: string; text: string; snapshot: Snapshot; h
 export type RunEvent =
   | { t: "start"; mode: "live" | "offline" }
   | { t: "say"; text: string }
+  /** Why someone on this run is doing what they do next. Display only: never reaches cash, support or the poll. */
+  | { t: "thought"; who: string; text: string }
   | { t: "plan"; items: PlanItem[] }
   | { t: "delegate"; to: string; job: string }
   | { t: "action"; effect: Effect }
@@ -42,6 +46,15 @@ export class RunCtx {
 
   get left() {
     return Math.max(0, this.req.budget - this.spent);
+  }
+
+  /** Say why, in a sentence or two. A long one is cut at a word; an empty one is dropped. */
+  think(who: string, text: string) {
+    const t = text.replace(/\s+/g, " ").replace(/^\W*(thinking|why)\W*:\s*/i, "").trim();
+    if (!t) return;
+    if (t.length <= THOUGHT_MAX) return this.emit({ t: "thought", who, text: t });
+    const cut = t.lastIndexOf(" ", THOUGHT_MAX - 1);
+    this.emit({ t: "thought", who, text: `${t.slice(0, cut > 0 ? cut : THOUGHT_MAX - 1).replace(/[,;:\s]+$/, "")}…` });
   }
 
   /** Carry out one catalog action. Returns the line the agent reads back. */

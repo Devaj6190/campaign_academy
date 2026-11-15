@@ -83,21 +83,43 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
       return (sk.some((s) => p.profile.skills.includes(s)) ? 2 : 0) + (p.profile.skills.includes(sk[0]) ? 0.5 : 0) + ((p.profile.special?.[a] ?? 1) > 1 ? 0.5 : 0) + (district && p.profile.turf?.includes(Math.floor(district / 100)) ? 1 : 0);
     }
     const who = ranked[0] && score(ranked[0]) >= 2 ? ranked[0] : null;
-    return { a, district, faction, who: who?.id ?? req.director, whoShort: short(who ?? me) };
+    // Why, in the words of whoever decided it. Each line follows the rule that actually made the pick.
+    const skill = who ? ACTIONS[a].skills.find((s) => who.profile.skills.includes(s)) : undefined;
+    const handoff = who ? `${cap(short(who))} takes "${titleOf(a, district, faction)}": ${skill ? `${skill} is their strength` : "the best fit I have"}${district && who.profile.turf?.includes(Math.floor(district / 100)) ? ", and they know the borough" : ""}.` : "";
+    const named = findPlaces(basis).length > 0;
+    const where = district ? (named ? `You named ${shortPlace(district)}, so that's where this goes.` : `${shortPlace(district)} is the closest race we have, at ${Math.round(w.sent[district] ?? 50)}% for us, so it's where work moves the most votes.`) : "";
+    const f = faction ? w.factions.find((x) => x.id === faction) : undefined;
+    const whom = f ? (findFactions(basis).length ? ` Aimed at ${f.name}, as asked.` : ` Aimed at ${f.name}: only ${Math.round(f.feel)}% with us and ${Math.round(f.size)}% of likely voters.`) : "";
+    const doing = `${where}${whom}`.trim() || `${ACTIONS[a].label} is the job, and it doesn't need a place or a group.`;
+    return { a, district, faction, who: who?.id ?? req.director, whoShort: short(who ?? me), handoff, doing };
   });
+  function titleOf(a: ActionId, district?: number, faction?: string) {
+    return `${ACTIONS[a].label}${district ? ` in ${shortPlace(district)}` : faction ? ` for ${w.factions.find((f) => f.id === faction)?.name}` : ""}`;
+  }
+  const asked = KEYWORDS.some(([re]) => re.test(basis.toLowerCase()));
+  const labels = [...new Set(jobs.map((j) => ACTIONS[j.a].label.toLowerCase()))].join(" and ");
+  const split = asked
+    ? `You asked for ${labels}. ${jobs.length > 1 ? `${jobs.length} jobs` : "One job"}${team.length ? `, each to whoever has the skills` : ", and I'll do it myself"}.`
+    : `No specific action named, so the usual for this post: ${labels}.${team.length ? " Each goes to whoever has the skills." : ""}`;
 
   emit({ t: "start", mode: "offline" });
   await wait(700);
   emit({ t: "say", text: team.length ? `On it. ${cap(jobs.map((j) => j.whoShort).filter((n, i, a) => a.indexOf(n) === i).join(" and "))} will take this.` : me.boss ? "On it." : `On it. I'll handle this myself; nobody reports to me yet.` });
-  const items = jobs.map((j) => ({ title: `${ACTIONS[j.a].label}${j.district ? ` in ${shortPlace(j.district)}` : j.faction ? ` for ${w.factions.find((f) => f.id === j.faction)?.name}` : ""}`, status: "pending" as const }));
+  const items = jobs.map((j) => ({ title: titleOf(j.a, j.district, j.faction), status: "pending" as const }));
+  ctx.think(req.director, split);
   emit({ t: "plan", items });
   await wait(900);
 
   const notes: string[] = [];
   for (const [i, j] of jobs.entries()) {
     emit({ t: "plan", items: items.map((it, k) => ({ ...it, status: k < i ? "completed" : k === i ? "in-progress" : "pending" })) });
-    if (j.who !== req.director) emit({ t: "delegate", to: j.who, job: items[i].title });
-    await wait(1600);
+    if (j.who !== req.director) {
+      ctx.think(req.director, j.handoff);
+      emit({ t: "delegate", to: j.who, job: items[i].title });
+    }
+    await wait(900);
+    ctx.think(j.who, j.doing);
+    await wait(700);
     const r = ctx.act(j.who, j.a, { district: j.district, faction: j.faction });
     notes.push(r.text);
     await wait(1100);
@@ -110,8 +132,11 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
   const overspender = prof.cost > 1.1;
   const blocked = notes.some((n) => n.startsWith("Not done: it costs"));
   const ask = !req.followOf && (blocked || overspender) ? { amount: (overspender ? 3000 : 5000) * w.scale.money, reason: blocked ? "to finish the job" : "to run another round while we have momentum" } : null;
-  const head = ctx.effects.length ? `Done. Spent $${ctx.spent.toLocaleString("en-US")}${ctx.raised ? `, raised $${ctx.raised.toLocaleString("en-US")}` : ""}.` : "Couldn't get it done.";
+  // The receipts already show each cost and effect, so the report says what it adds up to and what comes next.
+  const head = !ctx.effects.length ? "Couldn't get it done." : blocked ? "Done, but not all of it: the budget ran out." : "Done.";
   const best = ctx.effects.find((e) => Object.keys(e.sent).length || Object.keys(e.factions).length);
+  const group = best && Object.keys(best.factions)[0] ? w.factions.find((f) => f.id === Object.keys(best.factions)[0])?.name : undefined;
+  const next = best?.district ? `Next I'd go back to ${shortPlace(best.district)} while it's moving.` : group ? `Next I'd keep at ${group}.` : "";
   const coaching = req.followOf
     ? ""
     : ctx.quality.missing.length
@@ -119,6 +144,6 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
     : ctx.effects.some((e) => !e.fit)
       ? `Clear instruction, but part of it went to someone without the skills. Check who is best placed before you ask.`
       : `Clear, specific, and given to the right person. That's how delegation should look.`;
-  ctx.report(`${head} ${best ? best.summary.replace(/ \(Not their strength.*$/, "") : ""}${ask ? ` I could use another $${ask.amount.toLocaleString("en-US")} ${ask.reason}.` : ""}`.trim(), ask, coaching);
+  ctx.report(`${head} ${ask ? `I could use another $${ask.amount.toLocaleString("en-US")} ${ask.reason}.` : next}`.trim(), ask, coaching);
   emit({ t: "done" });
 }
