@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownRight, ArrowUp, Check, CircleDollarSign, Loader2, MapPin, MessageSquare, Plus, Shuffle, Sparkles, UserMinus, UserPlus, Users, X } from "lucide-react";
+import { ArrowDownRight, ArrowUp, Brain, Check, ChevronDown, CircleDollarSign, Loader2, MapPin, MessageSquare, Plus, Shuffle, Sparkles, UserMinus, UserPlus, Users, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Fit } from "@/components/Fit";
@@ -284,9 +284,15 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
   const end = useRef<HTMLDivElement>(null);
   const first = short(p), First = first[0].toUpperCase() + first.slice(1);
   const prof = hired ?? profileFor(p.id, p.role);
-  const plan = useMemo(() => toPlan(runs, staff), [runs, staff]);
+  // The plan is a live checklist: shown while an order runs. Once the report is in, the order card says it all.
+  const plan = useMemo(() => (thinking ? toPlan(runs?.slice(0, 1), staff) : []), [thinking, runs, staff]);
   const lastSuggest = [...(chat ?? [])].reverse().find((c): c is Extract<ChatItem, { k: "them" }> => c.k === "them" && !!c.suggest)?.suggest;
   const ideas = [...(lastSuggest ? [lastSuggest] : []), ...ideasFor(p)].slice(0, 3);
+  const rows = useMemo(() => group(chat ?? []), [chat]);
+  const lastOrder = rows.findLast((r) => r.order)?.order;
+  // Ideas help at the start, and right after a report when the student is deciding what next.
+  const last = chat?.at(-1);
+  const showIdeas = !thinking && (!last || last.k === "report" || last.k === "coach" || (last.k === "them" && !!last.suggest));
   // Braces matter: scrollIntoView returns a Promise in current Chromium, and an effect must not return one.
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [chat?.length, thinking]);
   const send = (t = text) => { if (t.trim() && !thinking) { instruct(p.id, t.trim()); setText(""); } };
@@ -339,7 +345,13 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
         <Section title="Conversation">
           {!chat?.length && <p className="text-[12.5px] text-faint">Nothing yet. Tell {first} what you need. Be specific: what, where, for whom, by when.</p>}
           <div className="space-y-2">
-            {chat?.map((c, i) => <ChatRow key={i} c={c} index={i} id={p.id} onSuggest={(s) => setText(s)} />)}
+            {rows.map((r) =>
+              r.order ? (
+                <OrderCard key={`o${r.order}`} rows={r.items} id={p.id} latest={r.order === lastOrder} onSuggest={(s) => setText(s)} />
+              ) : (
+                <ChatRow key={r.items[0].i} c={r.items[0].c} index={r.items[0].i} id={p.id} latest={false} onSuggest={(s) => setText(s)} />
+              ),
+            )}
             {thinking && (
               <div className="flex items-center gap-2 py-1 text-[12px] text-muted">
                 <Loader2 className="size-3.5 animate-spin text-warm" />
@@ -351,7 +363,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
         </Section>
       </div>
       <div className="border-t border-line p-3">
-        {!thinking && (
+        {showIdeas && (
           <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 [scrollbar-width:none]">
             {ideas.map((s) => (
               <button key={s} onClick={() => setText(s)} className="shrink-0 rounded-full border border-line-strong px-2.5 py-1 text-[11.5px] text-soft transition-colors hover:border-white/30 hover:text-fg">
@@ -379,8 +391,173 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
   );
 }
 
-function ChatRow({ c, index, id, onSuggest }: { c: ChatItem; index: number; id: string; onSuggest: (s: string) => void }) {
+type Row = { c: ChatItem; i: number };
+
+/** The chat as rows: each instruction's items gathered into one group where it starts, everything else on its own. */
+function group(chat: ChatItem[]) {
+  const out: { order?: number; items: Row[] }[] = [];
+  const at = new Map<number, Row[]>();
+  chat.forEach((c, i) => {
+    if (c.run == null) return void out.push({ items: [{ c, i }] });
+    const items = at.get(c.run);
+    if (items) return void items.push({ c, i });
+    at.set(c.run, [{ c, i }]);
+    out.push({ order: c.run, items: at.get(c.run)! });
+  });
+  return out;
+}
+
+/** The biggest moves an order made, summed across its receipts. */
+function moves(effects: Effect[], n = 2) {
+  const sum = new Map<string, number>();
+  for (const e of effects) {
+    for (const [cd, d] of Object.entries(e.sent)) sum.set(shortPlace(+cd), (sum.get(shortPlace(+cd)) ?? 0) + d);
+    for (const [f, d] of Object.entries(e.factions)) { const k = FACTIONS_2013.find((x) => x.id === f)?.name ?? f; sum.set(k, (sum.get(k) ?? 0) + d); }
+  }
+  return [...sum].filter(([, d]) => Math.abs(d) >= 0.05).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, n);
+}
+const signed = (d: number) => `${d >= 0 ? "+" : ""}${Math.round(d * 10) / 10}`;
+
+/**
+ * One instruction, start to finish: the order, the thinking, what got done, the report and the coaching.
+ * Open while it is the newest; older ones fold to a single line with what they cost and moved.
+ */
+function OrderCard({ rows, id, latest, onSuggest }: { rows: Row[]; id: string; latest: boolean; onSuggest: (s: string) => void }) {
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const thoughts = rows.find((r) => r.c.k === "thoughts")?.c as Extract<ChatItem, { k: "thoughts" }> | undefined;
+  const live = !!thoughts?.live;
+  const open = live || (toggled ?? latest);
+  const order = rows.find((r) => r.c.k === "me")?.c as Extract<ChatItem, { k: "me" }> | undefined;
+  const effects = rows.flatMap((r) => (r.c.k === "receipt" ? [r.c.effect] : []));
+  // What the director says while working comes before the receipts; the report and coaching close the card.
+  const said = rows.filter((r) => r.c.k === "them" || r.c.k === "note");
+  const closing = rows.filter((r) => r.c.k === "report" || r.c.k === "coach");
+  const reported = closing.some((r) => r.c.k === "report");
+  const staff = useGame((s) => s.staff);
+  const misfits = effects.filter((e) => !e.fit).map((e) => { const p = staff.find((x) => x.id === e.by); return `${e.label} went to ${p ? short(p) : "someone"}`; });
+  const spent = effects.reduce((a, e) => a + e.cost, 0);
+  const moved = moves(effects);
+
+  if (!open)
+    return (
+      <button onClick={() => setToggled(true)} className="flex w-full items-center gap-2 rounded-lg border border-line px-2.5 py-2 text-left text-[12px] transition-colors hover:bg-hover">
+        <ChevronDown className="size-3 shrink-0 -rotate-90 text-faint" />
+        <span className="min-w-0 flex-1 truncate text-soft">{order?.text ?? "Order"}</span>
+        {!!spent && <span className="tnum shrink-0 font-mono text-[10.5px] text-neg">−${spent.toLocaleString("en-US")}</span>}
+        {moved.slice(0, 1).map(([k, d]) => <span key={k} className={cn("tnum max-w-[110px] shrink-0 truncate font-mono text-[10.5px]", d >= 0 ? "text-pos" : "text-neg")}>{k} {signed(d)}</span>)}
+      </button>
+    );
+
+  return (
+    <div className="space-y-2">
+      {order && (
+        <div className="flex items-start justify-end gap-1.5">
+          {!live && !latest && (
+            <button onClick={() => setToggled(false)} aria-label="Fold this order" className="mt-2 text-faint hover:text-fg"><ChevronDown className="size-3" /></button>
+          )}
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="max-w-[88%] rounded-xl bg-gold px-3 py-2 text-[13px] leading-snug text-bg">{order.text}</motion.div>
+        </div>
+      )}
+      {thoughts && <Thoughts c={thoughts} latest={latest} />}
+      {said.map((r) => <ChatRow key={r.i} c={r.c} index={r.i} id={id} latest={false} onSuggest={onSuggest} />)}
+      {/* Until the report is in, each action shows as it lands; after, they fold into the report's totals line. */}
+      {!reported && !!effects.length && <div className="space-y-px border-l border-line pl-1.5">{effects.map((e, i) => <ReceiptLine key={i} e={e} />)}</div>}
+      {closing.map((r) =>
+        r.c.k === "coach" ? <CoachLine key={r.i} c={r.c} misfits={misfits} /> : r.c.k === "report" ? <Reply key={r.i} c={r.c} index={r.i} id={id} effects={effects} /> : null,
+      )}
+    </div>
+  );
+}
+
+/** One action on one line: what, who, and what it cost and moved. The full sentence is on hover. */
+function ReceiptLine({ e }: { e: Effect }) {
+  const staff = useGame((s) => s.staff);
+  const by = staff.find((p) => p.id === e.by);
+  const who = by ? short(by).replace(/^the /, "") : "Staff";
+  const chips: [string, "pos" | "neg"][] = [];
+  if (e.cost) chips.push([`−$${e.cost.toLocaleString("en-US")}`, "neg"]);
+  if (e.raised) chips.push([`+$${e.raised.toLocaleString("en-US")}`, "pos"]);
+  for (const [k, d] of moves([e], 3)) chips.push([`${k} ${signed(d)}`, d >= 0 ? "pos" : "neg"]);
+  return (
+    <div title={e.summary} className="px-2.5 py-1.5">
+      <div className="flex items-center gap-1.5 text-[11.5px]">
+        {e.district ? <MapPin className="size-3 shrink-0 text-muted" /> : <CircleDollarSign className="size-3 shrink-0 text-muted" />}
+        <span className="truncate font-medium text-soft">{e.label}</span>
+        <span className="truncate text-muted capitalize">· {who}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1 pl-[18px]">
+        {chips.map(([t, tone]) => (
+          <span key={t} className={cn("tnum rounded px-1.5 py-px font-mono text-[10.5px]", tone === "pos" ? "bg-pos/12 text-pos" : "bg-neg/12 text-neg")}>{t}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The director's report as an ordinary reply. Under it, one line of totals; the actions behind it open on click.
+ * An ask sits on its own row below, answered in place.
+ */
+function Reply({ c, index, id, effects }: { c: Extract<ChatItem, { k: "report" }>; index: number; id: string; effects: Effect[] }) {
+  const [open, setOpen] = useState(false);
+  const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
+  return (
+    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start">
+      <div className="max-w-[88%] rounded-xl border border-line bg-raised px-3 py-2 text-[13px] leading-snug text-soft">{c.text}</div>
+      <div className="tnum mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-1 font-mono text-[10.5px] text-muted">
+        <span>Spent <span className="text-neg">{usd(c.spent)}</span></span>
+        {!!c.raised && <span>Raised <span className="text-pos">{usd(c.raised)}</span></span>}
+        {moves(effects).map(([k, d]) => <span key={k} className={d >= 0 ? "text-pos" : "text-neg"}>{k} {signed(d)}</span>)}
+        {!!effects.length && (
+          <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-0.5 font-sans text-[11px] text-faint transition-colors hover:text-fg">
+            {effects.length} {effects.length === 1 ? "action" : "actions"}
+            <ChevronDown className={cn("size-3 transition-transform", !open && "-rotate-90")} />
+          </button>
+        )}
+      </div>
+      {open && <div className="mt-1 w-full space-y-px border-l border-line pl-1.5">{effects.map((e, i) => <ReceiptLine key={i} e={e} />)}</div>}
+      {c.ask &&
+        (c.state === "open" ? (
+          <div className="mt-2 flex w-full flex-wrap items-center gap-x-2 gap-y-1.5 pl-1">
+            <span className="text-[12px] text-soft">Wants <span className="tnum font-mono text-warm">{usd(c.ask.amount)}</span> more {c.ask.reason}</span>
+            <span className="flex gap-1.5">
+              <Button size="sm" variant="primary" onClick={() => answerAsk(id, index, true)}><Check className="size-3.5" />Approve</Button>
+              <Button size="sm" variant="ghost" onClick={() => answerAsk(id, index, false)}><X className="size-3.5" />Not now</Button>
+            </span>
+          </div>
+        ) : (
+          <span className={cn("mt-1 pl-1 text-[11px]", c.state === "approved" ? "text-pos" : "text-muted")}>{c.state === "approved" ? "Approved" : "Declined"}: {usd(c.ask.amount)} more {c.ask.reason}</span>
+        ))}
+    </motion.div>
+  );
+}
+
+const gradeOf =(c: { clarity: number; fit: number }) => (c.clarity >= 3 && c.fit === 1 ? "Strong delegation" : c.clarity >= 2 && c.fit >= 0.5 ? "Workable delegation" : "Weak delegation");
+
+/** Coaching in one line; the meters and the advice open on click, and on their own when the delegation was weak. */
+function CoachLine({ c, misfits = [] }: { c: Extract<ChatItem, { k: "coach" }>; misfits?: string[] }) {
+  const grade = gradeOf(c);
+  const [open, setOpen] = useState(grade.startsWith("Weak"));
+  return (
+    <div>
+      <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-center gap-1.5 text-left text-[11.5px] text-muted transition-colors hover:text-fg">
+        <span className={cn("shrink-0 font-medium whitespace-nowrap", grade.startsWith("Strong") ? "text-pos" : grade.startsWith("Work") ? "text-warm" : "text-neg")}>{grade}</span>
+        <span className="tnum min-w-0 truncate font-mono text-[10.5px]">· Clarity {c.clarity.toFixed(1)}/4 · Right people {Math.round(c.fit * 100)}%</span>
+        <ChevronDown className={cn("ml-auto size-3 shrink-0 transition-transform", !open && "-rotate-90")} />
+      </button>
+      {open && (
+        <div className="mt-1.5">
+          <Coach c={c} bare />
+          {!!misfits.length && <p className="mt-1.5 text-[11.5px] leading-snug text-neg">Wrong person: {misfits.join("; ")}.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatRow({ c, index, id, latest, onSuggest }: { c: ChatItem; index: number; id: string; latest: boolean; onSuggest: (s: string) => void }) {
   if (c.k === "note") return <p className="py-1 text-center text-[11px] text-faint">{c.text}</p>;
+  if (c.k === "thoughts") return <Thoughts c={c} latest={latest} />;
   if (c.k === "me" || c.k === "them")
     return (
       <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={cn("flex flex-col", c.k === "me" ? "items-end" : "items-start")}>
@@ -395,6 +572,41 @@ function ChatRow({ c, index, id, onSuggest }: { c: ChatItem; index: number; id: 
   if (c.k === "receipt") return <Receipt e={c.effect} />;
   if (c.k === "report") return <Report c={c} index={index} id={id} />;
   return <Coach c={c} />;
+}
+
+/**
+ * One instruction's thinking as a timeline: the director's reasons, then each staffer's as they take their job.
+ * Open while the newest; collapsed to a link once a newer instruction is given. Either can be toggled by hand.
+ */
+function Thoughts({ c, latest }: { c: Extract<ChatItem, { k: "thoughts" }>; latest: boolean }) {
+  const staff = useGame((s) => s.staff);
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const open = toggled ?? latest;
+  if (!c.live && !c.items.length) return null;
+  const name = (who: string) => { const p = staff.find((x) => x.id === who); return p ? short(p).replace(/^the /, "") : "Staff"; };
+  const steps = `${c.items.length} ${c.items.length === 1 ? "step" : "steps"}`;
+  return (
+    <div className="py-0.5">
+      <button onClick={() => setToggled(!open)} aria-expanded={open} className="flex items-center gap-1.5 text-[11.5px] text-muted transition-colors hover:text-fg">
+        {c.live ? <Loader2 className="size-3 animate-spin text-warm" /> : <Brain className="size-3" />}
+        <span>{c.live ? "Thinking" : open ? "Reasoning" : "Show reasoning"}</span>
+        {!!c.items.length && <span className="text-faint">· {steps}</span>}
+        <ChevronDown className={cn("size-3 transition-transform", !open && "-rotate-90")} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && !!c.items.length && (
+          <motion.ol initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mt-1.5 ml-[5px] space-y-1.5 overflow-hidden border-l border-line-strong pl-3">
+            {c.items.map((t, i) => (
+              <motion.li key={i} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} className="text-[12px] leading-snug">
+                <span className="font-medium text-soft capitalize">{name(t.who)}</span>
+                <span className="text-muted"> · {t.text}</span>
+              </motion.li>
+            ))}
+          </motion.ol>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 function Receipt({ e }: { e: Effect }) {
@@ -450,15 +662,18 @@ function Report({ c, index, id }: { c: Extract<ChatItem, { k: "report" }>; index
   );
 }
 
-function Coach({ c }: { c: Extract<ChatItem, { k: "coach" }> }) {
-  const grade = c.clarity >= 3 && c.fit === 1 ? "Strong delegation" : c.clarity >= 2 && c.fit >= 0.5 ? "Workable delegation" : "Weak delegation";
+/** `bare`: without the heading, when the one-line summary above already says the grade. */
+function Coach({ c, bare }: { c: Extract<ChatItem, { k: "coach" }>; bare?: boolean }) {
+  const grade = gradeOf(c);
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-lg border border-line bg-white/[0.02] p-3">
-      <div className="flex items-center justify-between">
-        <Label>How you delegated</Label>
-        <span className={cn("text-[11px] font-medium", grade.startsWith("Strong") ? "text-pos" : grade.startsWith("Work") ? "text-warm" : "text-neg")}>{grade}</span>
-      </div>
-      <div className="mt-2 grid grid-cols-2 gap-3 text-[11.5px]">
+      {!bare && (
+        <div className="mb-2 flex items-center justify-between">
+          <Label>How you delegated</Label>
+          <span className={cn("text-[11px] font-medium", grade.startsWith("Strong") ? "text-pos" : grade.startsWith("Work") ? "text-warm" : "text-neg")}>{grade}</span>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3 text-[11.5px]">
         <div>
           <div className="mb-1 flex justify-between text-muted"><span>Clarity</span><span className="tnum font-mono">{c.clarity.toFixed(1)}/4</span></div>
           <Meter value={(c.clarity / 4) * 100} color={c.clarity >= 3 ? "var(--color-pos)" : c.clarity >= 2 ? "var(--color-warm)" : "var(--color-neg)"} />
