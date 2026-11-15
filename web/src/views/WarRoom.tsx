@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownRight, ArrowUp, Brain, Check, ChevronDown, CircleDollarSign, Loader2, MapPin, MessageSquare, Plus, Shuffle, Sparkles, UserMinus, UserPlus, Users, X } from "lucide-react";
-import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
+import { animate, AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Fit } from "@/components/Fit";
 import { Avatar, Button, Dock, DockButton, Label, Meter, Section, ViewHeader } from "@/components/ui";
@@ -108,6 +108,36 @@ export function WarRoom() {
     mx.set(((e.clientX - r.left) / r.width) * 2 - 1);
     my.set(((e.clientY - r.top) / r.height) * 2 - 1);
   };
+  // Selecting someone moves the camera in on them and the people they work with: a director with their team, anyone
+  // else with their boss. The move is a flat pan and scale of the finished picture, so the 3D room itself is untouched.
+  const frame = sel ? [sel.id, ...(sel.boss ? [sel.boss] : staff.filter((p) => p.boss === sel.id).map((p) => p.id))].join() : "";
+  const inFrame = (id: string) => !frame || id === "you" || frame.split(",").includes(id);
+  const cam = useRef<HTMLDivElement>(null);
+  const cx = useMotionValue(0), cy = useMotionValue(0), cs = useMotionValue(1);
+  useEffect(() => {
+    const go = (x: number, y: number, s: number) => ([[cx, x], [cy, y], [cs, s]] as const).forEach(([m, v]) => (still ? m.set(v) : animate(m, v, { duration: 0.7, ease: [0.22, 1, 0.36, 1] })));
+    const el = cam.current?.parentElement;
+    if (!frame || !el) return go(0, 0, 1);
+    // Where the framed people are on the canvas with the camera at rest, worked back from where they are on screen now.
+    const o = el.getBoundingClientRect(), f = o.width / W, s0 = cs.get();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const id of frame.split(",")) {
+      const r = el.querySelector(`[data-feet="${id}"]`)?.getBoundingClientRect();
+      if (!r) continue;
+      x0 = Math.min(x0, ((r.left - o.left) / f - cx.get()) / s0); x1 = Math.max(x1, ((r.right - o.left) / f - cx.get()) / s0);
+      y0 = Math.min(y0, ((r.top - o.top) / f - cy.get()) / s0); y1 = Math.max(y1, ((r.bottom - o.top) / f - cy.get()) / s0);
+    }
+    if (x0 === Infinity) return go(0, 0, 1);
+    // Room for the names over heads and under feet.
+    y0 -= 50; y1 += 60;
+    const s = Math.max(1, Math.min(1.7, (W * 0.84) / (x1 - x0), (H * 0.88) / (y1 - y0)));
+    go(W / 2 - (s * (x0 + x1)) / 2, H / 2 - (s * (y0 + y1)) / 2, s);
+  }, [frame, still, cx, cy, cs]);
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement)) useGame.setState({ person: null }); };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, []);
   // One sheet of marble at a given height, sized to what it holds (`r` is how far out it reaches).
   const sheet = (z: number, r: number, children: React.ReactNode, key?: string) => (
     <svg key={key} viewBox={`${-r} -150 ${2 * r} ${r + 160}`} className="pointer-events-none absolute overflow-visible" style={{ left: -r, top: -150, width: 2 * r, height: r + 160, transform: `translateZ(${z}px)` }} aria-hidden>
@@ -134,7 +164,7 @@ export function WarRoom() {
       const q = at(LEVELS[t].r, pos[p.id].a), c = ringOf(p.id), lit = c !== "var(--color-gold)";
       return (
         <g key={p.id} transform={`translate(${q.x} ${q.y})`}>
-          <circle r="28" fill="#000" opacity="0.55" />
+          <circle r="38" fill="url(#foot)" />
           <circle r="40" fill="none" stroke={c} strokeWidth={p.id === person ? 3.6 : lit ? 2.6 : 1.6} strokeOpacity={lit ? 1 : 0.55} className={cn(!!active[p.id] && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 6px ${c})` } : undefined} />
         </g>
       );
@@ -154,9 +184,12 @@ export function WarRoom() {
           const [from, to] = g.getAttribute("data-wire")!.split(">");
           const a = point(`[data-feet="${from}"]`, true), b = point(`[data-head="${to}"]`, false);
           if (!a || !b) return;
-          const [x1, y1, x2, y2] = [a[0], a[1] + 2, b[0], b[1] - 6].map((v) => Math.round(v * 10) / 10), ym = (y1 + y2) / 2;
-          const d = `M${x1} ${y1}C${x1} ${ym},${x2} ${ym},${x2} ${y2}`;
-          paths.current[to] = [d, `M${x2} ${y2}C${x2} ${ym},${x1} ${ym},${x1} ${y1}`];
+          const [x1, y1, x2, y2] = [a[0], a[1] + 2, b[0], b[1] - 6].map((v) => Math.round(v * 10) / 10);
+          // A line always leaves downward and arrives from above, like a slack cable, even to someone standing level
+          // with their boss: otherwise it runs flat across the names in between.
+          const k = Math.round(Math.max((y2 - y1) / 2, 14)), ya = y1 + k, yb = y2 - k;
+          const d = `M${x1} ${y1}C${x1} ${ya},${x2} ${yb},${x2} ${y2}`;
+          paths.current[to] = [d, `M${x2} ${y2}C${x2} ${yb},${x1} ${ya},${x1} ${y1}`];
           // Checked per path, not per line: the glow and the running light are added when a line lights up.
           for (const path of g.children) if (path.getAttribute("d") !== d) path.setAttribute("d", d);
         });
@@ -173,11 +206,15 @@ export function WarRoom() {
     <div className="flex h-full">
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader title="War room" sub="You direct. Your reports plan the work and hand it to their people." right={<ModeBadge />} />
-        <div className="relative min-h-0 flex-1 px-6 pb-24" ref={room} onClick={() => pick(null)} onMouseMove={look} onMouseLeave={() => { mx.set(0); my.set(0); }}>
+        <div className="relative min-h-0 flex-1 px-6 pb-24" onClick={() => pick(null)} onMouseMove={look} onMouseLeave={() => { mx.set(0); my.set(0); }}>
           <motion.div className="pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-screen [mask-image:radial-gradient(ellipse_65%_60%_at_50%_0%,black,transparent)]">
             <ShaderBackground />
           </motion.div>
+          {sel && <Button size="sm" className="absolute top-1 left-6 z-10 !text-[13px]" onClick={(e) => { e.stopPropagation(); pick(null); }}><Users className="size-3.5" />Whole room</Button>}
+          {/* The hall fades into the page on every side instead of ending at an edge; the lines fade with it. */}
+          <div ref={room} className="relative h-full [mask-composite:intersect] [mask-image:linear-gradient(90deg,transparent,black_9%,black_91%,transparent),linear-gradient(transparent,black_10%,black_86%,transparent)]">
           <Fit w={W} h={H}>
+            <motion.div ref={cam} className="absolute inset-0 origin-top-left" style={{ x: cx, y: cy, scale: cs }}>
             <div className="absolute inset-0" style={{ perspective: 2400, perspectiveOrigin: "50% 36%" }}>
               <motion.div className="absolute inset-0" style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}>
                 <div className="absolute" style={{ left: W / 2, top: APEX, transform: `scale3d(${ZOOM}, ${ZOOM}, ${ZOOM}) rotateX(${TILT}deg)`, transformStyle: "preserve-3d" }}>
@@ -190,6 +227,9 @@ export function WarRoom() {
                         <pattern id="marble" patternUnits="userSpaceOnUse" x="-700" y="-150" width="1400" height="850"><image href={`${ART}marble.jpg`} width="1400" height="850" preserveAspectRatio="none" /></pattern>
                         {/* Light falls on the dais; the marble darkens away from it. */}
                         <radialGradient id="marble-shade" gradientUnits="userSpaceOnUse" cx="0" cy="0" r={FLOOR.r}><stop offset="0" stopColor="#070605" stopOpacity="0" /><stop offset="0.65" stopColor="#070605" stopOpacity="0.35" /><stop offset="1" stopColor="#070605" stopOpacity="0.8" /></radialGradient>
+                        {/* The shadow a figure casts where it stands, and the pool of light on the dais. */}
+                        <radialGradient id="foot"><stop offset="0" stopColor="#000" stopOpacity="0.9" /><stop offset="0.55" stopColor="#000" stopOpacity="0.55" /><stop offset="1" stopColor="#000" stopOpacity="0" /></radialGradient>
+                        <radialGradient id="pool"><stop offset="0" stopColor="#f3d999" stopOpacity="0.42" /><stop offset="1" stopColor="#f3d999" stopOpacity="0" /></radialGradient>
                         <radialGradient id="ground-shade" gradientUnits="userSpaceOnUse" cx="0" cy="200" r="1000"><stop offset="0.35" stopColor="#070605" stopOpacity="0.55" /><stop offset="1" stopColor="#070605" /></radialGradient>
                       </defs>
                       <rect x="-1100" y="-150" width="2200" height="1260" fill="url(#marble)" />
@@ -210,14 +250,15 @@ export function WarRoom() {
                   {wall(6, LEVELS[1].z, STEP.r + 10, pie(STEP.r, STEP.half), "s")}
                   {sheet(LEVELS[1].z, STEP.r + 10, <>{top(pie(STEP.r, STEP.half))}{rings(1)}</>)}
                   {wall(LEVELS[1].z + 6, LEVELS[0].z, DAIS + 10, circle, "d")}
-                  {sheet(LEVELS[0].z, DAIS + 10, <>{top(circle)}{rings(0)}</>)}
+                  {sheet(LEVELS[0].z, DAIS + 10, <>{top(circle)}<circle r={DAIS} fill="url(#pool)" />{rings(0)}</>)}
                   <Node id="you" at={YOU} name="You" role="The campaigner" you />
                   {staff.map((p) => (
-                    <Node key={p.id} id={p.id} at={pos[p.id]} name={p.name} role={p.role} figure={figureFor(p, !!hires[p.id])} shadow={p.id === "cm" && !hires[p.id]} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} selected={p.id === person} unread={unread[p.id]} onClick={() => pick(p.id)} />
+                    <Node key={p.id} id={p.id} at={pos[p.id]} name={p.name} role={p.role} figure={figureFor(p, !!hires[p.id])} shadow={p.id === "cm" && !hires[p.id]} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} selected={p.id === person} full={!!frame && inFrame(p.id)} dim={!inFrame(p.id)} unread={unread[p.id]} onClick={() => pick(p.id)} />
                   ))}
                 </div>
               </motion.div>
             </div>
+            </motion.div>
           </Fit>
           <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
             <defs>
@@ -245,6 +286,7 @@ export function WarRoom() {
               return <Spark key={k.id} path={() => paths.current[child.id]?.[up ? 1 : 0]} up={up} />;
             })}
           </svg>
+          </div>
         </div>
         <Dock label={sel ? (sel.name ?? `${sel.role} · vacant`) : "Nobody selected"}>
           {sel?.name && <DockButton primary icon={<MessageSquare />} label="Instruct" onClick={() => document.getElementById("instruct")?.focus()} />}
@@ -300,8 +342,10 @@ function ModeBadge() {
 }
 
 /** A person standing on the stone: placed on the floor plan, then stood upright to face the camera. */
-function Node({ id, at: where, name, role, figure, shadow, job, misfit, morale, you, selected, unread, onClick }: { id: string; at: Pt; name?: string; role: string; figure?: string; shadow?: boolean; job?: string; misfit?: boolean; morale?: number; you?: boolean; selected?: boolean; unread?: boolean; onClick?: () => void }) {
+function Node({ id, at: where, name, role, figure, shadow, job, misfit, morale, you, selected, full, dim, unread, onClick }: { id: string; at: Pt; name?: string; role: string; figure?: string; shadow?: boolean; job?: string; misfit?: boolean; morale?: number; you?: boolean; selected?: boolean; full?: boolean; dim?: boolean; unread?: boolean; onClick?: () => void }) {
   const lv = LEVELS[where.t], q = at(lv.r, where.a);
+  // With the whole room in view there is space for one line each: the second shows on hover and once the camera is in.
+  const more = !you && !full && "hidden group-hover:block";
   // You are a gilded figure under the light; an empty post is the dark shape of whoever will fill it.
   const tone = you
     ? "grayscale(1) sepia(1) saturate(2.2) brightness(1.5) contrast(1.05) drop-shadow(0 0 6px rgb(214 178 110 / 0.5))"
@@ -309,7 +353,8 @@ function Node({ id, at: where, name, role, figure, shadow, job, misfit, morale, 
       ? "brightness(0) drop-shadow(0 0 1px rgb(214 178 110 / 0.75))"
       : shadow
         ? "brightness(0.3) drop-shadow(0 0 1px rgb(214 178 110 / 0.6))"
-        : `brightness(${selected ? 1.12 : 0.96})`;
+        : // Further from the light on the dais is a little darker; people outside the camera's subject step back.
+          `brightness(${(selected ? 1.12 : where.t === 2 ? 0.9 : 0.96) * (dim ? 0.5 : 1)}) drop-shadow(0 3px 4px rgb(0 0 0 / 0.55))`;
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
@@ -325,18 +370,18 @@ function Node({ id, at: where, name, role, figure, shadow, job, misfit, morale, 
       {unread && <i className="absolute top-0 right-1 size-2.5 rounded-full border-2 border-bg bg-warm" />}
       {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute top-0 left-1 size-2.5 rounded-full border-2 border-bg bg-neg" />}
       {/*
-        Where the name goes depends on where there is clear stone. On the floor it is written on the floor in front of the
-        feet: laid back down into the floor's plane and stretched, so it reads upright. On the step it floats over the
-        head, because the floor row stands in front. Yours is beside you.
+        Where the name goes depends on where there is clear stone: under the feet on the floor, over the head on the
+        step (the floor row stands in front), beside you on the dais. Always upright and facing the camera.
       */}
       <span
         data-head={where.t === 1 ? id : undefined}
-        className={cn("absolute flex flex-col items-center [text-shadow:0_1px_4px_#000,0_0_2px_#000,0_0_8px_#000]", where.t === 2 ? "top-full left-1/2 origin-top" : where.t === 1 ? "bottom-full left-1/2 mb-1.5" : "top-1/4 left-full ml-3 items-start text-left")}
-        style={{ width: lv.label, marginLeft: where.t === 0 ? undefined : -lv.label / 2, transform: where.t === 2 ? `rotateX(${TILT}deg) translateZ(2px) translateY(46px) scaleY(1.62)` : undefined }}
+        className={cn("absolute flex flex-col items-center transition-opacity duration-300 [text-shadow:0_1px_4px_#000,0_0_2px_#000,0_0_8px_#000]", where.t === 2 ? "top-full left-1/2 mt-2" : where.t === 1 ? "bottom-full left-1/2 mb-1.5" : "top-1/4 left-full ml-3 items-start rounded-md bg-black/60 px-2.5 py-1 text-left", dim && "opacity-40")}
+        // Below the feet is below the floor, so the floor row's names are brought toward the camera until they clear it.
+        style={{ width: lv.label, marginLeft: where.t === 0 ? undefined : -lv.label / 2, transform: where.t === 2 ? "translateZ(130px)" : undefined }}
       >
-        <span className={cn("text-[20px] leading-tight font-medium", !name && "text-faint")}>{name ?? "Vacant"}</span>
+        <span className={cn("font-display text-[20px] leading-tight font-medium", !name && cn("text-faint", more))}>{name ?? "Vacant"}</span>
         {/* A post shown by its title has no separate name to print. */}
-        {role !== name && <span className="text-[20px] leading-tight text-soft">{role}</span>}
+        {role !== name && <span className={cn("text-[20px] leading-tight", name ? cn("text-soft", more) : "text-faint")}>{role}</span>}
         <AnimatePresence>
           {misfit && (
             <motion.span key="misfit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("my-0.5 rounded bg-neg/30 px-1.5 text-[18px] leading-[23px] whitespace-nowrap text-neg", where.t === 1 && "order-first")}>
@@ -466,7 +511,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Section title="Profile">
           {p.onRecord && <p className="mb-2 text-[12px] leading-relaxed text-muted">The record names {p.name} in this post.<Cite c={c} id={p.onRecord} /> What this post says and does here is simulated{p.good || p.weak ? ", and so are its strengths and weaknesses below: they describe the post in this exercise, not the person" : ""}.</p>}
-          <p className="mb-2 text-[12px] text-faint">{(!hired && CREDIT[p.id]) || "Figure: AI-generated. This person is invented."}</p>
+          {!hired && CREDIT[p.id] && <p className="mb-2 text-[12px] text-faint">{CREDIT[p.id]}</p>}
           <dl className="space-y-2 text-[13px]">
             {[["Good at", p.good], ["Weak at", p.weak], ["Working on", job ?? p.doing ?? "Nothing yet"]].filter(([, v]) => v).map(([k, v]) => (
               <div key={k} className="flex gap-3"><dt className="w-[76px] shrink-0 text-muted">{k}</dt><dd className="text-soft">{v}</dd></div>
