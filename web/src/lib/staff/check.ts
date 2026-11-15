@@ -1,4 +1,5 @@
 import { skip } from "../cases/clock";
+import { useRivals } from "../cases/rivals";
 import { currentCase, useCase } from "../cases/store";
 import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
@@ -189,6 +190,8 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
     const start = useCase.getState().date;
     const d = (n: number) => new Date(Date.parse(start) + n * 86_400_000).toISOString().slice(0, 10);
     for (const n of [2, 3, 4]) useCase.getState().book({ date: d(n), kind: "doors", cd: 308, by: "sch" });
+    // The clock asks the rival agents to plan, over the network; there is no server here, so count them as planned.
+    useRivals.setState({ planned: { 1: true } });
     for (let i = 0; i < 6 && useCase.getState().date < d(4); i++) skip();
     const done = useCase.getState().bookings;
     const ran = useCase.getState().work.filter((x) => x.by === "candidate").map((x) => x.date);
