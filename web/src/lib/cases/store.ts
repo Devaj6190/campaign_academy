@@ -115,9 +115,13 @@ export function changeAt(c: Case, picks: Record<string, Pick>, d: Decision): Shi
   return out;
 }
 
-/** The live world: on arrival at the step the campaign has reached, plus that decision if made, plus all work so far. */
-export function worldNow(): { c: Case; w: World } {
-  const { caseId, picks, at } = useCase.getState();
+/**
+ * The live world: on arrival at the step the campaign has reached, plus that decision if made, plus all work so far.
+ * `step`: read it as of arriving at that step instead (the staff memos are written for the decision's day).
+ */
+export function worldNow(step?: number): { c: Case; w: World } {
+  const { caseId, picks } = useCase.getState();
+  const at = step ?? useCase.getState().at;
   const c = currentCase(caseId);
   const i = Math.min(Math.max(at - 1, 0), c.decisions.length);
   const w = simulate(withWork(c), options(picks), i);

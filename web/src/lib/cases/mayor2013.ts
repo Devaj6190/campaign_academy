@@ -246,11 +246,6 @@ export const mayor2013: Case = {
         { id: "boroughs", label: "The outer-borough candidate", detail: "Neighbourhood services and equal treatment of the five boroughs come first.", preview: { up: ["Hispanic voters", "Union households"], down: ["White voters"] }, effect: { groups: { hispanic: 2, union: 1, white: -1 } } },
         { id: "prek", label: "One signature policy", detail: "Run on schools and pre-kindergarten and leave the incumbent's record alone.", preview: { up: ["Poll standing", "White voters"], down: [] }, effect: { poll: { deblasio: 1 }, groups: { white: 2 } } },
       ],
-      advice: [
-        { name: "John Del Cecato", role: "Media consultant", argues: "break", basis: "on-record", sources: ["tpm-brand"], short: "Proposed the tale of two cities, to make you the clear progressive.", says: "Proposed the tale of two cities as the frame, to make you the clear progressive while rivals compete for the same middle-class ground." },
-        { role: "Finance director", argues: "manager", basis: "predicted", sources: [], short: "Donors and editorial boards reward a steady hand.", says: "Donors and editorial boards reward a steady hand. A manager's pitch keeps doors open that a break from the mayor closes." },
-        { role: "Field director", argues: "boroughs", basis: "predicted", sources: [], short: "Borough fairness is a message volunteers can carry door to door.", says: "You live in Brooklyn and the front-runner is from Manhattan. Borough fairness is a message volunteers can carry door to door." },
-      ],
       taken: "break",
       did: [
         sh("Del Cecato proposed the tale of two cities, to make de Blasio the clear progressive.", c("Early in 2013 media consultant John Del Cecato met Bill and Chirlane de Blasio to build the message and proposed the tale of two cities. The aim was to make de Blasio the clear progressive and to differ from rivals' middle-class framing.", "tpm-brand")),
@@ -291,11 +286,6 @@ export const mayor2013: Case = {
         { id: "shift", label: "Change the message", detail: "Compete for the same outer-borough, middle-class voters he is talking to.", preview: { up: ["Poll standing", "White voters"], down: ["Black voters", "Hispanic voters"] }, effect: { poll: { deblasio: 1 }, groups: { white: 1, black: -2, hispanic: -1 } } },
         { id: "early", label: "Spend early on name recognition", detail: "Start paid advertising months ahead of plan so voters know who you are before the summer.", preview: { up: ["Poll standing"], down: [TV] }, effect: { poll: { deblasio: 3 }, budget: -700_000 } },
       ],
-      advice: [
-        { name: "Bill Hyers", role: "Campaign manager", argues: "hold", basis: "on-record", sources: ["spb-hyers", "gg-walzak"], short: "Recommended staying with the plan when the candidate considered spending more.", says: "When the candidate, trailing, considered speeding up and spending more to raise his name recognition, he recommended staying with the plan." },
-        { role: "Communications aide", argues: "attack", basis: "predicted", sources: [], short: "A direct contrast gets you into every story written about him.", says: "He is taking your oxygen every day. A direct contrast gets you into every story written about him." },
-        { role: "Pollster", argues: "early", basis: "predicted", sources: [], short: "You cannot win over voters who do not know your name.", says: "Nearly half of Democrats cannot rate you. You cannot win an argument with voters who do not know your name." },
-      ],
       taken: "hold",
       did: [
         sh("His spokesman said only that the race was now wide open.", c("On the day Weiner entered, de Blasio's spokesman said only that the race was now wide open.", "cbs-weiner")),
@@ -330,11 +320,6 @@ export const mayor2013: Case = {
         { id: "courts", label: "Stay off the street and use your office", detail: "Pursue the hospital through the courts and the Public Advocate's powers.", preview: { up: ["White voters", "Union households"], down: [] }, effect: { groups: { white: 1, union: 2 } } },
         { id: "statement", label: "Send a statement of support", detail: "Keep the day for other campaigning.", preview: { up: ["White voters"], down: ["Union households"] }, effect: { groups: { white: 1, union: -2 } } },
       ],
-      advice: [
-        { role: "Labor liaison", argues: "arrest", basis: "predicted", sources: [], short: "The union will remember who stood with them and who stepped back.", says: "The union that endorsed you is putting its own members on the line today. They will remember who stood with them and who stepped back." },
-        { role: "Campaign counsel", argues: "courts", basis: "predicted", sources: [], short: "A court order keeps the hospital open; a photograph does not.", says: "You hold an office with standing to sue. A court order keeps the hospital open; a photograph does not." },
-        { role: "Communications aide", argues: "speak", basis: "predicted", sources: [], short: "A mayoral candidate in handcuffs is a story you do not control.", says: "Be there and be heard, but a mayoral candidate in handcuffs is a story you do not control." },
-      ],
       taken: "arrest",
       did: [sh("De Blasio was one of fifteen arrested. Liu and Weiner stepped back and were not.", c("De Blasio was one of fifteen people arrested outside the state university chancellor's office in Manhattan, with a Council member, two nurses' union leaders and nine hospital employees. The charge was disorderly conduct and all were released within hours. Liu and Weiner moved back into the crowd and were not arrested.", "bkpaper-lich", "dna-arrest", "npq-lich"))],
       followed: [c("He polled 10 percent five days later, 15 on July 24 and 21 on July 29. Weiner's new admissions fall in the same weeks, so no source separates the effect of the arrest.", "q-0715", "q-0724", "q-0813")],
@@ -356,11 +341,6 @@ export const mayor2013: Case = {
         { id: "alltv", label: "Hold everything for television", detail: "Send no mail. Keep every available dollar for television in the final five weeks.", preview: { up: ["Poll standing"], down: [] }, effect: { poll: { deblasio: 2 } } },
         { id: "mail", label: "Lead with targeted mail", detail: "Mail the groups most likely to back you, and keep a smaller television buy for the last two weeks.", preview: { up: ["Poll standing", "Black voters", "Hispanic voters"], down: [TV] }, effect: { poll: { deblasio: 2 }, groups: { black: 2, hispanic: 2 }, budget: -500_000 } },
         { id: "tvnow", label: "Start television now at low weight", detail: "Lift your name recognition in July, at the cost of a thinner August.", preview: { up: ["Poll standing"], down: [TV] }, effect: { poll: { deblasio: 4 }, budget: -900_000 } },
-      ],
-      advice: [
-        { name: "Bill Hyers", role: "Campaign manager", argues: "alltv", basis: "predicted", sources: ["cfb-exp"], short: "Only television reaches every constituency. A dollar of mail is a dollar off the air.", says: "The city is several separate constituencies and only television reaches all of them at once. Under a cap, a dollar of mail is a dollar off the air." },
-        { role: "Mail consultant", argues: "mail", basis: "predicted", sources: [], short: "Primary turnout is small. Mail talks to those voters and nobody else.", says: "Primary turnout is small and the voter file tells you who they are. Mail talks to them and nobody else." },
-        { role: "Pollster", argues: "tvnow", basis: "predicted", sources: [], short: "Voters who meet you in late August may already have chosen someone.", says: "You are fourth with eight weeks left. Voters who meet you in late August may already have chosen someone." },
       ],
       taken: "alltv",
       did: [
@@ -397,11 +377,6 @@ export const mayor2013: Case = {
         { id: "contrast", label: "A contrast with the front-runner", detail: "Open on term limits and her record alongside the incumbent.", preview: { up: ["Poll standing", "White voters"], down: [TV] }, effect: { poll: { deblasio: 5, quinn: -2 }, groups: { white: 4 }, budget: -1_100_000 } },
         { id: "wait", label: "Hold all television for the last two weeks", detail: "Stay dark now and concentrate the buy at the end.", preview: { up: [], down: [] }, effect: {} },
       ],
-      advice: [
-        { name: "John Del Cecato", role: "Media consultant", argues: "family", basis: "on-record", sources: ["tpm-brand"], short: "Had the idea after the candidate's son drew press attention at the launch.", says: "Had the idea after the candidate's son drew press attention at the launch, and persuaded the candidate to pay for the ad and run it." },
-        { role: "Research director", argues: "contrast", basis: "predicted", sources: [], short: "The front-runner has never had to defend her record on air.", says: "The front-runner has never had to defend her record on air. Voters who want change need to hear why she is not it." },
-        { role: "Communications aide", argues: "bio", basis: "predicted", sources: [], short: "A child in the ad invites criticism. Let voters meet the candidate.", says: "Putting a child in front of a campaign invites criticism. Voters are choosing a mayor, so let them meet him." },
-      ],
       taken: "family",
       did: [
         sh("On August 8 the first ad came out: his 15-year-old son speaks for him.", c("On August 8 the campaign released its first television ad, a 30-second spot in which the candidate's 15-year-old son says his father is the only Democrat who will break from the Bloomberg years and end a stop-and-frisk era.", "vin-ad")),
@@ -436,11 +411,6 @@ export const mayor2013: Case = {
         { id: "jobs", label: "Move to jobs and the cost of living", detail: "The issues voters rank first.", preview: { up: ["Poll standing", "White voters", "Hispanic voters", "Union households"], down: [TV] }, effect: { poll: { deblasio: 4 }, groups: { white: 3, hispanic: 4, union: 3 }, budget: -1_700_000 } },
         { id: "manhattan", label: "Take liberal Manhattan from the Speaker", detail: "Leave the former Comptroller's supporters alone, with a runoff in mind.", preview: { up: ["Poll standing", "White voters"], down: [TV] }, effect: { poll: { deblasio: 4, quinn: -2 }, groups: { white: 8 }, budget: -1_700_000 } },
         { id: "repeat", label: "Keep the first ad on air", detail: "A smaller buy, and no direct contrast with any rival.", preview: { up: ["Poll standing", "Black voters", "White voters"], down: [TV] }, effect: { poll: { deblasio: 3 }, groups: { black: 3, white: 2 }, budget: -1_200_000 } },
-      ],
-      advice: [
-        { name: "Greenberg Quinlan Rosner", role: "Polling firm", argues: "frisk", basis: "predicted", sources: ["q-0813", "gqr"], short: "Six in ten primary voters call the policy excessive.", says: "Six in ten primary voters call the policy excessive, and the candidate they assume owns the issue has not taken the sharp position." },
-        { role: "Field director", argues: "jobs", basis: "predicted", sources: [], short: "At the doors people ask about rent and work.", says: "At the doors people ask about rent and work. The ruling already made your point on policing for you." },
-        { role: "Manhattan organiser", argues: "manhattan", basis: "predicted", sources: [], short: "The Speaker's voters are the easiest to move.", says: "The Speaker's voters are the easiest to move, and you may need the former Comptroller's supporters in a runoff." },
       ],
       taken: "frisk",
       did: [

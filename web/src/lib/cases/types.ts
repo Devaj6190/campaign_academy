@@ -51,14 +51,6 @@ export type Option = {
   synergy?: { with: string; effect: Shift };
 };
 
-/**
- * One adviser's argument for one option, from what was known at the decision date. The tool itself never advises.
- * `on-record`: the person is documented as holding this position, and `sources` say where.
- * `predicted`: written for this exercise from the person's role and documented record. Not a quotation.
- * A real name appears only where the record names that person in that role.
- */
-export type Advice = { name?: string; role: string; argues: string; says: string; /** As `Claim.short`, for `says`. */ short?: string; basis: "on-record" | "predicted"; sources: string[] };
-
 export type Decision = {
   id: string;
   /** ISO date of the moment, or the start of the phase it belongs to. */
@@ -71,7 +63,6 @@ export type Decision = {
   situation: Claim[];
   constraints: { daysLeft: number; cashOnHand?: number; notes?: string[] };
   options: Option[];
-  advice: Advice[];
   // --- the record, shown at the debrief ---
   /** The option closest to what the campaign did. Null when they did something not on the list. */
   taken: string | null;
@@ -164,7 +155,7 @@ export function missingSources(c: Case): string[] {
     ...c.platform.flatMap((p) => [p, ...(p.likedBy ? [p.likedBy] : []), ...(p.dislikedBy ? [p.dislikedBy] : []), ...(p.reactions ?? [])]),
     ...c.start.basis,
     ...c.close.notes,
-    ...c.decisions.flatMap((d) => [...(d.since?.notes ?? []), ...d.situation, ...d.did, ...d.followed, ...d.saidAfter, ...d.advice.filter((a) => a.basis === "on-record")]),
+    ...c.decisions.flatMap((d) => [...(d.since?.notes ?? []), ...d.situation, ...d.did, ...d.followed, ...d.saidAfter]),
     { sources: c.resultSources },
     ...c.press.map((p) => ({ sources: [p.source] })),
     ...c.finance.map((f) => ({ sources: [f.source] })),

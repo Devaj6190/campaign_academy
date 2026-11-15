@@ -3,8 +3,8 @@ import { hash } from "../util";
 import type { Staff } from "../data";
 
 // Live staff memos before each case decision (issue #41, item 8; agreed by Devaj on #32). Two directors each argue
-// for an option, from what has happened in the student's own campaign. Shown beside the fixed predicted advisers, not
-// in their place, and labelled as the post's simulated view, never the tool's advice.
+// for an option, from what has happened in the student's own campaign. They are the decision card's advisers (the
+// case's fixed advisers were removed), labelled as the posts' simulated views, never the tool's advice.
 //
 // The record must not leak through them. The request is built from what the student sees at that moment and nothing
 // else: never `taken`, `did`, `followed` or `saidAfter`. That is not enough on its own: the model knows 2013 and
@@ -21,11 +21,11 @@ export type MemoRequest = {
   campaign: string;
   memory: string[];
   /** The option the other director already argued for: this one must argue for another. */
-  against?: { option: string; who: string };
   /** The option this director argues for, assigned by `assign()`. The model writes the case for it; it never picks. */
   option: string;
 };
-export type Memo = { director: string; option: string; text: string; mode: "live" | "rules" };
+/** `headline`: the recommendation in a few words; `text`: the case for it in a sentence or two. Older saves have no headline. */
+export type Memo = { director: string; option: string; headline?: string; text: string; mode: "live" | "rules" };
 
 /** What a memo may be told about a decision: what the student sees on the card, and no part of the record. */
 export function memoDecision(d: Decision): MemoRequest["decision"] {
@@ -56,7 +56,6 @@ const WHY: Record<string, string> = {
   pol: "It is the position we can defend on substance for the rest of the race.",
 };
 
-/** The option a post argues for: the one its interests favour, never the one the other director already took. */
 /**
  * The option a post argues for. Not chosen from the cards' up and down chips: those were fitted to the record, so
  * scoring them sent the first memo to the real choice at four of six decisions (Devaj's review). A fixed rotation by
@@ -71,8 +70,7 @@ export function assign(decision: string, post: string, options: MemoOption[], ag
 
 export function rulesMemo(r: MemoRequest): Memo {
   const o = r.decision.options.find((x) => x.id === r.option) ?? r.decision.options[0];
-  const differ = r.against ? ` I see it differently from ${r.against.who}.` : "";
-  return { director: r.director.id, option: o.id, text: `I would go with "${o.label}". ${WHY[r.director.id] ?? WHY.cm}${differ}`, mode: "rules" };
+  return { director: r.director.id, option: o.id, headline: `Go with "${o.label}"`, text: WHY[r.director.id] ?? WHY.cm, mode: "rules" };
 }
 
 /** Words that would mean a memo knows what came after its date: later years, the election, how the race ended. */

@@ -26,11 +26,12 @@ export const BASE_BUDGET = 8000 * SCALE.money;
 
 // ponytail: the poll's voter groups are read from the one case that has them (mayor2013-factions); make them a field
 // on the case when a second case needs staff.
-export function snapshot(): Snapshot {
+/** `as`: the campaign as it will stand on arriving at a later step, dated that day (the memos; see lib/staff/memos). */
+export function snapshot(as?: { at: number; date: string }): Snapshot {
   const g = useGame.getState();
   const s = useStaff.getState();
-  const k = useCase.getState();
-  const { c, w } = worldNow();
+  const k = { ...useCase.getState(), ...as };
+  const { c, w } = worldNow(as?.at);
   const mine = w.poll[c.follow] ?? 0;
   const boost = factionWork();
   // Only the campaign's own work counts toward its cap, not what rivals took away.
