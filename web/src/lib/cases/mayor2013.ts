@@ -46,6 +46,17 @@ const sources: Source[] = [
   src("spb-hyers", "Summary of a Washington Post profile of Bill Hyers", "SaintPetersBlog", undefined, "https://saintpetersblog.com/must-read-profile-of-charlie-crists-new-campaign-manager", "reporting"),
   src("gg-walzak", "In Communications Move, de Blasio Chooses Campaign Over City Hall", "Gotham Gazette", "2016-10-24", "https://www.gothamgazette.com/city/6589-in-communications-move-de-blasio-chooses-campaign-over-city-hall", "reporting"),
   src("gqr", "Congratulations to Bill de Blasio", "Greenberg Quinlan Rosner", "2013-09-16", "https://www.gqrr.com/news/congratulations-to-bill-de-blasio-2", "campaign"),
+  src("nation-0813", "A Populist Insurgency in New York City", "The Nation", "2013-08-13", "https://www.thenation.com/?p=107906", "analysis"),
+  src("trd-0702", "Bill de Blasio calls for greater affordable housing to lessen \"tale of two cities\"", "The Real Deal", "2013-07-02", "https://therealdeal.com/new-york/2013/07/02/bill-de-blasio-calls-for-greater-affordable-housing-to-lessen-tale-of-two-cities/", "reporting"),
+  src("nextcity-0903", "Bill de Blasio Is Running on Change, but Can New Yorkers Believe in It?", "Next City", "2013-09-03", "https://nextcity.org/equityfactor/entry/bill-de-blasio-is-running-on-change-but-can-new-yorkers-believe-in-it", "analysis"),
+  src("dna-quinn-0211", "Quinn Vows to Build 40,000 New Middle-Class Apartments", "DNAinfo", "2013-02-11", "https://www.dnainfo.com/new-york/20130211/new-york-city/quinn-vows-build-40000-new-middle-class-apartments", "reporting"),
+  src("dna-quinn-0529", "Quinn Pledges New CUNY Campus in Brooklyn Navy Yard in Tech Speech", "DNAinfo", "2013-05-29", "https://www.dnainfo.com/new-york/20130529/flatiron/quinn-pledges-new-cuny-campus-brooklyn-navy-yard-tech-speech", "reporting"),
+  src("jw-thompson-0807", "'We're Not Going Backwards On Crime'", "New York Jewish Week (JTA)", "2013-08-07", "https://www.jta.org/2013/08/07/ny/were-not-going-backwards-on-crime", "reporting"),
+  src("dna-thompson-0729", "Police Unions Unfazed by Thompson's Damning Tone On 'Stop-and-Frisks'", "DNAinfo", "2013-07-29", "https://www.dnainfo.com/new-york/20130729/civic-center/police-unions-unfazed-by-thompsons-damning-tone-on-stop-frisks", "reporting"),
+  src("sb-thompson-0816", "Thompson Puts Cars First in Transportation Platform", "Streetsblog NYC", "2013-08-16", "https://nyc.streetsblog.org/2013/08/16/thompson-puts-cars-first-in-transportation-platform-announcement", "analysis"),
+  src("cbs-liu-0814", "City Comptroller Liu Calls For Legalizing Pot In NYC", "CBS New York", "2013-08-14", "https://www.cbsnews.com/newyork/news/city-comptroller-liu-calls-for-legalizing-pot-in-nyc", "reporting"),
+  src("tnr-liu-0814", "The Most Surprising Proposal in the New York Mayoral Race", "The New Republic", "2013-08-14", "https://newrepublic.com/article/114304/john-lius-progressive-proposal-new-york-mayor-race", "analysis"),
+  src("cap-weiner-0703", "Anthony Weiner's single-payer plan is progressive, but not single-payer (Capital New York, reposted)", "PNHP / Capital New York", "2013-07-03", "https://pnhp.org/news/anthony-weiners-single-payer-plan-is-progressive-but-not-single-payer/", "analysis"),
   src("chalk-prek", "Public advocate tells city's elite he'd raise taxes to pay for pre-K", "Chalkbeat New York", "2012-10-04", "https://www.chalkbeat.org/newyork/2012/10/4/21092903/public-advocate-tells-city-s-elite-he-d-raise-taxes-to-pay-for-pre-k", "reporting"),
 ];
 
@@ -78,11 +89,117 @@ export const mayor2013: Case = {
     { id: "weiner", name: "Anthony Weiner", standing: "Former congressman, not yet running", about: [c("Resigned from Congress in 2011. He enters this race by video on May 22 with $4.8 million in his campaign account.", "cbs-weiner")] },
   ],
 
+  // Each plank is dated to when it was first on record; a plank that answered a decision waits for that decision.
   platform: [
-    { text: "Raise the city income tax on incomes above $500,000 to fund full-day pre-kindergarten and after-school programmes.", sources: ["chalk-prek"], likedBy: c("In May 2013, 56 percent of voters said they were more likely to back a candidate who would raise taxes on the wealthy.", "q-0522"), dislikedBy: c("Mayor Bloomberg said the tax would drive people out of the city.", "chalk-prek") },
-    { text: "Overhaul stop-and-frisk: no appeal of the federal ruling against it, and an inspector general for the police.", sources: ["dna-launch", "dna-0812"], likedBy: c("60 percent of likely Democratic primary voters called the tactic excessive in August 2013.", "q-0813"), dislikedBy: c("31 percent of the same voters called it an acceptable way to make the city safer.", "q-0813") },
-    { text: "A clean break from the Bloomberg years, framed as a tale of two cities divided by income.", sources: ["tpm-brand", "dna-launch"], likedBy: c("By late August, 65 percent of likely Democratic primary voters wanted a new direction.", "q-0828") },
-    { text: "Keep community hospitals open, in particular Long Island College Hospital in Brooklyn.", sources: ["dna-arrest", "bkpaper-lich"], likedBy: c("The health-care workers' union 1199 SEIU, which had endorsed him, and the state nurses' association organised the protests.", "dna-arrest", "npq-lich") },
+    {
+      text: "Raise the city income tax on incomes above $500,000 to fund full-day pre-kindergarten and after-school programmes.",
+      sources: ["chalk-prek"],
+      asOf: "2012-10-04",
+      reactions: [
+        { who: "Stephanie Gendell, Campaign for Children", text: "Called the plan bold and fully funded.", sources: ["chalk-prek"], stance: "for", asOf: "2012-10-04" },
+        { who: "Mayor Michael Bloomberg", text: "Said the tax would drive people out of the city.", sources: ["chalk-prek"], stance: "against", asOf: "2012-10-04" },
+        { who: "Quinnipiac poll of city voters", text: "56 percent said they were more likely to back a candidate who would raise taxes on the wealthy.", sources: ["q-0522"], stance: "for", asOf: "2013-05-22" },
+      ],
+    },
+    {
+      text: "Paid sick leave: press the Council Speaker to allow a vote on the paid sick days bill.",
+      sources: ["wnyc-lucky"],
+      asOf: "2013-01-27",
+      reactions: [
+        { who: "Paid sick leave activists", text: "Held events with him in January 2013 against the Speaker's stalling of the bill.", sources: ["wnyc-lucky"], stance: "for", asOf: "2013-01-27" },
+      ],
+    },
+    {
+      text: "A clean break from the Bloomberg years, framed as a tale of two cities divided by income.",
+      sources: ["tpm-brand", "dna-launch"],
+      asOf: "2013-01-27",
+      decision: "positioning",
+      reactions: [
+        { who: "Katrina vanden Heuvel, The Nation", text: "Praised the agenda as a populist insurgency.", sources: ["nation-0813"], stance: "for", asOf: "2013-08-13" },
+        { who: "Quinnipiac poll of likely Democratic primary voters", text: "65 percent wanted a new direction from the Bloomberg years.", sources: ["q-0828"], stance: "for", asOf: "2013-08-28" },
+        { who: "Mayor Michael Bloomberg", text: "Called the campaign racist in a September 2013 interview, as reported by TPM.", sources: ["tpm-brand"], stance: "against", asOf: "2013-09-10" },
+      ],
+    },
+    {
+      text: "Keep community hospitals open, in particular Long Island College Hospital in Brooklyn.",
+      sources: ["dna-arrest", "bkpaper-lich"],
+      asOf: "2013-07-10",
+      decision: "hospital",
+      reactions: [
+        { who: "1199 SEIU and the New York State Nurses Association", text: "The health-care unions organised the protests over the hospital; 1199 had endorsed him.", sources: ["dna-arrest", "npq-lich"], stance: "for", groups: ["union"], asOf: "2013-07-10" },
+        { who: "SUNY", text: "The state university system, which ran the hospital, was planning its sale.", sources: ["dna-arrest"], stance: "against", asOf: "2013-07-10" },
+      ],
+    },
+    {
+      text: "Create or preserve 200,000 affordable homes, put about $1 billion of city pension money into building them, and tighten the 80/20 programme so more new projects are affordable.",
+      sources: ["trd-0702"],
+      asOf: "2013-07-02",
+      reactions: [
+        { who: "Brad Lander, City Council member", text: "Praised his vision of more equal development and said he was optimistic it could be delivered.", sources: ["nextcity-0903"], stance: "for", asOf: "2013-09-03" },
+      ],
+    },
+    {
+      text: "Overhaul stop-and-frisk: no appeal of the federal ruling against it, and an inspector general for the police.",
+      sources: ["dna-launch", "dna-0812"],
+      asOf: "2013-08-12",
+      reactions: [
+        { who: "Quinnipiac poll of likely Democratic primary voters", text: "60 percent called the tactic excessive.", sources: ["q-0813"], stance: "for", asOf: "2013-08-13" },
+        { who: "Quinnipiac poll of likely Democratic primary voters", text: "31 percent called it an acceptable way to make the city safer.", sources: ["q-0813"], stance: "against", asOf: "2013-08-13" },
+      ],
+    },
+    // The rivals, from coverage of the race. Same rules: dated, cited, nothing beyond the source.
+    {
+      by: "quinn",
+      text: "Build 40,000 middle-class apartments over ten years, paid for by borrowing and savings, with a tax break for owners who keep units affordable.",
+      sources: ["dna-quinn-0211"],
+      asOf: "2013-02-11",
+      reactions: [
+        { who: "Ruben Diaz Jr., Bronx Borough President", text: "Praised the package as substantive.", sources: ["dna-quinn-0211"], stance: "for", asOf: "2013-02-11" },
+        { who: "Daniel Halloran, Queens Council member", text: "Said it could not be paid for without large tax rises.", sources: ["dna-quinn-0211"], stance: "against", asOf: "2013-02-11" },
+      ],
+    },
+    { by: "quinn", text: "A technology agenda: a CUNY campus at the Brooklyn Navy Yard, a tech cluster in Long Island City and citywide high-speed internet by 2018.", sources: ["dna-quinn-0529"], asOf: "2013-05-29" },
+    { by: "quinn", text: "Drop the city's appeal of the federal stop-and-frisk ruling.", sources: ["dna-0812"], asOf: "2013-08-12" },
+    {
+      by: "thompson",
+      text: "Keep stop-and-frisk but limit it to stops tied to a suspect description, and add 2,000 officers.",
+      sources: ["jw-thompson-0807", "dna-thompson-0729"],
+      asOf: "2013-07-29",
+      reactions: [
+        { who: "Leaders of the detectives' and captains' unions", text: "Stood by him and called his approach realistic.", sources: ["dna-thompson-0729"], stance: "for", groups: ["union"], asOf: "2013-07-29" },
+      ],
+    },
+    {
+      by: "thompson",
+      text: "A driver-friendly transport plan: pay-by-phone parking meters, no tolls on the East River bridges, real bus rapid transit, and bring back the commuter tax.",
+      sources: ["sb-thompson-0816"],
+      asOf: "2013-08-16",
+      reactions: [
+        { who: "Amalgamated Transit Union Local 726", text: "Endorsed him at the plan's launch.", sources: ["sb-thompson-0816"], stance: "for", groups: ["union"], asOf: "2013-08-16" },
+        { who: "Streetsblog", text: "Called it the most driver-friendly plan in the race and noted it never mentions pedestrians.", sources: ["sb-thompson-0816"], stance: "against", asOf: "2013-08-16" },
+      ],
+    },
+    { by: "liu", text: "Abolish stop-and-frisk, the only leading candidate to pledge it.", sources: ["jw-thompson-0807"], asOf: "2013-08-07" },
+    {
+      by: "liu",
+      text: "Legalise and tax marijuana, for about $400 million a year, and use the money to cut CUNY tuition.",
+      sources: ["cbs-liu-0814", "tnr-liu-0814"],
+      asOf: "2013-08-14",
+      reactions: [
+        { who: "Betty Aldworth, National Cannabis Industry Association", text: "Applauded the plan.", sources: ["cbs-liu-0814"], stance: "for", asOf: "2013-08-14" },
+        { who: "Gabriel Sayegh, Drug Policy Alliance", text: "Doubted it would get anywhere in Albany.", sources: ["tnr-liu-0814"], stance: "against", asOf: "2013-08-14" },
+      ],
+    },
+    {
+      by: "weiner",
+      text: "A city-run health plan modelled on single payer, pooling city health spending, that could cover undocumented immigrants.",
+      sources: ["cap-weiner-0703"],
+      asOf: "2013-07-03",
+      reactions: [
+        { who: "Richard Gottfried, State Assembly member", text: "Said Weiner's thinking on coverage was in the right place.", sources: ["cap-weiner-0703"], stance: "for", asOf: "2013-07-03" },
+        { who: "Dr. David Himmelstein, Physicians for a National Health Program", text: "Said it had useful parts but was not truly single payer.", sources: ["cap-weiner-0703"], stance: "against", asOf: "2013-07-03" },
+      ],
+    },
   ],
 
   groups: [

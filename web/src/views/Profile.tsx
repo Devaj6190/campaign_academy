@@ -6,7 +6,8 @@ import { ShaderBackground } from "@/components/ui21/dithering";
 import { useCase, worldNow } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
-import { Cite, Claims } from "./CaseView";
+import { Claims } from "./CaseView";
+import { PlatformSection } from "./Platform";
 
 // The real candidate and race of the current case. Everything here is read from the case file; the only
 // simulated numbers are the student's own standing and money, which follow their decisions so far.
@@ -16,7 +17,7 @@ const money = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.
 
 export function Profile() {
   const step = useCase((s) => s.step);
-  useCase((s) => s.picks); // re-render when a decision is made
+  const picks = useCase((s) => s.picks); // re-render when a decision is made
   const go = useGame((s) => s.go);
   const { c, w } = worldNow();
   const me = c.candidates.find((x) => x.id === c.follow)!;
@@ -64,18 +65,7 @@ export function Profile() {
 
             <div className="mt-8"><Claims c={c} items={me.about} /></div>
 
-            <div className="mt-10">
-              <Label>Platform</Label>
-              <ul className="mt-3 space-y-4">
-                {c.platform.map((p) => (
-                  <li key={p.text}>
-                    <div className="text-[14px] leading-relaxed">{p.text}{p.sources.map((id) => <Cite key={id} c={c} id={id} />)}</div>
-                    {p.likedBy && <div className="mt-1 text-[12.5px] text-muted"><span className="text-pos">For it: </span>{p.likedBy.text}{p.likedBy.sources.map((id) => <Cite key={id} c={c} id={id} />)}</div>}
-                    {p.dislikedBy && <div className="mt-1 text-[12.5px] text-muted"><span className="text-neg">Against it: </span>{p.dislikedBy.text}{p.dislikedBy.sources.map((id) => <Cite key={id} c={c} id={id} />)}</div>}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <div className="mt-10"><PlatformSection c={c} step={step} picks={picks} /></div>
           </div>
         </div>
         <Dock>
