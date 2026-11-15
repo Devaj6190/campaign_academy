@@ -24,11 +24,12 @@ The case is the 2013 Democratic primary for Mayor of New York, from inside Bill 
 
 - **Agreement:** how often an agent chose what the real person chose. Chance is one over the number of options (about 25%).
 - **Not the final vote share.** The simulation is fitted so that the real choices land on the real result, so the vote share measures the fitting, not the agents. It is shown as context only.
-- **The scores that matter are grounding scores** (decided 15 November, after the first run, section 8):
-  1. **Agreement on masked cards the model did not recognise.** Where it cannot tell which race this is, it cannot be recalling it.
-  2. **How often the agent follows changed facts.** When a card is rewritten so the facts point away from the 2013 choice, a grounded agent moves; an agent recalling 2013 does not.
+- **The scores that matter are grounding scores.** The model knows this race, and masking cannot hide it (runs 1 to 3 recognised it on nearly every masked card), so the question is not whether it remembers 2013 but whether its choices follow the facts in front of it. The headline (decided 15 November, after run 3, section 8):
+  1. **How often the agent follows changed facts**, beside a control. A card rewritten so the facts point away from the 2013 choice should move a grounded agent; the same facts in other words (the control) should not. An agent that moves on both is reacting to wording, not facts.
+  2. **Agreement where memory is wrong.** Recall (no card) is run in the same run. Where it picks the wrong option and the card still leads to the real one, that agreement cannot be recall.
+  3. **Agreement on twins the model does not recognise.** A twin moves the decision to an invented city with equivalent specifics (section 4).
 
-  Plain agreement is reported, but it is not the target: the model's memory alone already reaches it.
+  Plain agreement is reported, but it is not the target: the model's memory alone already reaches it. Agreement on unrecognised masked cards was the first choice of headline; it stays as a reported finding, because for this race there are almost none.
 
 ## 4. What is run
 
@@ -48,8 +49,10 @@ The case is the 2013 Democratic primary for Mayor of New York, from inside Bill 
 | `card` | Nothing: the card as a student sees it | Plain agreement |
 | `nochips` | The options' up/down chips are removed | How much the chips give away (they were fitted to the record) |
 | `masked` | People, places, boroughs, dates, the year, outlets and identifying figures are replaced; afterwards the model is asked which real race it was | Agreement when it cannot tell, and whether the mask held |
-| `changed` | The situation is rewritten so a reasoning agent should move away from the 2013 choice (written before the first run, `CHANGED` in `conditions.ts`) | Whether it follows the facts or its memory |
-| `recall` | No card: "which of these did the real campaign do?" | The pure-memory score |
+| `changed` | The situation is rewritten so a reasoning agent should move away from the 2013 choice. Two versions per decision (`CHANGED` in `conditions.ts`; the first written before run 1, the second before run 4) | Whether it follows the facts or its memory |
+| `reworded` | The control: the same situation in other words (`REWORDED`) | Whether it moves on wording alone |
+| `twin` | The whole decision moved to an invented city, Halvern, with equivalent specifics: an ombudsman instead of the Public Advocate, a luxury property tax for free school meals instead of an income tax for pre-K, police sweeps in public housing instead of stop-and-frisk, an expenses scandal instead of the real one (`twins.ts`). Same options, costs and chips, so the real choice is still the answer. No map, no paper, no memos. Recognition probe afterwards | Judgement with memory switched off. Weaker evidence than the real cards, because a twin is right only if it kept the real trade-offs |
+| `recall` | No card: "which of these did the real campaign do?" | The pure-memory score, and which decisions memory gets wrong |
 
 Option order is shuffled per run (the same order across conditions), so position is not a cue.
 
@@ -178,6 +181,7 @@ What it showed:
 | 15 Nov | The campaigner sees what a student sees, memos and chips included, plus a no-chips condition | Devaj |
 | 15 Nov | After run 1: the target is grounding, not agreement. Report agreement on unrecognised masked cards and how often changed facts are followed | Memory alone gives 100% agreement |
 | 15 Nov | Memos skip the lines the card leaves out; masking also hides identifying figures and details; recall replies that are cut short still count | Found in run 1's transcripts |
+| 15 Nov | After run 3, the headline changes to: changed facts followed (with a reworded control), agreement where memory is wrong, and agreement on unrecognised twins. Twins, controls and a second changed version per decision are written before any of them runs | Masking cannot hide this race (27 of 27 recognised in run 2); tuning 1 did not move the changed-facts score. Devaj |
 | 15 Nov | Tuning 1: the campaigner is told the facts it is given are this campaign's facts, even where they differ from what it remembers (`GROUNDED` in `decider.ts`). It names no option and no outcome | Run 1: at three changed-facts cards it argued from memory, not the card |
 
 ## 9. Limits
