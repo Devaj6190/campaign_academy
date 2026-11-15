@@ -156,9 +156,9 @@ export function WarRoom() {
           if (!a || !b) return;
           const [x1, y1, x2, y2] = [a[0], a[1] + 2, b[0], b[1] - 6].map((v) => Math.round(v * 10) / 10), ym = (y1 + y2) / 2;
           const d = `M${x1} ${y1}C${x1} ${ym},${x2} ${ym},${x2} ${y2}`;
-          if (paths.current[to]?.[0] === d) return;
           paths.current[to] = [d, `M${x2} ${y2}C${x2} ${ym},${x1} ${ym},${x1} ${y1}`];
-          for (const path of g.children) path.setAttribute("d", d);
+          // Checked per path, not per line: the glow and the running light are added when a line lights up.
+          for (const path of g.children) if (path.getAttribute("d") !== d) path.setAttribute("d", d);
         });
       }
       raf = requestAnimationFrame(tick);
@@ -225,13 +225,15 @@ export function WarRoom() {
             </defs>
             {staff.map((p) => {
               const state = busy[p.id];
-              const c = misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "var(--color-gold-bright)";
+              // A line stays dim until something is on it: work going down, a report coming back, or a wrong-person flag.
+              const lit = !!state || misfit[p.id];
+              const c = misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "var(--color-gold)";
               return (
                 <g key={p.id} data-wire={`${p.boss ?? "you"}>${p.id}`} fill="none" strokeLinecap="round">
-                  <path stroke={c} strokeWidth={state ? 8 : 6} strokeOpacity={state ? 0.55 : 0.32} filter="url(#glow)" />
-                  <path stroke={c} strokeWidth={state ? 2.4 : 1.8} strokeOpacity={0.95} />
-                  {/* Light running along the line: steadily when idle, fast when work is moving, back up with a report. */}
-                  <path stroke="#fff" strokeWidth={state ? 3 : 2.2} className={cn("wire-run", state && "busy", state === "up" && "up")} />
+                  {lit && <path stroke={c} strokeWidth={8} strokeOpacity={0.55} filter="url(#glow)" />}
+                  <path stroke={c} strokeWidth={lit ? 2.4 : 1.2} strokeOpacity={lit ? 0.95 : 0.28} />
+                  {/* Light running along the line while work is moving: down with a job, back up with a report. */}
+                  {state && state !== "work" && <path stroke="#fff" strokeWidth={3} className={cn("wire-run busy", state === "up" && "up")} />}
                 </g>
               );
             })}
