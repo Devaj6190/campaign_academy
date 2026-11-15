@@ -56,13 +56,14 @@ export const PROFILES: Record<string, Profile> = {
   dg: { skills: ["digital"], cost: 1, effect: 1, special: { email_blast: 1.3 }, voice: "Online native. Edgy, punchy, uses short sentences.", salary: 400 },
 };
 
-// The candidate in person: better than staff, no skill gaps, strongest in his council district in western Queens.
+// The candidate in person: better than staff, no skill gaps, strongest at home. The case's briefing puts his home
+// in Park Slope, Brooklyn (community district 306).
 export const CANDIDATE: Profile = {
   skills: ["planning", "scheduling", "field", "volunteers", "finance", "events", "comms", "press", "digital", "policy", "data"],
   cost: 1,
   effect: 1.15,
-  home: [401, 402, 403],
-  voice: "Adrian Cole, the candidate.",
+  home: [306],
+  voice: "The candidate.",
   salary: 0,
 };
 

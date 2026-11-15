@@ -1,4 +1,4 @@
-# Ballot to Bill: web app
+# Campaign Academy: web app
 
 The UI for the campaign sim described in the repo's root `README.md`.
 

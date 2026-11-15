@@ -76,7 +76,28 @@ export type Decision = {
   saidAfter: Judgment[];
 };
 
-export type Plank = { text: string; sources: string[]; likedBy?: Claim; dislikedBy?: Claim };
+/** How someone reacted to a plank, in their own reported words. `groups` ties it to the case's voter groups,
+ *  and only when the cited source itself makes that tie. */
+export type Reaction = Judgment & { stance: "for" | "against"; groups?: string[]; /** When it was said (ISO); hidden before then. */ asOf?: string };
+
+/**
+ * One position a candidate ran on. `asOf` is the date it was first on record, so a screen can show only what
+ * was known at the student's step. `decision` marks a plank that was the real campaign's answer to a decision:
+ * it stays hidden until the student has made that decision.
+ */
+export type Plank = {
+  text: string;
+  sources: string[];
+  /** Candidate id; the followed candidate when absent. */
+  by?: string;
+  asOf: string;
+  decision?: string;
+  reactions?: Reaction[];
+  /** @deprecated Read through reactionsOf (lib/cases/platform.ts); kept so older case files still load. */
+  likedBy?: Claim;
+  /** @deprecated As likedBy. */
+  dislikedBy?: Claim;
+};
 
 /** What the press was reporting. `summary` is a paraphrase, never the article's own text. */
 export type Press = { date: string; outlet: string; summary: string; source: string };
@@ -131,7 +152,7 @@ export function missingSources(c: Case): string[] {
     ...c.briefing,
     ...c.aftermath,
     ...c.candidates.flatMap((x) => x.about),
-    ...c.platform.flatMap((p) => [p, ...(p.likedBy ? [p.likedBy] : []), ...(p.dislikedBy ? [p.dislikedBy] : [])]),
+    ...c.platform.flatMap((p) => [p, ...(p.likedBy ? [p.likedBy] : []), ...(p.dislikedBy ? [p.dislikedBy] : []), ...(p.reactions ?? [])]),
     ...c.start.basis,
     ...c.close.notes,
     ...c.decisions.flatMap((d) => [...(d.since?.notes ?? []), ...d.situation, ...d.did, ...d.followed, ...d.saidAfter, ...d.advice.filter((a) => a.basis === "on-record")]),
@@ -140,7 +161,17 @@ export function missingSources(c: Case): string[] {
     ...c.finance.map((f) => ({ sources: [f.source] })),
   ];
   const unsourced = claims.some((x) => x.sources.length === 0) ? ["(a claim with no source)"] : [];
-  return [...new Set([...claims.flatMap((x) => x.sources).filter((id) => !known.has(id)), ...unsourced])];
+  // Platform entries must point at real decisions, candidates and voter groups, and carry a date.
+  const decisions = new Set(c.decisions.map((d) => d.id));
+  const people = new Set(c.candidates.map((x) => x.id));
+  const groups = new Set(c.groups.map((g) => g.id));
+  const platform = c.platform.flatMap((p) => [
+    ...(!/^\d{4}-\d{2}-\d{2}$/.test(p.asOf ?? "") ? [`(plank without a date: ${p.text.slice(0, 40)})`] : []),
+    ...(p.decision && !decisions.has(p.decision) ? [`(plank linked to unknown decision ${p.decision})`] : []),
+    ...(p.by && !people.has(p.by) ? [`(plank by unknown candidate ${p.by})`] : []),
+    ...(p.reactions ?? []).flatMap((r) => (r.groups ?? []).filter((g) => !groups.has(g)).map((g) => `(reaction tied to unknown group ${g})`)),
+  ]);
+  return [...new Set([...claims.flatMap((x) => x.sources).filter((id) => !known.has(id)), ...unsourced, ...platform])];
 }
 
 export type World = { budget: number; poll: Record<string, number>; groups: Record<string, number> };

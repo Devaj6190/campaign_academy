@@ -5,7 +5,7 @@ import { z } from "zod";
 import { ACTION_IDS, ACTIONS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
 import type { RunCtx } from "./protocol";
-import { humanize, PLACES, type Snapshot } from "./world";
+import { humanize, PLACES, short, type Snapshot } from "./world";
 
 // Real staff. Each director is a deep agent: it plans with write_todos and hands jobs to its people through the
 // task tool. Each of their people is a subagent that does one job with take_action. All model ids live here.
@@ -26,21 +26,28 @@ const textOf = (c: unknown) => (typeof c === "string" ? c : Array.isArray(c) ? c
 
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z]+/g, "_").replace(/^_|_$/g, "");
 
+/** How a post introduces itself to its agent. A post held by a real person is played as the post, not as that person. */
+const post = (p: { name?: string; role: string; onRecord?: string }) =>
+  p.onRecord ? `the ${p.role} (the post ${p.name} held in the real campaign; speak as a professional in that post, never as an impersonation of him)` : p.name === p.role ? `the ${p.role}` : `${p.name}, ${p.role}`;
+
+const frame = (w: Snapshot) => `on ${w.candidate}'s campaign in ${w.race}. This is a nonpartisan teaching simulation built on the real race: the people, dates and standings up to today are real, and what your work achieves is simulated`;
+
 export function world(w: Snapshot) {
-  const days = 30 - w.day;
-  const factions = w.factions.map((f) => `${f.id} (${f.name}): feels ${Math.round(f.feel)}/100 toward Cole, size ${f.size}`).join("\n");
-  const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 50) - (w.sent[b.cd] ?? 50));
-  const line = (p: (typeof PLACES)[number]) => `${p.cd} ${p.name} (${p.boro}): support ${Math.round(w.sent[p.cd] ?? 50)}, top complaint "${p.issue}"`;
-  return `Day ${w.day} of 30 (${days} left). Cash $${w.cash.toLocaleString("en-US")}. Poll: Hale ${w.poll.hale}, Cole ${w.poll.cole}, Brandt ${w.poll.brandt}.
-Manifesto: ${w.manifesto.map((m, i) => `${i + 1}. ${m}`).join(" ")}
-Factions (use the id):
+  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const poll = Object.entries(w.poll).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([id, v]) => `${w.names[id] ?? id} ${Math.round(v)}`).join(", ");
+  const factions = w.factions.map((f) => `${f.id} (${f.name}): ${Math.round(f.feel)}% support ${w.candidate}; ${f.size}% of likely voters`).join("\n");
+  const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 0) - (w.sent[b.cd] ?? 0));
+  const line = (p: (typeof PLACES)[number]) => `${p.cd} ${p.name} (${p.boro}): support ${Math.round(w.sent[p.cd] ?? 0)}%`;
+  return `Today is ${w.date}; ${w.daysLeft} days to the primary. Left to spend under the cap: ${usd(w.cash)}. Poll: ${poll}.
+Platform: ${w.manifesto.map((m, i) => `${i + 1}. ${m}`).join(" ")}
+Voter groups (use the id). They overlap: one voter is in several.
 ${factions}
-Districts (use the number). Support is simulated, 0-100:
+Districts (use the number). Support is simulated, in percent:
 ${PLACES.map(line).join("\n")}
 Weakest five: ${weakest.slice(0, 5).map((p) => p.name).join(", ")}.`;
 }
 
-export const CATALOG = ACTION_IDS.map((id) => `- ${id}: ${ACTIONS[id].about} ~$${ACTIONS[id].cost.toLocaleString("en-US")}${ACTIONS[id].needs.district ? " [needs district]" : ""}${ACTIONS[id].needs.faction ? " [needs faction]" : ""}`).join("\n");
+export const catalog = (w: Snapshot) => ACTION_IDS.map((id) => `- ${id}: ${ACTIONS[id].about} ~$${(ACTIONS[id].cost * w.scale.money).toLocaleString("en-US")}${ACTIONS[id].needs.district ? " [needs district]" : ""}${ACTIONS[id].needs.faction ? " [needs voter group]" : ""}`).join("\n");
 
 function actionTool(ctx: RunCtx, by: string) {
   return tool(
@@ -51,7 +58,7 @@ function actionTool(ctx: RunCtx, by: string) {
       schema: z.object({
         action: z.enum(ACTION_IDS),
         district: z.enum(DISTRICT_IDS).nullable().describe("Community district number, when the action needs a place"),
-        faction: z.enum(ctx.req.snapshot.factions.map((f) => f.id) as [string, ...string[]]).nullable().describe("Faction id, when the action targets a group"),
+        faction: z.enum(ctx.req.snapshot.factions.map((f) => f.id) as [string, ...string[]]).nullable().describe("Voter group id, when the action targets a group"),
       }),
     },
   );
@@ -70,13 +77,13 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
     description: `${p.name}, ${p.role}. Good at: ${p.good ?? p.profile.skills.join(", ")}. Weak at: ${p.weak ?? "nothing noted"}. Skills: ${p.profile.skills.join(", ")}.`,
     model: worker(),
     tools: [actionTool(ctx, p.id)],
-    systemPrompt: `You are ${p.name}, ${p.role} on Adrian Cole's campaign for Mayor of New York City. This is a fictional, nonpartisan teaching simulation.
+    systemPrompt: `You are ${post(p)} ${frame(w)}.
 Voice: ${p.profile.voice}
-Your boss ${me.name} has handed you one job. Do it with take_action: usually one action, at most two. Pick the action, district and faction that best fit the job and your skills. If take_action says something was not done, do not retry the same thing.
+Your boss, ${short(me)}, has handed you one job. Do it with take_action: usually one action, at most two. Pick the action, district and voter group that best fit the job and your skills. If take_action says something was not done, do not retry the same thing.
 Then reply in under 40 words, in your own voice, saying what happened. Use only the facts take_action gave you.
 
 Actions you can take:
-${CATALOG}
+${catalog(w)}
 
 The city right now:
 ${world(w)}`,
@@ -104,19 +111,19 @@ ${world(w)}`,
     name: slug(me.name!),
     tools: team.length ? [send] : [actionTool(ctx, me.id), send],
     subagents,
-    systemPrompt: `You are ${me.name}, ${me.role} on Adrian Cole's campaign for Mayor of New York City. This is a fictional, nonpartisan teaching simulation; the player is a student learning to run a campaign, and they are your boss.
+    systemPrompt: `You are ${post(me)} ${frame(w)}. The player is a student learning to run a campaign, and they are your boss.
 Voice: ${prof.voice}
 Strengths: ${me.good ?? prof.skills.join(", ")}. Weaknesses: ${me.weak ?? "none noted"}. Let both show in your choices.
 
 How you work:
 1. Start with write_todos: two to four concrete jobs.
-2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass renters in Jackson Heights"). Then brief them precisely: what, where (district number), who (faction id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
+2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass union households in Jackson Heights"). Then brief them precisely: what, where (district number), who (voter group id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
 3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. Never plan past it. If the job needs more, ask in your report.
 4. If the instruction is vague, make a sensible call and say what you assumed. If it is the wrong job for your department, do your best and say who should have had it.
 5. Finish with send_report exactly once. Report only what tool results told you; never invent numbers.
 
 Actions available to the campaign:
-${CATALOG}
+${catalog(w)}
 
 The city right now:
 ${world(w)}`,

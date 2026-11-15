@@ -58,25 +58,22 @@ export function resolve(
   const luck = 0.85 + hash(ctx.seed, 13) * 0.3;
   const mod = prof.effect * (prof.special?.[id] ?? 1) * turf * (0.85 + morale / 400) * ctx.quality * stretched * luck * (fit ? 1 : 0.65);
 
-  const cost = r50(a.cost * prof.cost * (fit ? 1 : 1.15));
+  // The catalog is written in engine units; the snapshot says what one unit is worth in the case.
+  const k = w.scale;
+  const cost = r50(a.cost * k.money * prof.cost * (fit ? 1 : 1.15));
   const sent: Record<number, number> = {};
   const factions: Record<string, number> = {};
   // Aiming at a group lands harder where that group really lives (census shares).
   const here = presence(district, p.faction ? faction : undefined);
   if (a.local && district) {
     const now = w.sent[district] ?? 50;
-    sent[district] = r1(a.local * mod * here * Math.max(0.3, Math.min(1.2, (100 - now) / 55)));
+    sent[district] = r1(a.local * k.local * mod * here * Math.max(0.3, Math.min(1.2, (100 - now) / 55)));
   }
   if (a.group && faction) {
     const feel = w.factions.find((f) => f.id === faction)?.feel ?? 50;
-    factions[faction] = r1(a.group * mod * here * Math.max(0.35, Math.min(1.2, (100 - feel) / 55)));
+    factions[faction] = r1(a.group * k.group * mod * here * Math.max(0.35, Math.min(1.2, (100 - feel) / 55)));
   }
-  // Fundraising from the rich is noticed by the people who dislike the rich.
-  if (id === "donor_dinner") {
-    factions.activists = r1((factions.activists ?? 0) - 1.5);
-    factions.donors = r1((factions.donors ?? 0) + 2 * mod);
-  }
-  const raised = a.raise ? r50((a.raise[0] + (a.raise[1] - a.raise[0]) * hash(ctx.seed, 29)) * mod) : 0;
+  const raised = a.raise ? r50((a.raise[0] + (a.raise[1] - a.raise[0]) * hash(ctx.seed, 29)) * k.money * mod) : 0;
   const momentum = (a.momentum ?? 0) * mod;
 
   const place = district ? shortPlace(district) : "";
@@ -91,7 +88,7 @@ export function resolve(
       case "phone_bank": return `Made ${n(1200 * mod)} calls into ${place}. Support ${sign(sd)}.`;
       case "rally": return `Rally in ${place} drew ${n(500 * mod + 300 * luck)} people. Support ${sign(sd)}${fname ? `, ${fname} ${sign(fd)}` : ""}.`;
       case "house_party": return `House party in ${place} raised $${n(raised)}.`;
-      case "donor_dinner": return `Donor dinner raised $${n(raised)}. Young activists grumbled.`;
+      case "donor_dinner": return `Donor dinner raised $${n(raised)}.`;
       case "call_time": return `Call time raised $${n(raised)} from ${n(8 + 10 * mod)} donors.`;
       case "email_blast": return `Email to ${fname.toLowerCase()} raised $${n(raised)}. ${fname} ${sign(fd)}.`;
       case "digital_ads": return `Ads reached ${n(90000 * mod)} ${fname.toLowerCase()}. ${fname} ${sign(fd)}.`;
@@ -102,7 +99,7 @@ export function resolve(
       case "coalition_meeting": return `Met ${fname.toLowerCase()} leaders. ${fname} ${sign(fd)}.`;
       case "policy_brief": return `Brief for ${fname.toLowerCase()} is out. ${fname} ${sign(fd)}.`;
       case "voter_targeting": return `Built a ${n(9000 * mod)}-voter target list for ${place}.`;
-      case "schedule_event": return `On the calendar for day ${w.day + 1}.`;
+      case "schedule_event": return "On the candidate's calendar.";
     }
   })();
   const calendar = ["rally", "donor_dinner", "house_party", "coalition_meeting", "schedule_event"].includes(id) ? `${a.label}${district ? ` · ${shortPlace(district)}` : fname ? ` · ${fname}` : ""}` : undefined;

@@ -3,27 +3,28 @@
 import { ArrowRight, BookOpen, Map as MapIcon } from "lucide-react";
 import { Dock, DockButton, Inspector, Label, Meter, Section } from "@/components/ui";
 import { ShaderBackground } from "@/components/ui21/dithering";
-import { useCase, worldNow } from "@/lib/cases/store";
+import { useCase, useCaseNow } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
-import { Cite, Claims } from "./CaseView";
+import { Claims } from "./CaseView";
+import { PlankDesk } from "@/components/PlankDesk";
+import { PlatformSection } from "./Platform";
 
 // The real candidate and race of the current case. Everything here is read from the case file; the only
 // simulated numbers are the student's own standing and money, which follow their decisions so far.
 
-const DAY = 86_400_000;
 const money = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n / 1000)}k`);
 
 export function Profile() {
-  const step = useCase((s) => s.step);
-  useCase((s) => s.picks); // re-render when a decision is made
   const go = useGame((s) => s.go);
-  const { c, w } = worldNow();
+  // The platform shows what was on record by the step the campaign has reached.
+  const { c, w, step, daysLeft } = useCaseNow();
+  const picks = useCase((s) => s.picks);
   const me = c.candidates.find((x) => x.id === c.follow)!;
   const rivals = c.candidates.filter((x) => x.id !== c.follow);
+  const work = useCase((s) => s.work);
+  const lastMove = (id: string) => [...work].reverse().find((x) => x.by === id)?.note;
 
-  const today = step === 0 ? c.briefingDate : (c.decisions[step - 1]?.date ?? c.electionDate);
-  const daysLeft = Math.max(0, Math.round((Date.parse(c.electionDate) - Date.parse(today)) / DAY));
   const race = c.candidates.map((x) => ({ ...x, poll: w.poll[x.id] ?? 0 })).filter((x) => x.poll > 0 || x.id === c.follow).sort((a, b) => b.poll - a.poll);
   const rank = race.findIndex((x) => x.id === c.follow) + 1;
   const undecided = Math.max(0, 100 - race.reduce((n, x) => n + x.poll, 0));
@@ -64,18 +65,8 @@ export function Profile() {
 
             <div className="mt-8"><Claims c={c} items={me.about} /></div>
 
-            <div className="mt-10">
-              <Label>Platform</Label>
-              <ul className="mt-3 space-y-4">
-                {c.platform.map((p) => (
-                  <li key={p.text}>
-                    <div className="text-[14px] leading-relaxed">{p.text}{p.sources.map((id) => <Cite key={id} c={c} id={id} />)}</div>
-                    {p.likedBy && <div className="mt-1 text-[12.5px] text-muted"><span className="text-pos">For it: </span>{p.likedBy.text}{p.likedBy.sources.map((id) => <Cite key={id} c={c} id={id} />)}</div>}
-                    {p.dislikedBy && <div className="mt-1 text-[12.5px] text-muted"><span className="text-neg">Against it: </span>{p.dislikedBy.text}{p.dislikedBy.sources.map((id) => <Cite key={id} c={c} id={id} />)}</div>}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <div className="mt-10"><PlatformSection c={c} step={step} picks={picks} /></div>
+            <div className="mt-10"><PlankDesk /></div>
           </div>
         </div>
         <Dock>
@@ -102,6 +93,7 @@ export function Profile() {
               <div key={o.id} className="rounded-lg border border-line bg-raised p-3">
                 <div className="text-[13px] font-medium">{o.name}</div>
                 <div className="text-[11.5px] text-muted">{o.standing}</div>
+                {lastMove(o.id) && <div className="mt-1.5 text-[11.5px] leading-snug text-soft">Latest move (simulated): {lastMove(o.id)!.replace(`${o.name}: `, "")}</div>}
               </div>
             ))}
           </div>

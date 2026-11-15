@@ -7,46 +7,44 @@ import { cn, initials } from "@/lib/util";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
-// Gold is spent on one thing per screen: the primary action. Everything else is neutral.
 type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "outline" | "ghost"; size?: "sm" | "md" };
 export function Button({ variant = "outline", size = "md", className, ...p }: BtnProps) {
   return (
     <button
       {...p}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md font-medium whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40",
-        size === "sm" ? "h-7 px-2.5 text-[12.5px]" : "h-9 px-3.5 text-[13.5px]",
-        variant === "primary" && "bg-gold text-[#1a1408] hover:bg-gold-bright",
-        variant === "outline" && "border border-line-strong text-fg hover:bg-hover",
-        variant === "ghost" && "text-muted hover:bg-hover hover:text-fg",
+        "inline-flex shrink-0 items-center justify-center gap-2 font-display font-semibold whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40",
+        size === "sm" ? "h-7 px-3.5 text-[12.5px]" : "h-9 px-5 text-[13.5px]",
+        variant === "primary" && "btn-gold",
+        variant === "outline" && "btn-pill",
+        variant === "ghost" && "text-muted underline decoration-line-strong underline-offset-4 hover:text-gold-bright hover:decoration-gold",
         className,
       )}
     />
   );
 }
 
-/** A field or group label. Sentence case, quiet: it names the thing below it and nothing more. */
 export const Label = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <span className={cn("text-[12px] font-medium text-muted", className)}>{children}</span>
+  <span className={cn("font-display text-[12px] font-medium text-gold/80", className)}>{children}</span>
 );
 
 /** Marks a number or section as coming from real data or from the simulation. */
 export const Tag = ({ kind }: { kind: "real" | "sim" }) => (
-  <span className={cn("rounded border px-1.5 py-px text-[11px] font-medium", kind === "real" ? "border-pos/30 text-pos" : "border-warm/30 text-warm")}>
+  <span className={cn("rounded-full border px-2 py-px font-display text-[11px] font-medium", kind === "real" ? "border-pos/25 text-pos" : "border-warm/25 text-warm")}>
     {kind === "real" ? "Real data" : "Simulated"}
   </span>
 );
 
-export const Meter = ({ value, color = "var(--color-fg)", className }: { value: number; color?: string; className?: string }) => (
-  <div className={cn("h-1 overflow-hidden rounded-full bg-white/[0.08]", className)}>
-    <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: color }} />
+export const Meter = ({ value, color = "var(--color-gold)", className }: { value: number; color?: string; className?: string }) => (
+  <div className={cn("relative h-[5px] overflow-hidden rounded-full bg-white/[0.09]", className)}>
+    <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: `linear-gradient(90deg, color-mix(in srgb, ${color} 45%, transparent), ${color})` }} />
   </div>
 );
 
 export function Avatar({ name, size = 40, className }: { name?: string; size?: number; className?: string }) {
   return (
     <div
-      className={cn("grid shrink-0 place-items-center rounded-full border border-line-strong bg-gradient-to-b from-[#2a2722] to-[#161512] font-medium text-soft", className)}
+      className={cn("grid shrink-0 place-items-center rounded-full border border-gold/45 bg-gradient-to-b from-[#2e2616] to-[#100d08] font-display font-semibold tracking-wide text-gold-bright", className)}
       style={{ width: size, height: size, fontSize: size * 0.34 }}
     >
       {name ? initials(name) : ""}
@@ -55,23 +53,22 @@ export function Avatar({ name, size = 40, className }: { name?: string; size?: n
 }
 
 export const Section = ({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) => (
-  <section className="border-t border-line px-5 pt-5 pb-4 first:border-t-0">
-    <div className="mb-3 flex items-baseline justify-between gap-2">
-      <h3 className="text-[13px] font-medium text-fg">{title}</h3>
+  <section className="px-5 pt-5 pb-3 first:pt-0">
+    <div className="plate -mx-5 mb-3.5 flex h-8 items-center gap-2.5 px-5">
+      <Label className="flex-1 text-gold-bright">{title}</Label>
       {right}
     </div>
     {children}
   </section>
 );
 
-export const Inspector = ({ children }: { children: ReactNode }) => <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-line bg-surface xl:w-[340px]">{children}</aside>;
+export const Inspector = ({ children }: { children: ReactNode }) => <aside className="edge-l panel w-[300px] shrink-0 overflow-y-auto xl:w-[340px]">{children}</aside>;
 
-/** The title of a screen: a serif heading and one line saying what the screen is for. */
 export const ViewHeader = ({ title, sub, right }: { title: string; sub: string; right?: ReactNode }) => (
-  <header className="flex shrink-0 items-end justify-between gap-6 px-8 pt-7 pb-5">
+  <header className="relative flex min-h-[84px] shrink-0 items-center justify-between gap-4 px-8 py-4">
     <div className="min-w-0">
-      <h1 className="font-serif text-[30px] leading-none tracking-tight">{title}</h1>
-      <p className="mt-2 max-w-[72ch] text-[13.5px] text-muted">{sub}</p>
+      <h1 className="gilt font-display text-[28px] leading-none font-semibold whitespace-nowrap">{title}</h1>
+      <p className="mt-2 text-[14px] leading-snug text-soft">{sub}</p>
     </div>
     {right}
   </header>
@@ -79,13 +76,13 @@ export const ViewHeader = ({ title, sub, right }: { title: string; sub: string; 
 
 /** Floating action bar at the bottom of a view. Its contents change from screen to screen. */
 export const Dock = ({ label, children }: { label?: string; children: ReactNode }) => (
-  <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
+  <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex items-center justify-center px-4">
     <motion.div
       layout
       transition={{ duration: 0.25, ease }}
-      className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-line-strong bg-raised p-1.5 shadow-[0_12px_32px_-8px_rgba(0,0,0,0.75)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-2xl border border-line-strong bg-[#0f0d09] p-1.5 shadow-[0_18px_44px_-14px_rgba(0,0,0,0.9)]"
     >
-      {label && <div className="hidden max-w-[190px] shrink-0 truncate border-r border-line px-3 text-[12.5px] text-muted @[760px]:block">{label}</div>}
+      {label && <div className="hidden max-w-[190px] shrink-0 truncate border-r border-line px-3 text-[12px] text-muted @[760px]:block">{label}</div>}
       {children}
     </motion.div>
   </div>
@@ -96,14 +93,14 @@ export function DockButton({ icon, label, sub, primary, ...p }: ButtonHTMLAttrib
     <button
       {...p}
       className={cn(
-        "flex h-10 shrink-0 items-center gap-2.5 rounded-lg px-3 text-left transition-colors [&_svg]:size-4",
-        primary ? "bg-gold text-[#1a1408] hover:bg-gold-bright" : "text-fg hover:bg-hover [&_svg]:text-muted",
+        "flex h-11 shrink-0 items-center gap-2.5 rounded-xl px-4 text-left transition-colors [&_svg]:size-4",
+        primary ? "btn-gold !rounded-xl" : "text-fg hover:bg-gold/10 hover:text-gold-bright [&_svg]:text-gold",
       )}
     >
       {icon}
       <span className="leading-tight">
-        <span className="block text-[13px] font-medium">{label}</span>
-        {sub && <span className={cn("hidden text-[11.5px] @[680px]:block", primary ? "text-[#1a1408]/70" : "text-muted")}>{sub}</span>}
+        <span className="block font-display text-[13.5px] font-semibold">{label}</span>
+        {sub && <span className={cn("hidden font-mono text-[10.5px] @[680px]:block", primary ? "text-[#1a1206]/65" : "text-faint")}>{sub}</span>}
       </span>
     </button>
   );
@@ -138,7 +135,7 @@ export function Popover({ trigger, children, align = "center", className }: { tr
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.16, ease }}
             className={cn(
-              "absolute top-full z-50 mt-2 rounded-lg border border-line-strong bg-raised shadow-[0_16px_40px_-10px_rgba(0,0,0,0.85)]",
+              "panel absolute top-full z-50 mt-2 overflow-hidden rounded-xl border border-line-strong shadow-[0_24px_60px_-12px_rgba(0,0,0,0.9)]",
               align === "center" && "left-1/2 -translate-x-1/2",
               align === "start" && "left-0",
               align === "end" && "right-0",
@@ -165,7 +162,7 @@ export function Dialog({ open, onClose, children, side, plate, className }: { op
     <AnimatePresence>
       {open && (
         <motion.div
-          className={cn("fixed inset-0 z-[60] flex bg-black/65", side ? "justify-end" : "items-center justify-center p-6")}
+          className={cn("fixed inset-0 z-[60] flex bg-black/75", side ? "justify-end" : "items-center justify-center p-6")}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -173,17 +170,17 @@ export function Dialog({ open, onClose, children, side, plate, className }: { op
           onMouseDown={(e) => e.target === e.currentTarget && onClose()}
         >
           <motion.div
-            initial={side ? { x: 24, opacity: 0 } : { y: 8, opacity: 0 }}
-            animate={{ x: 0, y: 0, opacity: 1 }}
-            exit={side ? { x: 24, opacity: 0 } : { y: 8, opacity: 0 }}
-            transition={{ duration: 0.22, ease }}
+            initial={side ? { x: 40, opacity: 0 } : { y: 10, scale: 0.98, opacity: 0 }}
+            animate={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+            exit={side ? { x: 40, opacity: 0 } : { y: 10, scale: 0.98, opacity: 0 }}
+            transition={{ duration: 0.26, ease }}
             className={cn(
-              "relative flex flex-col overflow-hidden border-line-strong bg-surface shadow-[0_32px_80px_-20px_rgba(0,0,0,0.9)]",
-              side ? "h-full w-[480px] border-l" : "max-h-full w-full rounded-xl border",
+              "panel relative flex flex-col overflow-hidden border-line-strong shadow-[0_40px_100px_-20px_rgba(0,0,0,1)]",
+              side ? "h-full w-[480px] border-l" : "max-h-full w-full rounded-2xl border",
               className,
             )}
           >
-            <button onClick={onClose} aria-label="Close" className={cn("absolute top-3.5 right-3.5 z-10 grid size-8 place-items-center rounded-md text-muted transition-colors hover:bg-hover hover:text-fg", plate && "bg-surface/70 text-soft")}>
+            <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 z-10 grid size-7 place-items-center rounded-full border border-line-strong text-muted transition-colors hover:border-gold hover:text-gold-bright">
               <X className="size-4" />
             </button>
             {plate && <div className="plate-art -mb-4 h-[132px] shrink-0" style={{ backgroundImage: `url(/art/${plate}.webp)` }} />}

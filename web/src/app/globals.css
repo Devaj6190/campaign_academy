@@ -1,33 +1,44 @@
 @import "tailwindcss";
 
-/* Warm black ground, cream text, and gold kept to one job: marking the thing you can act on or the place you are. */
+/* Black and gold. Warm blacks, cream text, brass linework, soft corners.
+   This is the look of the earlier "C2" pass with the game dressing taken off: no drifting smoke, no ring linework,
+   no glow halos, no gradient lettering. What stays is the palette, the hairlines, the framed panels and the plates. */
 @theme {
-  --color-bg: #0c0b09;
-  --color-surface: #131210;
-  --color-raised: #1a1815;
-  --color-hover: #23201b;
-  --color-line: rgb(255 244 220 / 0.09);
-  --color-line-strong: rgb(255 244 220 / 0.17);
-  --color-fg: #ece6da;
-  --color-soft: #c6bfb1;
-  --color-muted: #9d9586;
-  --color-faint: #8a8273;
-  --color-gold: #cfa85a;
-  --color-gold-bright: #e6c684;
+  --color-bg: #070605;
+  --color-surface: #0d0b08;
+  --color-raised: #15120c;
+  --color-hover: #211b11;
+  --color-line: rgb(214 178 110 / 0.13);
+  --color-line-strong: rgb(214 178 110 / 0.3);
+  --color-fg: #f3ecdc;
+  --color-soft: #cdc3ad;
+  --color-muted: #9f947d;
+  --color-faint: #857a64;
+  --color-gold: #d6b26e;
+  --color-gold-bright: #f3d999;
   --color-gold-deep: #8c6b2e;
   /* Data colours. warm is the candidate, cool is the opposition. */
-  --color-warm: #e39a45;
+  --color-warm: #ee9a3a;
   --color-cool: #6f9fc4;
   --color-pos: #86c58f;
   --color-neg: #e06a52;
   /* Every white/N overlay in the app picks up the cream tint. */
   --color-white: #fbf3df;
+
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
 }
 
 @theme inline {
-  --font-sans: var(--font-public-sans);
+  --font-sans: var(--font-hedvig);
   --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-newsreader);
+  /* Headings. `font-serif` is the class the views already use for titles; it and `font-display` both mean Funnel Display. */
+  --font-serif: var(--font-funnel);
+  --font-display: var(--font-funnel);
 }
 
 html,
@@ -37,32 +48,37 @@ body {
 }
 
 body {
-  background: var(--color-bg);
+  /* A still, low glow along the bottom edge and the top corners. It is light, not a picture, and nothing moves. */
+  background:
+    radial-gradient(62% 40% at 50% 112%, rgb(228 158 70 / 0.13), transparent 70%),
+    radial-gradient(40% 30% at 8% -10%, rgb(214 178 110 / 0.07), transparent 70%),
+    radial-gradient(36% 28% at 94% -6%, rgb(214 178 110 / 0.05), transparent 70%),
+    var(--color-bg);
   color: var(--color-fg);
-  font-family: var(--font-public-sans), system-ui, sans-serif;
-  font-size: 14px;
+  font-family: var(--font-hedvig), system-ui, sans-serif;
+  font-size: 13.5px;
   line-height: 1.5;
   caret-color: var(--color-gold);
 }
 
-/* Film grain over everything: the one texture in an otherwise flat UI. */
+/* Film grain over everything. */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 100;
   pointer-events: none;
-  opacity: 0.04;
+  opacity: 0.05;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 ::selection {
-  background: rgb(207 168 90 / 0.3);
+  background: rgb(214 178 110 / 0.32);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(255 244 220 / 0.16) transparent;
+  scrollbar-color: rgb(214 178 110 / 0.28) transparent;
 }
 
 button {
@@ -74,7 +90,7 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-gold);
+  outline: 1px solid var(--color-gold-bright);
   outline-offset: 2px;
 }
 
@@ -83,8 +99,14 @@ a {
 }
 
 .dots {
-  background-image: radial-gradient(rgb(255 244 220 / 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(rgb(214 178 110 / 0.1) 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+/* Every card built on these two fills catches a little light along its top edge. */
+.bg-raised,
+.bg-surface {
+  background-image: linear-gradient(180deg, rgb(255 236 190 / 0.04), transparent 46%);
 }
 
 /* Painted header band on a dialog. It fades into the panel below it. */
@@ -94,6 +116,95 @@ a {
   filter: sepia(0.3) saturate(1.1);
   -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent);
   mask-image: linear-gradient(to bottom, black 55%, transparent);
+}
+
+/* ---- Ornament ----
+   In the components layer so Tailwind utilities on the same element still win. */
+@layer components {
+  /* Gold lettering for titles and the brand. Solid, not a gradient. */
+  .gilt {
+    color: var(--color-gold-bright);
+  }
+
+  /* Side panels, popovers and dialogs: near-black with a faint gold wash at the top. */
+  .panel {
+    background: linear-gradient(180deg, rgb(214 178 110 / 0.06), transparent 220px), #0c0a07;
+  }
+
+  /* Panel edges are drawn as a line that fades out at both ends, not a full border. */
+  .edge-l {
+    border-left: 1px solid;
+    border-image: linear-gradient(to bottom, transparent, var(--color-line-strong) 12%, var(--color-gold) 50%, var(--color-line-strong) 88%, transparent) 1;
+  }
+  .edge-r {
+    border-right: 1px solid;
+    border-image: linear-gradient(to bottom, transparent, var(--color-line-strong) 12%, var(--color-gold) 50%, var(--color-line-strong) 88%, transparent) 1;
+  }
+
+  /* Section heading row: one hairline under it that trails off to the right. */
+  .plate {
+    position: relative;
+  }
+  .plate::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--color-line-strong), var(--color-line) 55%, transparent);
+  }
+
+  /* Secondary action: an outlined pill. */
+  .btn-pill {
+    border: 1px solid rgb(214 178 110 / 0.4);
+    border-radius: 9999px;
+    background: rgb(214 178 110 / 0.04);
+    color: var(--color-gold-bright);
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .btn-pill:hover {
+    border-color: var(--color-gold);
+    background: rgb(214 178 110 / 0.12);
+  }
+
+  /* Hairline that fades out at both ends, with a diamond at the centre. */
+  .rule {
+    position: relative;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--color-line-strong) 18%, var(--color-gold) 50%, var(--color-line-strong) 82%, transparent);
+  }
+  .rule::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: var(--color-gold-bright);
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+
+  /* Small diamond bullet used before section titles. */
+  .diamond {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    flex-shrink: 0;
+    background: var(--color-gold);
+    transform: rotate(45deg);
+  }
+
+  /* The primary action: a rounded gold button. */
+  .btn-gold {
+    color: #1a1206;
+    background: linear-gradient(180deg, #ecd08f, var(--color-gold));
+    border-radius: 9999px;
+    transition: filter 0.2s;
+  }
+  .btn-gold:hover {
+    filter: brightness(1.1);
+  }
 }
 
 @keyframes flow {

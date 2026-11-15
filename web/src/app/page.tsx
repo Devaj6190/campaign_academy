@@ -1,22 +1,25 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import { DecisionCard, useTicker } from "@/components/Clock";
+import { Paper } from "@/components/Paper";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { useGame } from "@/lib/store";
-import { Advisers } from "@/views/Advisers";
 import { CaseView } from "@/views/CaseView";
 import { MapView } from "@/views/MapView";
 import { Profile } from "@/views/Profile";
 import { VoterGroups } from "@/views/VoterGroups";
+import { WarRoom } from "@/views/WarRoom";
 
-// Every screen reads the current case. The first version's fictional race (its clock, staff chatter, pop-ups,
-// War room and Factions screens) is no longer mounted; time moves only when the student makes a decision.
-const VIEWS = { case: CaseView, profile: Profile, war: Advisers, map: MapView, factions: VoterGroups };
+// Every screen reads the current case. The War room is the live staff: real agents (lib/staff) whose work lands on
+// the case as a layer over the student's decisions. The clock (lib/cases/clock) runs between decisions and stops at each one.
+const VIEWS = { case: CaseView, profile: Profile, war: WarRoom, map: MapView, factions: VoterGroups };
 
 export default function Home() {
   const view = useGame((s) => s.view);
   const View = VIEWS[view];
+  useTicker();
 
   return (
     <div className="grid h-full grid-rows-[56px_minmax(0,1fr)]">
@@ -31,6 +34,8 @@ export default function Home() {
           </AnimatePresence>
         </main>
       </div>
+      <Paper />
+      <DecisionCard />
     </div>
   );
 }

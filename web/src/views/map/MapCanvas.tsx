@@ -4,7 +4,8 @@ import { Map as MLMap, NavigationControl, setWorkerUrl, type StyleSpecification 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import adResult from "@/lib/cases/mayor2013-ad.json";
-import { mapValue } from "@/lib/cases/store";
+import type { NightRow } from "@/lib/cases/night";
+import { mapValue, useCase } from "@/lib/cases/store";
 import { groupsHere } from "@/lib/demographics";
 import { DISTRICTS } from "@/lib/geo";
 import { sentimentOf, useGame } from "@/lib/store";
@@ -59,39 +60,39 @@ async function loadStyle(): Promise<StyleSpecification | string> {
 
 /** One Assembly District's certified 2013 votes (Board of Elections recaps, checked against the borough totals). */
 export type RealRow = { ad: number; total: number; share: number; deblasio: number; thompson: number; quinn: number; liu: number; weiner: number };
-export type Tip = { x: number; y: number; cd: number; real?: RealRow };
+/** `night`: the hover is on the election-night layer, so the row is the district to look up in the simulated result. */
+export type Tip = { x: number; y: number; cd: number; real?: RealRow; night?: boolean };
+/** What the map shows: the student's campaign by community district, their election night, or the certified result. */
+export type Layer = "campaign" | "night" | "real";
 
-const LAYERS = { districts: ["district-fill", "district-line", "district-pulse", "district-selected"], real: ["real-fill", "real-line"] };
-const show = (m: MLMap, real: boolean) => {
-  for (const id of LAYERS.districts) m.setLayoutProperty(id, "visibility", real ? "none" : "visible");
-  for (const id of LAYERS.real) m.setLayoutProperty(id, "visibility", real ? "visible" : "none");
+const LAYERS: Record<Layer, string[]> = { campaign: ["district-fill", "district-line", "district-pulse", "district-selected"], night: ["night-fill", "real-line"], real: ["real-fill", "real-line"] };
+const show = (m: MLMap, layer: Layer) => {
+  for (const id of new Set(Object.values(LAYERS).flat())) m.setLayoutProperty(id, "visibility", LAYERS[layer].includes(id) ? "visible" : "none");
 };
+// Both Assembly District layers colour by de Blasio's share on one scale, so the two maps can be compared.
+const SHARE = (v: unknown) => ["interpolate", ["linear"], v, 25, "rgb(70,116,214)", 40, "rgb(50,50,58)", 55, "rgb(240,162,59)"];
 
-export function MapCanvas({ onHover, onSelect, real = false }: { onHover: (t: Tip | null) => void; onSelect: (cd: number | null) => void; real?: boolean }) {
+export function MapCanvas({ onHover, onSelect, layer = "campaign", night }: { onHover: (t: Tip | null) => void; onSelect: (cd: number | null) => void; layer?: Layer; night?: { rows: NightRow[]; order: number[]; shown: number } }) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const ready = useRef(false);
-  const cbs = useRef({ onHover, onSelect, real });
-  useEffect(() => { cbs.current = { onHover, onSelect, real }; });
+  const cbs = useRef({ onHover, onSelect, layer });
+  useEffect(() => { cbs.current = { onHover, onSelect, layer }; });
 
   const sent = useGame((s) => s.sent);
   const filter = useGame((s) => s.filter);
   const factions = useGame((s) => s.factions);
   const district = useGame((s) => s.district);
-  const ledger = useGame((s) => s.ledger.length);
-  const election = useGame((s) => s.election);
 
-  // Election night: colour each district by its winner as its result comes in.
-  useEffect(() => {
-    const m = map.current;
-    if (!m || !ready.current) return;
-    if (!election) {
-      for (const d of DISTRICTS) if (!d.park) m.setFeatureState({ source: "districts", id: d.cd }, { winner: null });
-      return;
-    }
-    const byCd = new Map(election.result.byDistrict.map((r) => [r.cd, r.winner]));
-    for (const cd of election.result.order.slice(0, election.shown)) m.setFeatureState({ source: "districts", id: cd }, { winner: byCd.get(cd), op: 0.85 });
-  }, [election]);
+  // Election night: mark each Assembly District that has reported, with the student's share there.
+  const nightRef = useRef(night);
+  useEffect(() => { nightRef.current = night; });
+  const count = () => {
+    const m = map.current, n = nightRef.current;
+    if (!m || !ready.current || !n) return;
+    const reported = new Set(n.order.slice(0, n.shown));
+    for (const r of n.rows) m.setFeatureState({ source: "real", id: r.ad }, { in: reported.has(r.ad), s: r.share });
+  };
 
   // Paint support (and, under a group filter, how many of that group live there) into feature state.
   const paint = () => {
@@ -120,28 +121,29 @@ export function MapCanvas({ onHover, onSelect, real = false }: { onHover: (t: Ti
         if (m.getLayer("background")) m.setPaintProperty("background", "background-color", "#08080a");
         m.addSource("districts", { type: "geojson", data: geojson });
         const support = ["interpolate", ["linear"], ["coalesce", ["feature-state", "v"], 50], 20, "rgb(70,116,214)", 47.5, "rgb(50,50,58)", 75, "rgb(240,162,59)"];
-        // On election night a district shows its winner once its result is in.
-        const heat = ["match", ["coalesce", ["feature-state", "winner"], "none"], "cole", "#f0a23b", "hale", "#a3a3ad", "brandt", "#7b72d6", support];
-        m.addLayer({ id: "district-fill", type: "fill", source: "districts", filter: ["!", ["get", "park"]], paint: { "fill-color": heat as never, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], ["+", ["coalesce", ["feature-state", "op"], 0.6], 0.18], ["coalesce", ["feature-state", "op"], 0.6]] as never, "fill-opacity-transition": { duration: 400 }, "fill-color-transition": { duration: 600 } } }, firstLabel);
+        m.addLayer({ id: "district-fill", type: "fill", source: "districts", filter: ["!", ["get", "park"]], paint: { "fill-color": support as never, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], ["+", ["coalesce", ["feature-state", "op"], 0.6], 0.18], ["coalesce", ["feature-state", "op"], 0.6]] as never, "fill-opacity-transition": { duration: 400 }, "fill-color-transition": { duration: 600 } } }, firstLabel);
         m.addLayer({ id: "district-line", type: "line", source: "districts", filter: ["!", ["get", "park"]], paint: { "line-color": "rgba(255,255,255,0.22)", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 14, 1.6] } }, firstLabel);
         m.addLayer({ id: "district-pulse", type: "line", source: "districts", paint: { "line-color": "#f0a23b", "line-blur": 3, "line-width": ["case", ["boolean", ["feature-state", "pulse"], false], 6, 0], "line-opacity": ["case", ["boolean", ["feature-state", "pulse"], false], 0.9, 0], "line-width-transition": { duration: 500 }, "line-opacity-transition": { duration: 900 } } });
         m.addLayer({ id: "district-selected", type: "line", source: "districts", filter: ["==", ["get", "cd"], -1], paint: { "line-color": "#ffffff", "line-width": 2.4 } });
         // The real 2013 result by Assembly District, coloured by de Blasio's share. Hidden until the case is finished.
         m.addSource("real", { type: "geojson", data: adResult as never });
-        m.addLayer({ id: "real-fill", type: "fill", source: "real", paint: { "fill-color": ["interpolate", ["linear"], ["get", "share"], 25, "rgb(70,116,214)", 40, "rgb(50,50,58)", 55, "rgb(240,162,59)"] as never, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.85, 0.68] as never } }, firstLabel);
+        m.addLayer({ id: "real-fill", type: "fill", source: "real", paint: { "fill-color": SHARE(["get", "share"]) as never, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.85, 0.68] as never } }, firstLabel);
+        // Election night: the same districts, dark until each one reports, then coloured by the student's simulated share there.
+        m.addLayer({ id: "night-fill", type: "fill", source: "real", paint: { "fill-color": ["case", ["boolean", ["feature-state", "in"], false], SHARE(["coalesce", ["feature-state", "s"], 40]), "rgb(20,20,24)"] as never, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.85, 0.68] as never, "fill-color-transition": { duration: 500 } } }, firstLabel);
         m.addLayer({ id: "real-line", type: "line", source: "real", paint: { "line-color": "rgba(255,255,255,0.22)", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 14, 1.6] } }, firstLabel);
-        show(m, cbs.current.real);
+        show(m, cbs.current.layer);
         // 3D buildings from the street map's own building data, rising as you zoom in.
         if (m.getSource("openmaptiles")) {
           m.addLayer({ id: "buildings-3d", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: 12, paint: { "fill-extrusion-color": "#3b3b45", "fill-extrusion-height": ["coalesce", ["get", "render_height"], 10] as never, "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0] as never, "fill-extrusion-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13.2, 0.9] as never } }, firstLabel);
         }
         ready.current = true;
         paint();
+        count();
         // Coming back to the map with a district already picked: go straight to it.
         focus(m, true, useGame.getState().district, 0);
       });
-      // Only one of the two fills is visible at a time, so they share the hover bookkeeping.
-      for (const [layer, source] of [["district-fill", "districts"], ["real-fill", "real"]] as const) {
+      // Only one of the fills is visible at a time, so they share the hover bookkeeping.
+      for (const [layer, source] of [["district-fill", "districts"], ["real-fill", "real"], ["night-fill", "real"]] as const) {
         m.on("mousemove", layer, (e) => {
           const f = e.features?.[0];
           if (!f) return;
@@ -154,7 +156,7 @@ export function MapCanvas({ onHover, onSelect, real = false }: { onHover: (t: Ti
           m.getCanvas().style.cursor = source === "real" ? "" : "pointer";
           const r = m.getContainer().getBoundingClientRect();
           const at = { x: r.left + e.point.x, y: r.top + e.point.y };
-          cbs.current.onHover(source === "real" ? { ...at, cd: 0, real: f.properties as RealRow } : { ...at, cd: id });
+          cbs.current.onHover(source === "real" ? { ...at, cd: 0, real: f.properties as RealRow, night: layer === "night-fill" } : { ...at, cd: id });
         });
         m.on("mouseleave", layer, () => {
           if (hovered != null) m.setFeatureState({ source, id: hovered }, { hover: false });
@@ -172,29 +174,31 @@ export function MapCanvas({ onHover, onSelect, real = false }: { onHover: (t: Ti
   }, []);
 
   // Recolour whenever support, the group filter or group feelings change.
-  useEffect(paint, [sent, filter, factions]);
+  // The case moves while the map is open: a decision is made, the campaign reaches the next one, a staff job lands.
+  const picks = useCase((s) => s.picks), at = useCase((s) => s.at), work = useCase((s) => s.work);
+  useEffect(paint, [sent, filter, factions, picks, at, work]);
 
-  // Swap between the student's campaign and the real result.
-  useEffect(() => { if (map.current && ready.current) show(map.current, real); }, [real]);
+  // Swap between the student's campaign, their election night and the real result.
+  useEffect(() => { if (map.current && ready.current) show(map.current, layer); }, [layer]);
+  useEffect(count, [night?.shown, night?.rows]);
 
   // Fly to the selected district and tilt so its buildings stand up; zoom back out when cleared.
   useEffect(() => focus(map.current, ready.current, district), [district]);
 
-  // Districts that just changed glow for a moment, so the map visibly reacts to staff and to the candidate.
-  const seen = useRef(0);
+  // Districts where work just landed glow for a moment, so the map visibly reacts to staff, the candidate and rivals.
+  const seen = useRef(work.length);
   useEffect(() => {
     const m = map.current;
-    const entries = useGame.getState().ledger;
-    const fresh = entries.slice(seen.current);
-    seen.current = entries.length;
+    const fresh = work.slice(seen.current);
+    seen.current = work.length;
     if (!m || !ready.current) return;
-    for (const l of fresh) {
-      for (const cd of Object.keys(l.effect.sent)) {
+    for (const x of fresh) {
+      for (const cd of Object.keys(x.districts)) {
         m.setFeatureState({ source: "districts", id: +cd }, { pulse: true });
         setTimeout(() => map.current?.setFeatureState({ source: "districts", id: +cd }, { pulse: false }), 2600);
       }
     }
-  }, [ledger]);
+  }, [work]);
 
   // MapLibre's stylesheet makes its container position: relative, so it fills a positioned wrapper instead.
   return (

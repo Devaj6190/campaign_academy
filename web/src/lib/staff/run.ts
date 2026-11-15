@@ -1,41 +1,70 @@
 "use client";
 
+import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
+import { platformAt } from "../cases/platform";
+import { factionWork, popShare, supportIn, useCase, worldNow } from "../cases/store";
 import { useGame } from "../store";
-import { ACTIONS } from "../engine/catalog";
-import type { Effect } from "../engine/resolve";
+import { ACTIONS, type ActionId } from "../engine/catalog";
+import { resolve, type Effect } from "../engine/resolve";
 import { runOffline } from "./offline";
 import { RunCtx, type Line, type RunEvent, type RunRequest } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
 import { bumpMorale, nextId, pushChat, useStaff, type FeedItem } from "./store";
-import { shortPlace, type Snapshot } from "./world";
+import { PLACES, short, shortPlace, type Snapshot } from "./world";
 
-// Drives one instruction from the browser: sends it, reads the event stream, and applies each event to the game.
+// Drives one instruction from the browser: sends it, reads the event stream, and applies each event to the campaign.
+// The staff read the live case (the student's world on today's date) and their results land on the case's work layer.
 
-export const BASE_BUDGET = 8000;
+// What one unit of the action catalog is worth in the case. Simulated, and the one place to tune it.
+// Money is 1:10. A point of district sentiment is half a point of support there; a point of group feeling is 0.15
+// points of support in that group. All staff work fades as its citywide total nears STAFF_CAP points, so the
+// student's decisions stay the main lever on the race.
+export const SCALE = { money: 10, local: 0.5, group: 0.15 };
+export const STAFF_CAP = 5;
+export const BASE_BUDGET = 8000 * SCALE.money;
 
+// ponytail: the poll's voter groups are read from the one case that has them (mayor2013-factions); make them a field
+// on the case when a second case needs staff.
 export function snapshot(): Snapshot {
   const g = useGame.getState();
   const s = useStaff.getState();
+  const k = useCase.getState();
+  const { c, w } = worldNow();
+  const mine = w.poll[c.follow] ?? 0;
+  const boost = factionWork();
+  // Only the campaign's own work counts toward its cap, not what rivals took away.
+  const gained = k.work.reduce((a, x) => a + (c.candidates.some((r) => r.id === x.by) ? 0 : (x.poll[c.follow] ?? 0)), 0);
+  const room = Math.max(0, 1 - gained / STAFF_CAP);
+  const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
   return {
-    day: g.day,
-    min: g.min,
-    cash: g.cash,
-    poll: g.poll,
-    sent: g.sent,
-    factions: g.factions.map(({ id, name, feel, size, values, dislikes }) => ({ id, name, feel, size, values, dislikes })),
+    race: c.title[0].toLowerCase() + c.title.slice(1),
+    candidate: c.candidates.find((x) => x.id === c.follow)?.name ?? c.follow,
+    me: c.follow,
+    date: k.date,
+    daysLeft: Math.max(0, days(k.date, c.electionDate)),
+    day: days(c.briefingDate, k.date) + 1,
+    min: 0,
+    cash: w.budget,
+    poll: w.poll,
+    names: Object.fromEntries(c.candidates.map((x) => [x.id, x.name])),
+    sent: Object.fromEntries(PLACES.map((p) => [p.cd, supportIn(p.cd) ?? mine])),
+    factions: FACTIONS_2013.map((f) => ({ id: f.id, name: f.name, feel: factionNow(f, w.groups, mine, c.start.poll[c.follow] ?? 0, boost), size: f.share, values: [], dislikes: [] })),
     staff: g.staff,
-    manifesto: g.manifesto,
+    // The platform on record so far, then the planks the student has added.
+    manifesto: [...platformAt(c, k.at, k.picks).map((p) => p.text), ...k.work.filter((x) => x.by === "platform").map((x) => x.note ?? x.label)],
     hires: s.hires,
     morale: s.morale,
+    scale: { money: SCALE.money, local: SCALE.local * room, group: SCALE.group * room },
   };
 }
 
-const nameOf = (id: string) => useGame.getState().staff.find((p) => p.id === id)?.name ?? "Someone";
-const first = (id: string) => nameOf(id).split(" ")[0];
+const person = (id: string) => useGame.getState().staff.find((p) => p.id === id);
+const first = (id: string) => { const p = person(id); return p ? short(p) : "someone"; };
+const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
 
 export function feed(who: string, text: string, tone?: FeedItem["tone"]) {
-  const { day, min } = useGame.getState();
-  useStaff.setState((s) => ({ feed: [{ id: nextId(), day, min, who, text, tone }, ...s.feed].slice(0, 60) }));
+  const { date } = useCase.getState();
+  useStaff.setState((s) => ({ feed: [{ id: nextId(), date, who, text, tone }, ...s.feed].slice(0, 60) }));
 }
 
 function setBusy(id: string, v?: "down" | "up" | "work") {
@@ -53,7 +82,57 @@ function packet(from: string, to: string) {
   setTimeout(() => useStaff.setState((s) => ({ packets: s.packets.filter((p) => p.id !== id) })), 1300);
 }
 
-const apply = (e: Effect) => useGame.getState().applyEffect(e, "staff");
+/**
+ * One finished job lands on the case. District points stay in that district; group points go to the case's own voter
+ * group where it simulates one, otherwise to the poll group. Both also move the citywide figure by the share of
+ * the city they reach.
+ */
+/** `cap`: the most this one effect may move the citywide figure either way (used for platform planks). */
+export function apply(e: Effect, cap = Infinity) {
+  const { c } = worldNow();
+  const groups: Record<string, number> = {}, factions: Record<string, number> = {};
+  let citywide = 0;
+  for (const [cd, d] of Object.entries(e.sent)) citywide += d * popShare(+cd);
+  for (const [id, d] of Object.entries(e.factions)) {
+    const f = FACTIONS_2013.find((x) => x.id === id);
+    if (!f) continue;
+    if (f.tracks) groups[f.tracks] = (groups[f.tracks] ?? 0) + d;
+    else factions[id] = (factions[id] ?? 0) + d;
+    citywide += (d * f.share) / 100;
+  }
+  useCase.getState().addWork({ by: e.by, label: e.label, note: e.summary.replace(/ \(Not their strength.*$/, ""), cost: e.cost, raised: e.raised, poll: { [c.follow]: Math.max(-cap, Math.min(cap, citywide)) }, groups, factions, districts: e.sent });
+}
+
+// --- The candidate in person, from the map ---
+
+/** What the candidate can do in a district himself. He has a few appearances a day; staff can do more. */
+export const APPEARANCES: { id: ActionId; label: string; note: string }[] = [
+  { id: "canvass", label: "Knock doors", note: "moves this district" },
+  { id: "rally", label: "Hold a rally", note: "moves this district more" },
+  { id: "house_party", label: "House party", note: "raises money" },
+];
+export const DAILY = 2;
+
+export const appearancesToday = () => { const { work, date } = useCase.getState(); return work.filter((x) => x.by === "candidate" && x.date === date).length; };
+
+/** What an appearance would cost and do, without doing it. */
+export const preview = (cd: number, id: ActionId) => resolve(snapshot(), "candidate", id, { district: cd }, { quality: 1, seed: cd * 7 + appearancesToday(), load: 1 });
+
+/** The candidate does it. Refused when he is out of appearances for the day or the money is not there. */
+export function appear(cd: number, id: ActionId): { ok: boolean; text: string } {
+  if (appearancesToday() >= DAILY) return { ok: false, text: "No appearances left today. Send staff, or let the clock run to tomorrow." };
+  const e = preview(cd, id);
+  if (e.cost > worldNow().w.budget) return { ok: false, text: "The campaign does not have the money for that." };
+  apply(e);
+  feed("candidate", `The candidate: ${e.summary}`, e.raised > e.cost ? "pos" : undefined);
+  return { ok: true, text: e.summary };
+}
+
+/** Hand a district to the Field Director: a draft order waits in their box in the War room. */
+export function sendStaff(cd: number) {
+  useStaff.setState((s) => ({ draft: { ...s.draft, fd: `Canvass ${shortPlace(cd)} this week and tell me what you find` } }));
+  useGame.setState({ view: "war", person: "fd" });
+}
 
 function handle(director: string, runId: number, e: RunEvent) {
   const patchRun = (fn: (r: NonNullable<ReturnType<typeof current>>) => void) =>
@@ -79,7 +158,7 @@ function handle(director: string, runId: number, e: RunEvent) {
       useStaff.setState((s) => ({ job: { ...s.job, [e.to]: e.job } }));
       patchRun((r) => { r.jobs = [...r.jobs, { to: e.to, job: e.job, done: false }]; });
       pushChat(e.to, { k: "me", text: `From ${first(director)}: ${e.job}` });
-      feed(director, `${first(director)} → ${first(e.to)}: ${e.job}`);
+      feed(director, `${cap(first(director))} → ${first(e.to)}: ${e.job}`);
       break;
     }
     case "action": {
@@ -111,7 +190,7 @@ function handle(director: string, runId: number, e: RunEvent) {
       // Clear orders to the right person lift morale; vague ones and misfits wear people down.
       bumpMorale(director, e.clarity >= 3 ? 3 : e.clarity <= 1 ? -3 : 0);
       if (e.fit < 1) for (const j of current()?.jobs ?? []) bumpMorale(j.to, -2);
-      feed(director, `${first(director)} reported back${e.ask ? ` and wants $${e.ask.amount.toLocaleString("en-US")} more` : ""}.`, e.ask ? "warm" : undefined);
+      feed(director, `${cap(first(director))} reported back${e.ask ? ` and wants $${e.ask.amount.toLocaleString("en-US")} more` : ""}.`, e.ask ? "warm" : undefined);
       break;
     case "error":
       pushChat(director, { k: "note", text: e.text });
@@ -125,7 +204,7 @@ function handle(director: string, runId: number, e: RunEvent) {
 export async function instruct(id: string, text: string, extra = 0, followOf?: string) {
   const s = useStaff.getState();
   if (s.active[id]) {
-    pushChat(id, { k: "note", text: `${first(id)} is still on the last job. Wait for the report.` });
+    pushChat(id, { k: "note", text: `${cap(first(id))} is still on the last job. Wait for the report.` });
     return;
   }
   const runId = Date.now() % 1e9;
@@ -192,15 +271,12 @@ export function answerAsk(id: string, index: number, yes: boolean) {
 
 // --- The team: hiring, letting go, reassigning ---
 
-const payroll = (delta: number) =>
-  useGame.setState((g) => ({ losses: g.losses.map((c, i) => (i === 0 ? { ...c, v: Math.max(0, c.v + delta), items: c.items.map(([n, v], x) => [n, x === 0 ? Math.max(0, v + delta) : v] as [string, number]) } : c)) }));
-
 export async function loadCandidates(post: string) {
   const role = useGame.getState().staff.find((p) => p.id === post)?.role;
   if (!role || useStaff.getState().candidates[post]) return;
   useStaff.setState((s) => ({ candidates: { ...s.candidates, [post]: { status: "loading", list: [] } } }));
-  const g = useGame.getState();
-  const context = `Day ${g.day} of 30, $${g.cash.toLocaleString("en-US")} in the bank, candidate Adrian Cole stands for more housing near transit, better buses, level police funding and help for small business, and is polling ${g.poll.cole}% to Hale's ${g.poll.hale}%.`;
+  const w = snapshot();
+  const context = `${w.candidate}'s campaign in ${w.race}. Today is ${w.date}, ${w.daysLeft} days to the primary, with $${Math.round(w.cash).toLocaleString("en-US")} left to spend under the cap. Poll: ${Object.entries(w.poll).sort((x, y) => y[1] - x[1]).slice(0, 4).map(([id, v]) => `${w.names[id]} ${Math.round(v)}`).join(", ")}.`;
   try {
     const res = await fetch("/api/staff/candidates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role, context }) });
     const data = (await res.json()) as { list: Candidate[]; mode: "live" | "offline" };
@@ -215,15 +291,14 @@ export function hire(post: string, c: Candidate) {
   const p = useGame.getState().staff.find((x) => x.id === post);
   if (!p || p.name) return;
   const base = profileFor(post, p.role);
-  useGame.setState((g) => ({ staff: g.staff.map((x) => (x.id === post ? { ...x, name: c.name, good: c.good, weak: c.weak, doing: "Settling in" } : x)) }));
+  useGame.setState((g) => ({ staff: g.staff.map((x) => (x.id === post ? { ...x, name: x.role, good: c.good, weak: c.weak } : x)) }));
   useStaff.setState((s) => {
     const candidates = { ...s.candidates };
     delete candidates[post];
     return { hires: { ...s.hires, [post]: { skills: ROLE_SKILLS[p.role] ?? base.skills, cost: c.cost, effect: c.effect, turf: base.turf, voice: c.voice, salary: c.salary } }, morale: { ...s.morale, [post]: 80 }, candidates };
   });
-  payroll(c.salary);
   pushChat(post, { k: "them", text: `Glad to be here. Tell me where you want me first.` });
-  feed(post, `You hired ${c.name} as ${p.role} ($${c.salary.toLocaleString("en-US")}/day).`, "pos");
+  feed(post, `You filled the ${p.role} post.`, "pos");
   useGame.setState((g) => ({ tasks: g.tasks.map((t) => (t.text.toLowerCase().includes(p.role.toLowerCase().split(",")[0].toLowerCase()) ? { ...t, done: true } : t)) }));
 }
 
@@ -231,13 +306,11 @@ export function letGo(id: string) {
   const g = useGame.getState();
   const p = g.staff.find((x) => x.id === id);
   if (!p?.name || useStaff.getState().active[id]) return;
-  const salary = useStaff.getState().hires[id]?.salary ?? profileFor(id, p.role).salary;
   useGame.setState((s) => ({ staff: s.staff.map((x) => (x.id === id ? { id: x.id, boss: x.boss, role: x.role } : x)), person: id }));
   useStaff.setState((s) => { const hires = { ...s.hires }; delete hires[id]; const chat = { ...s.chat }; delete chat[id]; return { hires, chat }; });
-  payroll(-salary);
   // Colleagues notice.
   for (const x of g.staff) if (x.name && x.id !== id && (x.boss === p.boss || x.boss === id || x.id === p.boss)) bumpMorale(x.id, -5);
-  feed(id, `You let ${p.name} go. Payroll −$${salary.toLocaleString("en-US")}/day; the team is rattled.`, "neg");
+  feed(id, `You let ${short(p)} go. The team is rattled.`, "neg");
 }
 
 export function reassign(id: string, boss: string) {
@@ -246,5 +319,5 @@ export function reassign(id: string, boss: string) {
   if (!p?.name || !p.boss || p.boss === boss || useStaff.getState().active[id]) return;
   useGame.setState((s) => ({ staff: s.staff.map((x) => (x.id === id ? { ...x, boss } : x)) }));
   bumpMorale(id, -2);
-  feed(id, `${p.name.split(" ")[0]} now reports to ${first(boss)}.`);
+  feed(id, `${cap(short(p))} now reports to ${first(boss)}.`);
 }

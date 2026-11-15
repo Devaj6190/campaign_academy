@@ -1,9 +1,10 @@
 import { planLive, rulePlan, type PlanRequest } from "@/lib/engine/rivalAgent";
 
-// One rival's moves for tonight. Live agent when there is an API key; the rules otherwise, or if it fails.
+// One rival's moves for the coming stretch. Live agent when there is an API key; the rules otherwise, or if it fails.
 export async function POST(request: Request) {
   const req = (await request.json()) as PlanRequest;
-  if (req.who !== "hale" && req.who !== "brandt") return Response.json({ error: "Unknown rival" }, { status: 400 });
+  const names = req.snapshot?.names ?? {};
+  if (!req.who || !(req.who in names) || req.who === req.snapshot.me) return Response.json({ error: "Unknown rival" }, { status: 400 });
   if (!process.env.ANTHROPIC_API_KEY) return Response.json(rulePlan(req));
   try {
     const t0 = Date.now();

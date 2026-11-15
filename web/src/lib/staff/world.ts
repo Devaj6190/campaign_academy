@@ -6,17 +6,31 @@ import type { Profile } from "./roster";
 // The slice of the world a staff run needs. The browser sends it with each instruction; the server never keeps state.
 
 export type Snapshot = {
+  /** The race, the candidate the student works for (name and id) and the live date, read from the case. */
+  race: string;
+  candidate: string;
+  me: string;
+  date: string;
+  daysLeft: number;
+  /** Days since the briefing, from 1. */
   day: number;
   min: number;
+  /** What is left to spend under the cap. */
   cash: number;
-  poll: { cole: number; hale: number; brandt: number };
+  /** Citywide standing by candidate id, with the names to print. */
+  poll: Record<string, number>;
+  names: Record<string, string>;
+  /** The student's support in each community district, in percent. */
   sent: Record<number, number>;
+  /** The primary's voter groups: `feel` is the student's support there in percent, `size` the group's share of likely voters. */
   factions: Pick<Faction, "id" | "name" | "feel" | "size" | "values" | "dislikes">[];
   staff: Staff[];
   manifesto: string[];
   /** Profiles for people hired during the game (seed staff use roster.ts). */
   hires: Record<string, Profile>;
   morale: Record<string, number>;
+  /** Case units per engine unit: dollars, points in a district, points in a voter group (set in staff/run.ts). */
+  scale: { money: number; local: number; group: number };
 };
 
 export const BOROS = ["", "Manhattan", "Bronx", "Brooklyn", "Queens", "Staten Island"];
@@ -35,18 +49,30 @@ export const shortPlace = (cd?: number) => {
   return first.length < 5 ? full : first; // "Mid-Island", not "Mid"
 };
 
-// Words a player might use for each faction.
+// Words a student might use for each of the primary's voter groups (ids from lib/cases/mayor2013-factions).
 export const FACTION_WORDS: Record<string, string[]> = {
-  renters: ["renter", "tenant", "rent"],
-  homeowners: ["homeowner", "owner", "property"],
-  immigrants: ["immigrant", "language", "community", "communities"],
-  transit: ["transit", "subway", "bus", "rider", "commut"],
-  seniors: ["senior", "older", "elderly", "retire"],
-  unions: ["union", "labor", "labour", "worker", "picket"],
-  smallbiz: ["small business", "small-business", "merchant", "shop", "bodega", "restaurant"],
-  activists: ["progressive", "left", "activist", "brandt"],
-  donors: ["donor", "real estate", "wealthy", "developer"],
-  students: ["student", "college", "campus", "young"],
+  white: ["white voter", "white "],
+  black: ["black voter", "black ", "african american", "african-american"],
+  latino: ["latino", "latina", "hispanic"],
+  brooklyn: ["brooklyn"],
+  manhattan: ["manhattan"],
+  "queens-si": ["queens", "staten island"],
+  bronx: ["bronx"],
+  liberal: ["liberal", "progressive"],
+  moderate: ["moderate"],
+  conservative: ["conservative"],
+  catholic: ["catholic"],
+  protestant: ["protestant", "church"],
+  jewish: ["jewish"],
+  older: ["older", "senior", "over 45", "45 and older", "retire"],
+  younger: ["younger", "young", "under 45", "student"],
+  women: ["women"],
+  men: [" men ", "male voter"],
+  "income-high": ["higher income", "high income", "above $50", "over $50"],
+  "income-low": ["lower income", "low income", "working class", "under $50"],
+  college: ["college graduate", "graduates", "degree holder"],
+  "no-college": ["no college", "without a degree", "non-college"],
+  union: ["union", "labor", "labour"],
 };
 
 export const findPlaces = (text: string) => {
@@ -69,6 +95,8 @@ export const humanize = (text: string, factions: { id: string; name: string }[])
   return text
     .replace(/(?<![$\d,.])\b(?:(?:community )?district |cd ?)?#?(\d{3})\b(?![,.]?\d)/gi, (m, n) => (PLACES.some((p) => p.cd === +n) ? shortPlace(+n) : m))
     .replace(/\(?\bfaction(?:[ _]id)?\s*[:=]?\s*"?([a-z]+)"?\)?/gi, (m, id) => fname(id) ?? m)
-    .replace(/\b(smallbiz|progressives)\b/g, (m) => fname(m)?.toLowerCase() ?? m)
     .replace(/\b[a-z]+(?:_[a-z]+)+\b/g, (m) => (ACTIONS as Record<string, { label: string }>)[m]?.label.toLowerCase() ?? m.replace(/_/g, " "));
 };
+
+/** How to refer to someone in a sentence: a first name, or "the Field Director" for a post shown by its title. */
+export const short = (p: { name?: string; role: string }) => (!p.name ? "someone" : p.name === p.role ? `the ${p.role}` : p.name.split(" ")[0]);
