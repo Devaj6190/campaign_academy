@@ -6,6 +6,7 @@ import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
 import { factionWork, shortMoney, supportIn, useCase, worldNow } from "../cases/store";
 import { useGame } from "../store";
 import { profileFor } from "./roster";
+import { runway } from "../sim/spend";
 import { comeBack, dueFollowUps, feed } from "./run";
 import { pushChat, useStaff } from "./store";
 import { BOROS, PLACES, short, shortPlace } from "./world";
@@ -58,6 +59,13 @@ function triggers(day: number): Trigger[] {
   // Money: the closing weeks need a reserve.
   const close = -(c.close.shift.budget ?? 0);
   if (close > 0 && w.budget < close && has("fin")) out.push({ key: "money", who: "fin", situation: `The campaign has ${shortMoney(w.budget)} left to spend under the cap. A full push in the closing weeks costs about ${shortMoney(close)}.`, text: `We have ${shortMoney(w.budget)} left under the cap, and the closing weeks need about ${shortMoney(close)}. Everything we fund now comes out of the finish.`, suggest: "Raise money this week with call time and a donor dinner" });
+
+  // The weekly plan (the top bar's sliders) will not last, or eats the closing push.
+  const plan = runway(k.allocation);
+  if (w.budget >= close && (plan.runsOut || plan.eatsClose) && has("fin")) {
+    const when = plan.runsOut ? `runs out around ${plan.runsOut}` : `leaves less than ${shortMoney(close)} for the closing weeks`;
+    out.push({ key: `plan-${plan.runsOut ? "out" : "close"}`, who: "fin", situation: `The weekly spending plan costs ${shortMoney(plan.cost)} a week and raises about ${shortMoney(plan.raised)}. At that rate the money ${when}.`, text: `At this week's spending the money ${when}. Something on the plan has to come down.`, suggest: "Tell me which line of the weekly plan to cut and I will keep the rest running" });
+  }
 
   // The large voter group where the campaign trails its own citywide figure by the most.
   const boost = factionWork();

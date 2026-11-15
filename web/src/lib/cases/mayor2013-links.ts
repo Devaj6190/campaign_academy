@@ -17,7 +17,8 @@ import { FACTIONS_2013 } from "./mayor2013-factions";
 // same people (Black voters and Protestants, Latino voters and Catholics). Women, men, college graduates and the Bronx
 // have no links: the tables show no clear gap for them.
 //
-// A link only shows a connection. It moves no number: work aimed at one group does not spill into its linked groups.
+// A link shows a connection. Work bought by the weekly plan spills along it (`spill` in lib/cases/allocation, #33);
+// staff orders, appearances and planks do not.
 // ponytail: written by hand, one line per pair. Derive them from a table of figures if a second case needs links.
 
 export type Link = { a: string; b: string; kind: "shared" | "opposed"; why: string };

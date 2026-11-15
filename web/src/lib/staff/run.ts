@@ -2,7 +2,8 @@
 
 import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
 import { platformAt } from "../cases/platform";
-import { factionWork, popShare, supportIn, useCase, worldNow } from "../cases/store";
+import { describePlan } from "../cases/allocation";
+import { factionWork, popShare, supportIn, useCase, worldNow, type Work } from "../cases/store";
 import { useGame } from "../store";
 import { ACTIONS, BOOKING, type ActionId } from "../engine/catalog";
 import { resolve, type Effect } from "../engine/resolve";
@@ -56,6 +57,7 @@ export function snapshot(as?: { at: number; date: string }): Snapshot {
     staff: g.staff,
     booked: k.bookings.filter((b) => !b.done).map((b) => ({ date: b.date, label: `${BOOKING[b.kind].label} in ${shortPlace(b.cd)}` })),
     daily: DAILY,
+    plan: describePlan(k.allocation, (l) => ACTIONS[l.action].cost * SCALE.money * profileFor(l.by, l.by).cost),
     // The platform on record so far, then the planks the student has added.
     manifesto: [...platformAt(c, k.at, k.picks).map((p) => p.text), ...k.work.filter((x) => x.by === "platform").map((x) => x.note ?? x.label)],
     hires: s.hires,
@@ -93,8 +95,8 @@ function packet(from: string, to: string) {
  * group where it simulates one, otherwise to the poll group. Both also move the citywide figure by the share of
  * the city they reach.
  */
-/** `cap`: the most this one effect may move the citywide figure either way (used for platform planks). */
-export function apply(e: Effect, cap = Infinity) {
+/** `cap`: the most this one effect may move the citywide figure either way (used for platform planks). `extra`: more fields for the work entry. */
+export function apply(e: Effect, cap = Infinity, extra?: Pick<Work, "plan">) {
   const { c } = worldNow();
   const groups: Record<string, number> = {}, factions: Record<string, number> = {};
   let citywide = 0;
@@ -106,7 +108,7 @@ export function apply(e: Effect, cap = Infinity) {
     else factions[id] = (factions[id] ?? 0) + d;
     citywide += (d * f.share) / 100;
   }
-  useCase.getState().addWork({ by: e.by, label: e.label, note: e.summary.replace(/ \(Not their strength.*$/, ""), cost: e.cost, raised: e.raised, poll: { [c.follow]: Math.max(-cap, Math.min(cap, citywide)) }, groups, factions, districts: e.sent });
+  useCase.getState().addWork({ by: e.by, label: e.label, note: e.summary.replace(/ \(Not their strength.*$/, ""), cost: e.cost, raised: e.raised, poll: { [c.follow]: Math.max(-cap, Math.min(cap, citywide)) }, groups, factions, districts: e.sent, ...extra });
 }
 
 // --- The candidate in person, from the map ---
@@ -119,7 +121,8 @@ export const APPEARANCES: { id: ActionId; label: string; note: string }[] = [
 ];
 export const DAILY = 2;
 
-export const appearancesToday = () => { const { work, date } = useCase.getState(); return work.filter((x) => x.by === "candidate" && x.date === date).length; };
+/** Call time is the candidate on the phone, so a session, ordered or from the weekly plan, uses one of his appearances. */
+export const appearancesToday = () => { const { work, date } = useCase.getState(); return work.filter((x) => x.date === date && (x.by === "candidate" || x.label === ACTIONS.call_time.label)).length; };
 
 /** What an appearance would cost and do, without doing it. */
 export const preview = (cd: number, id: ActionId, faction?: string) => resolve(snapshot(), "candidate", id, { district: cd, faction }, { quality: 1, seed: cd * 7 + appearancesToday(), load: 1 });

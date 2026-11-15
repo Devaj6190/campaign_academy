@@ -2,6 +2,7 @@ import type { StoreApi } from "zustand";
 import { quietly } from "./loading";
 import { useNight } from "./cases/night";
 import { useRivals } from "./cases/rivals";
+import { DEFAULT_ALLOCATION } from "./cases/allocation";
 import { CASES } from "./cases/index";
 import { useCase } from "./cases/store";
 import { usePlanks } from "./manifesto/run";
@@ -25,7 +26,7 @@ export const SAVE_KEY = "campaign-academy:save";
 type Store = StoreApi<any>;
 /** A store and the fields of it that make up the campaign. The case store comes first: see restore(). */
 const SLOTS: { name: string; store: Store; keys: string[] }[] = [
-  { name: "case", store: useCase, keys: ["caseId", "step", "at", "date", "speed", "card", "picks", "work", "bookings"] },
+  { name: "case", store: useCase, keys: ["caseId", "step", "at", "date", "speed", "card", "picks", "work", "bookings", "allocation"] },
   { name: "staff", store: useStaff, keys: ["chat", "runs", "job", "feed", "morale", "hires", "spoken", "followups", "memory", "draft"] },
   { name: "game", store: useGame, keys: ["staff", "unread"] },
   { name: "paper", store: usePaper, keys: ["editions", "unread"] },
@@ -52,13 +53,16 @@ export function snapshot(): Save {
   return JSON.parse(JSON.stringify({ v: SAVE_VERSION, caseId: useCase.getState().caseId, savedAt: new Date().toISOString(), stores }));
 }
 
+/** Fields added after saves were first written: an older save without them still loads (restore fills them in). */
+const LATER = new Set(["allocation"]);
+
 /** Whether a save can be loaded: this version, a case that exists, and every field the shape the game expects. */
 export function valid(x: unknown): x is Save {
   const s = x as Save;
   if (!s || typeof s !== "object" || s.v !== SAVE_VERSION || !CASES.some((c) => c.id === s.caseId) || !s.stores) return false;
   return SLOTS.every(({ name, store, keys }) => {
     const got = s.stores[name], init = initial(store);
-    return !!got && typeof got === "object" && keys.every((k) => k in got && (init[k] === null || got[k] === null ? true : kind(got[k]) === kind(init[k])));
+    return !!got && typeof got === "object" && keys.every((k) => (k in got ? init[k] === null || got[k] === null || kind(got[k]) === kind(init[k]) : LATER.has(k)));
   });
 }
 
@@ -79,7 +83,8 @@ export function restore(save: unknown): boolean {
 function put(save: unknown): boolean {
   if (!valid(save)) return false;
   const st = JSON.parse(JSON.stringify(save.stores)) as Save["stores"];
-  useCase.setState({ ...st.case, running: false });
+  // A save from before the weekly plan existed starts on the default plan, not on whatever was set before loading.
+  useCase.setState({ allocation: structuredClone(DEFAULT_ALLOCATION), ...st.case, running: false });
 
   const staff = st.staff as { chat: Record<string, ChatItem[]>; runs: Record<string, { id: number; status: string }[]>; job: Record<string, string>; feed: { id: number }[] };
   for (const [who, runs] of Object.entries(staff.runs)) {
