@@ -239,31 +239,38 @@ function Standing() {
 function RivalsPanel({ c, rivals, onOpen }: { c: Case; rivals: ReturnType<typeof useRivals>["rivals"]; onOpen: () => void }) {
   // Opening the list is reading it: the strip stops glowing.
   useEffect(onOpen, [onOpen]);
-  // The text pass (docs/ui-text-pass.md): short versions on screen, the original wording behind "Read more".
+  // The text pass (docs/ui-text-pass.md). Closed, the list is each rival's latest item in its short version, so it
+  // fits without scrolling. "Read more" brings the standing line, the earlier items and the original wording.
   const [full, setFull] = useState(false);
-  const shown = rivals.map((o) => ({ ...o, items: o.items.slice(0, RIVAL_ITEMS) }));
+  const stamp = (i: RivalItem) => <span className="flex shrink-0 items-center gap-2"><span className="tnum font-mono text-[13px] text-muted">{shortDate(i.date)}</span><Tag kind={i.source ? "real" : "sim"} /></span>;
   return (
     <div className="max-h-[72vh] overflow-y-auto p-4">
       <Label className="text-[20px] leading-tight font-semibold text-gold-bright">What your rivals are doing</Label>
       <div className="mt-3 space-y-2">
-        {shown.map((o) => (
-          <div key={o.id} className="rounded-lg border border-line bg-raised p-3.5">
-            <div className="font-display text-[18px] leading-tight font-medium">{o.name}</div>
-            <div className="mt-0.5 text-[13px] text-muted">{o.standing}</div>
-            {o.items.length ? (
-              <ul className="mt-2.5 space-y-3 border-t border-line pt-2.5">
-                {o.items.map((i) => (
-                  <li key={i.key} className="text-[16px] leading-snug text-soft">
-                    <div className="mb-1 flex items-center gap-2"><span className="tnum font-mono text-[13px] text-muted">{shortDate(i.date)}</span><Tag kind={i.source ? "real" : "sim"} /></div>
-                    {full ? i.text : (i.short ?? i.text)}{i.source && <Cite c={c} id={i.source} />}
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="mt-2.5 border-t border-line pt-2.5 text-[14px] text-muted">Nothing reported yet.</p>}
-          </div>
-        ))}
+        {rivals.map((o) => {
+          const items = o.items.slice(0, full ? RIVAL_ITEMS : 1);
+          return (
+            <div key={o.id} className="rounded-lg border border-line bg-raised px-3.5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-display text-[18px] leading-tight font-medium">{o.name}</span>
+                {!full && items[0] && stamp(items[0])}
+              </div>
+              {full && <div className="mt-0.5 text-[13px] text-muted">{o.standing}</div>}
+              {items.length ? (
+                <ul className={cn("space-y-3", full ? "mt-2.5 border-t border-line pt-2.5" : "mt-1.5")}>
+                  {items.map((i) => (
+                    <li key={i.key} className="text-[16px] leading-snug text-soft">
+                      {full && <div className="mb-1">{stamp(i)}</div>}
+                      <div className={cn(!full && "line-clamp-3")}>{full ? i.text : (i.short ?? i.text)}{i.source && <Cite c={c} id={i.source} />}</div>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="mt-1.5 text-[14px] text-muted">Nothing reported yet.</p>}
+            </div>
+          );
+        })}
       </div>
-      {shown.some((o) => o.items.some((i) => i.short)) && <More on={full} set={setFull} />}
+      {rivals.some((o) => o.items.length) && <More on={full} set={setFull} />}
       <p className="mt-3 border-t border-line pt-3 text-[13px] text-muted">{full ? "The candidates are real. Items marked simulated are the moves each rival campaign makes in answer to yours." : "The candidates are real. Simulated items are each rival's moves against yours."}</p>
     </div>
   );
