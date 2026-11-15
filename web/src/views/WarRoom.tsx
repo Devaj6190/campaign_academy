@@ -35,8 +35,6 @@ const LEVELS = [
 const DAIS = 86, STEP = { r: 430, half: 72 }, FLOOR = { r: 690, half: 76 };
 /** The floor is itself a low plinth standing on the ground of the hall. */
 const GROUND = -26;
-/** Wires run along the foot of a wall before turning out to a person, so they never cross. */
-const RAIL = 20;
 type Pt = { a: number; t: number };
 const YOU: Pt = { a: 0, t: 0 };
 /** A point on the floor plan: `r` out from the point of the fan, `a` degrees off the line toward the camera. */
@@ -52,18 +50,6 @@ function layout(staff: Staff[]) {
   const subs = dirs.flatMap((d) => staff.filter((p) => p.boss === d.id));
   subs.forEach((p, i) => (pos[p.id] = { a: -50 + (i * 100) / Math.max(1, subs.length - 1), t: 2 }));
   return pos;
-}
-
-// A wire on the marble from a boss to a report, drawn on the report's level. A direct report's runs straight out from
-// the dais. For their people it comes down the step under the boss, runs along the foot of the step, and turns out to
-// the person: every wire shares that one rail, so none cross. Reversed for the way back.
-function wire(a: Pt, b: Pt, up = false) {
-  const end = LEVELS[b.t].r - 44;
-  if (b.t === 1) return up ? `M${xy(end, b.a)}L${xy(DAIS, b.a)}` : `M${xy(DAIS, b.a)}L${xy(end, b.a)}`;
-  const rail = STEP.r + RAIL, right = b.a > a.a;
-  return up
-    ? `M${xy(end, b.a)}L${xy(rail, b.a)}A${rail} ${rail} 0 0 ${right ? 1 : 0} ${xy(rail, a.a)}L${xy(STEP.r, a.a)}`
-    : `M${xy(STEP.r, a.a)}L${xy(rail, a.a)}A${rail} ${rail} 0 0 ${right ? 0 : 1} ${xy(rail, b.a)}L${xy(end, b.a)}`;
 }
 
 // Standing figures, one cut-out per post in /art/staff, all facing the front. Bodies are generated. Walzak and Singleton
@@ -153,27 +139,33 @@ export function WarRoom() {
         </g>
       );
     });
-  const tone = (p: Staff) => { const state = busy[p.id]; return { stroke: misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "var(--color-gold)", opacity: misfit[p.id] || (state && state !== "work") ? 1 : state ? 0.6 : 0.55, width: state || misfit[p.id] ? 3 : 2 }; };
-  const wires = (t: number) =>
-    staff.filter((p) => pos[p.id].t === t).map((p) => {
-      const k = tone(p);
-      return <path key={p.id} d={wire(pos[p.boss ?? "you"], pos[p.id])} fill="none" strokeLinejoin="round" strokeWidth={k.width} stroke={k.stroke} strokeOpacity={k.opacity} className={cn(busy[p.id] === "down" && "edge-flow", busy[p.id] === "up" && "edge-flow up")} />;
-    });
-  // Work in transit: a spark runs along the wire when a job is handed over, and back with the report.
-  const sparks = (t: number) =>
-    packets.map((k) => {
-      const child = staff.find((p) => p.id === k.to && p.boss === k.from) ?? staff.find((p) => p.id === k.from && p.boss === k.to);
-      if (!child || pos[child.id]?.t !== t) return null;
-      const up = child.id === k.from;
-      return <Spark key={k.id} d={wire(pos[child.boss ?? "you"], pos[child.id], up)} up={up} />;
-    });
-  const bosses = staff.filter((p) => staff.some((c) => c.boss === p.id));
-  const dirs = staff.filter((p) => !p.boss);
-  // A wire's run down a wall: a strip standing on the plan at `r`, `a`, from height `z` up one step.
-  const drop = (key: string, r: number, a: number, z: number) => {
-    const q = at(r, a);
-    return <i key={key} className="pointer-events-none absolute w-[2px] bg-gold opacity-60" style={{ left: q.x, top: q.y, height: LEVELS[1].z, transformOrigin: "50% 100%", transform: `translate(-50%, -100%) translateZ(${z}px) rotateX(-90deg)` }} />;
-  };
+  // The lines from each person to their reports are drawn flat over the room, straight from one to the other, as on the
+  // old chart. The room is 3D and moves with the pointer, so each frame they are redrawn from where people actually are.
+  const room = useRef<HTMLDivElement>(null);
+  const paths = useRef<Record<string, [down: string, up: string]>>({});
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const el = room.current;
+      if (el) {
+        const o = el.getBoundingClientRect();
+        const point = (sel: string, bottom: boolean) => { const n = el.querySelector(sel); if (!n) return null; const r = n.getBoundingClientRect(); return [r.left + r.width / 2 - o.left, (bottom ? r.bottom : r.top) - o.top] as const; };
+        el.querySelectorAll("[data-wire]").forEach((g) => {
+          const [from, to] = g.getAttribute("data-wire")!.split(">");
+          const a = point(`[data-feet="${from}"]`, true), b = point(`[data-head="${to}"]`, false);
+          if (!a || !b) return;
+          const [x1, y1, x2, y2] = [a[0], a[1] + 2, b[0], b[1] - 6].map((v) => Math.round(v * 10) / 10), ym = (y1 + y2) / 2;
+          const d = `M${x1} ${y1}C${x1} ${ym},${x2} ${ym},${x2} ${y2}`;
+          if (paths.current[to]?.[0] === d) return;
+          paths.current[to] = [d, `M${x2} ${y2}C${x2} ${ym},${x1} ${ym},${x1} ${y1}`];
+          for (const path of g.children) path.setAttribute("d", d);
+        });
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
   // Something standing in the hall behind the fan, facing the camera: the back wall and its columns.
   const upright = (x: number, y: number, w: number, h: number): React.CSSProperties => ({ left: x, top: y, width: w, height: h, transformOrigin: "50% 100%", transform: `translate(-50%, -100%) translateZ(${GROUND}px) rotateX(${-TILT}deg)` });
 
@@ -181,7 +173,7 @@ export function WarRoom() {
     <div className="flex h-full">
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader title="War room" sub="You direct. Your reports plan the work and hand it to their people." right={<ModeBadge />} />
-        <div className="relative min-h-0 flex-1 px-6 pb-24" onClick={() => pick(null)} onMouseMove={look} onMouseLeave={() => { mx.set(0); my.set(0); }}>
+        <div className="relative min-h-0 flex-1 px-6 pb-24" ref={room} onClick={() => pick(null)} onMouseMove={look} onMouseLeave={() => { mx.set(0); my.set(0); }}>
           <motion.div className="pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-screen [mask-image:radial-gradient(ellipse_65%_60%_at_50%_0%,black,transparent)]">
             <ShaderBackground />
           </motion.div>
@@ -195,7 +187,6 @@ export function WarRoom() {
                     1100,
                     <>
                       <defs>
-                        <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3" /></filter>
                         <pattern id="marble" patternUnits="userSpaceOnUse" x="-700" y="-150" width="1400" height="850"><image href={`${ART}marble.jpg`} width="1400" height="850" preserveAspectRatio="none" /></pattern>
                         {/* Light falls on the dais; the marble darkens away from it. */}
                         <radialGradient id="marble-shade" gradientUnits="userSpaceOnUse" cx="0" cy="0" r={FLOOR.r}><stop offset="0" stopColor="#070605" stopOpacity="0" /><stop offset="0.65" stopColor="#070605" stopOpacity="0.35" /><stop offset="1" stopColor="#070605" stopOpacity="0.8" /></radialGradient>
@@ -215,22 +206,43 @@ export function WarRoom() {
                   ))}
                   {/* The fan itself: the floor as a low plinth, the step, the dais. */}
                   {wall(GROUND + 6, 0, FLOOR.r + 10, pie(FLOOR.r, FLOOR.half), "f")}
-                  {sheet(0, FLOOR.r + 10, <>{top(pie(FLOOR.r, FLOOR.half))}{wires(2)}{sparks(2)}{rings(2)}</>)}
+                  {sheet(0, FLOOR.r + 10, <>{top(pie(FLOOR.r, FLOOR.half))}{rings(2)}</>)}
                   {wall(6, LEVELS[1].z, STEP.r + 10, pie(STEP.r, STEP.half), "s")}
-                  {sheet(LEVELS[1].z, STEP.r + 10, <>{top(pie(STEP.r, STEP.half))}{wires(1)}{bosses.map((p) => <path key={p.id} d={`M${xy(LEVELS[1].r + 44, pos[p.id].a)}L${xy(STEP.r, pos[p.id].a)}`} stroke="var(--color-gold)" strokeOpacity={0.55} strokeWidth={2} />)}{sparks(1)}{rings(1)}</>)}
+                  {sheet(LEVELS[1].z, STEP.r + 10, <>{top(pie(STEP.r, STEP.half))}{rings(1)}</>)}
                   {wall(LEVELS[1].z + 6, LEVELS[0].z, DAIS + 10, circle, "d")}
-                  {sheet(LEVELS[0].z, DAIS + 10, <>{top(circle)}{dirs.map((p) => <path key={p.id} d={`M${xy(44, pos[p.id].a)}L${xy(DAIS, pos[p.id].a)}`} stroke="var(--color-gold)" strokeOpacity={0.55} strokeWidth={2} />)}{rings(0)}</>)}
-                  {/* Each wire's run down the wall it crosses. */}
-                  {dirs.map((p) => drop("d" + p.id, DAIS, pos[p.id].a, LEVELS[1].z))}
-                  {bosses.map((p) => drop("s" + p.id, STEP.r, pos[p.id].a, 0))}
-                  <Node at={YOU} name="You" role="The campaigner" you />
+                  {sheet(LEVELS[0].z, DAIS + 10, <>{top(circle)}{rings(0)}</>)}
+                  <Node id="you" at={YOU} name="You" role="The campaigner" you />
                   {staff.map((p) => (
-                    <Node key={p.id} at={pos[p.id]} name={p.name} role={p.role} figure={figureFor(p, !!hires[p.id])} shadow={p.id === "cm" && !hires[p.id]} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} selected={p.id === person} unread={unread[p.id]} onClick={() => pick(p.id)} />
+                    <Node key={p.id} id={p.id} at={pos[p.id]} name={p.name} role={p.role} figure={figureFor(p, !!hires[p.id])} shadow={p.id === "cm" && !hires[p.id]} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} selected={p.id === person} unread={unread[p.id]} onClick={() => pick(p.id)} />
                   ))}
                 </div>
               </motion.div>
             </div>
           </Fit>
+          <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
+            <defs>
+              <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3" /></filter>
+            </defs>
+            {staff.map((p) => {
+              const state = busy[p.id];
+              const c = misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "var(--color-gold-bright)";
+              return (
+                <g key={p.id} data-wire={`${p.boss ?? "you"}>${p.id}`} fill="none" strokeLinecap="round">
+                  <path stroke={c} strokeWidth={state ? 8 : 6} strokeOpacity={state ? 0.55 : 0.32} filter="url(#glow)" />
+                  <path stroke={c} strokeWidth={state ? 2.4 : 1.8} strokeOpacity={0.95} />
+                  {/* Light running along the line: steadily when idle, fast when work is moving, back up with a report. */}
+                  <path stroke="#fff" strokeWidth={state ? 3 : 2.2} className={cn("wire-run", state && "busy", state === "up" && "up")} />
+                </g>
+              );
+            })}
+            {/* Work in transit: a spark runs along the line when a job is handed over, and back with the report. */}
+            {packets.map((k) => {
+              const child = staff.find((p) => p.id === k.to && p.boss === k.from) ?? staff.find((p) => p.id === k.from && p.boss === k.to);
+              if (!child) return null;
+              const up = child.id === k.from;
+              return <Spark key={k.id} path={() => paths.current[child.id]?.[up ? 1 : 0]} up={up} />;
+            })}
+          </svg>
         </div>
         <Dock label={sel ? (sel.name ?? `${sel.role} · vacant`) : "Nobody selected"}>
           {sel?.name && <DockButton primary icon={<MessageSquare />} label="Instruct" onClick={() => document.getElementById("instruct")?.focus()} />}
@@ -256,15 +268,20 @@ export function WarRoom() {
   );
 }
 
-// A spark running along an edge. SMIL animations added after load start at once only when begun explicitly.
-function Spark({ d, up }: { d: string; up: boolean }) {
+// A spark running along a line. SMIL animations added after load start at once only when begun explicitly.
+function Spark({ path, up }: { path: () => string | undefined; up: boolean }) {
   const a = useRef<SVGAnimateMotionElement>(null);
   const b = useRef<SVGAnimateMotionElement>(null);
-  useEffect(() => { a.current?.beginElement(); b.current?.beginElement(); }, []);
+  useEffect(() => {
+    const d = path();
+    if (!d) return;
+    for (const m of [a.current, b.current]) { m?.setAttribute("path", d); m?.beginElement(); }
+    // The line as it was when the spark set off: it is gone before the room can move far.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <g>
-      <circle r="7" fill="var(--color-warm)" opacity="0.5" filter="url(#glow)"><animateMotion ref={a} begin="indefinite" dur="1.1s" path={d} fill="freeze" /></circle>
-      <circle r="3" fill={up ? "var(--color-pos)" : "#fff"}><animateMotion ref={b} begin="indefinite" dur="1.1s" path={d} fill="freeze" /></circle>
+      <circle r="9" fill="var(--color-warm)" opacity="0.6" filter="url(#glow)"><animateMotion ref={a} begin="indefinite" dur="1.1s" fill="freeze" /></circle>
+      <circle r="4" fill={up ? "var(--color-pos)" : "#fff"}><animateMotion ref={b} begin="indefinite" dur="1.1s" fill="freeze" /></circle>
     </g>
   );
 }
@@ -281,7 +298,7 @@ function ModeBadge() {
 }
 
 /** A person standing on the stone: placed on the floor plan, then stood upright to face the camera. */
-function Node({ at: where, name, role, figure, shadow, job, misfit, morale, you, selected, unread, onClick }: { at: Pt; name?: string; role: string; figure?: string; shadow?: boolean; job?: string; misfit?: boolean; morale?: number; you?: boolean; selected?: boolean; unread?: boolean; onClick?: () => void }) {
+function Node({ id, at: where, name, role, figure, shadow, job, misfit, morale, you, selected, unread, onClick }: { id: string; at: Pt; name?: string; role: string; figure?: string; shadow?: boolean; job?: string; misfit?: boolean; morale?: number; you?: boolean; selected?: boolean; unread?: boolean; onClick?: () => void }) {
   const lv = LEVELS[where.t], q = at(lv.r, where.a);
   // You are a gilded figure under the light; an empty post is the dark shape of whoever will fill it.
   const tone = you
@@ -295,6 +312,8 @@ function Node({ at: where, name, role, figure, shadow, job, misfit, morale, you,
     <button
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       disabled={you}
+      data-feet={id}
+      data-head={where.t === 1 ? undefined : id}
       className="group absolute text-center"
       style={{ left: q.x, top: q.y, width: lv.h * 0.5, height: lv.h, transformOrigin: "50% 100%", transformStyle: "preserve-3d", transform: `translate(-50%, -100%) translateZ(${lv.z}px) rotateX(${-TILT}deg)` }}
     >
@@ -309,6 +328,7 @@ function Node({ at: where, name, role, figure, shadow, job, misfit, morale, you,
         head, because the floor row stands in front. Yours is beside you.
       */}
       <span
+        data-head={where.t === 1 ? id : undefined}
         className={cn("absolute flex flex-col items-center [text-shadow:0_1px_4px_#000,0_0_2px_#000,0_0_8px_#000]", where.t === 2 ? "top-full left-1/2 origin-top" : where.t === 1 ? "bottom-full left-1/2 mb-1.5" : "top-1/4 left-full ml-3 items-start text-left")}
         style={{ width: lv.label, marginLeft: where.t === 0 ? undefined : -lv.label / 2, transform: where.t === 2 ? `rotateX(${TILT}deg) translateZ(2px) translateY(46px) scaleY(1.62)` : undefined }}
       >
