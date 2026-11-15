@@ -85,6 +85,7 @@ function Page({ close }: { close: () => void }) {
   return (
     <div className="overflow-y-auto px-11 pt-8 pb-7">
       <Masthead e={e} editions={editions} />
+      {e.by && <p className="mt-2 text-center text-[13px] italic text-muted">Simulated stories written by {e.by === "gemini" ? "Gemini" : "Claude"}</p>}
       {!latest && <p className="mt-3 text-center text-[13px] italic text-muted">An earlier edition. <button className="font-bold not-italic text-gold underline underline-offset-2" onClick={() => usePaper.getState().show(null)}>Back to this morning</button></p>}
 
       {/* key: a new edition prints its front page afresh, headline ink and all. */}

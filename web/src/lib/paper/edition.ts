@@ -41,6 +41,8 @@ export type Edition = {
   /** Every number the simulated stories may use. */
   numbers: string[];
   mode: "template" | "live";
+  /** The model that wrote the simulated stories, when one did (#52). */
+  by?: "gemini" | "claude";
   decision?: Decision;
   /** Ways to answer the lead, drafted when the student first asks (stances.ts). */
   stances?: Stance[];

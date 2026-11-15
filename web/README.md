@@ -9,6 +9,8 @@ npm run dev
 
 The staff, the rivals and plank shaping are live agents (`deepagents`, `@langchain/anthropic`). They need `ANTHROPIC_API_KEY` in `web/.env.local` (copy `web/.env.example`). Without a key every agent route falls back to a rules version, and the War room says so.
 
+The morning paper is written by Gemini (`@google/genai`, model `gemini-3.8-flash`, or `GEMINI_MODEL`) when `GEMINI_API_KEY` is set. That covers the newsroom's simulated stories and letters (`lib/paper/newsroom.ts`) and the three ways to answer the lead story (`lib/paper/stancesLive.ts`), both through `lib/paper/model.ts`. If Gemini is missing or fails, Claude writes the paper; with neither key, the template and the rules stand. The same number check (`honest()`) applies whoever writes it, and the paper says under its masthead which model wrote that morning's stories. Everything else stays on Claude.
+
 ## How it fits together
 
 ```
