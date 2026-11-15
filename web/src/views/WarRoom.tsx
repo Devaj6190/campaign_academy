@@ -54,6 +54,7 @@ export function WarRoom() {
   const open = useGame((s) => s.open);
   const packets = useStaff((s) => s.packets);
   const job = useStaff((s) => s.job);
+  const misfit = useStaff((s) => s.misfit);
   const morale = useStaff((s) => s.morale);
   const active = useStaff((s) => s.active);
   const pos = layout(staff);
@@ -86,8 +87,8 @@ export function WarRoom() {
                     key={p.id}
                     d={edge(pos[p.boss ?? "you"], pos[p.id], !!p.boss)}
                     fill="none"
-                    strokeWidth={state ? 1.4 : 1}
-                    stroke={state ? "var(--color-warm)" : "rgb(255 255 255 / 0.1)"}
+                    strokeWidth={state || misfit[p.id] ? 1.4 : 1}
+                    stroke={misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "rgb(255 255 255 / 0.1)"}
                     strokeOpacity={state === "work" ? 0.45 : 1}
                     className={cn(state === "down" && "edge-flow", state === "up" && "edge-flow up")}
                   />
@@ -104,7 +105,7 @@ export function WarRoom() {
             </svg>
             <Node at={YOU} name="You" role="The campaigner" you />
             {staff.map((p) => (
-              <Node key={p.id} at={pos[p.id]} name={p.name} role={p.role} job={job[p.id]} morale={p.name ? morale[p.id] : undefined} thinking={!!active[p.id]} selected={p.id === person} busy={!!busy[p.id]} unread={unread[p.id]} onClick={() => pick(p.id)} />
+              <Node key={p.id} at={pos[p.id]} name={p.name} role={p.role} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} thinking={!!active[p.id]} selected={p.id === person} busy={!!busy[p.id]} unread={unread[p.id]} onClick={() => pick(p.id)} />
             ))}
           </Fit>
         </div>
@@ -157,7 +158,7 @@ function ModeBadge() {
   );
 }
 
-function Node({ at, name, role, job, morale, thinking, you, selected, busy, unread, onClick }: { at: Pt; name?: string; role: string; job?: string; morale?: number; thinking?: boolean; you?: boolean; selected?: boolean; busy?: boolean; unread?: boolean; onClick?: () => void }) {
+function Node({ at, name, role, job, misfit, morale, thinking, you, selected, busy, unread, onClick }: { at: Pt; name?: string; role: string; job?: string; misfit?: boolean; morale?: number; thinking?: boolean; you?: boolean; selected?: boolean; busy?: boolean; unread?: boolean; onClick?: () => void }) {
   const size = at.r * 2;
   return (
     <button
@@ -166,7 +167,7 @@ function Node({ at, name, role, job, morale, thinking, you, selected, busy, unre
       className="group absolute flex -translate-x-1/2 flex-col items-center text-center"
       style={{ left: at.x, top: at.y - at.r - 4, width: at.r < 24 ? 94 : 124 }}
     >
-      <span className={cn("relative rounded-full p-1 transition-shadow duration-300", selected && "shadow-[0_0_0_1.5px_#fff,0_0_36px_rgba(255,255,255,0.28)]", busy && !selected && "shadow-[0_0_0_1.5px_var(--color-warm),0_0_28px_rgba(240,162,59,0.35)]")}>
+      <span className={cn("relative rounded-full p-1 transition-shadow duration-300", selected && "shadow-[0_0_0_1.5px_#fff,0_0_36px_rgba(255,255,255,0.28)]", busy && !selected && !misfit && "shadow-[0_0_0_1.5px_var(--color-warm),0_0_28px_rgba(240,162,59,0.35)]", misfit && "shadow-[0_0_0_1.5px_var(--color-neg),0_0_28px_rgba(240,112,95,0.4)]")}>
         {name ? (
           <Avatar name={you ? undefined : name} size={size} className={cn("transition-colors group-hover:border-white/30", you && "border-white/40 from-white to-[#c9c9cf]")} />
         ) : (
@@ -181,6 +182,11 @@ function Node({ at, name, role, job, morale, thinking, you, selected, busy, unre
       <span className={cn("mt-1.5 text-[12.5px] leading-tight font-medium", !name && "text-faint")}>{name ?? "Vacant"}</span>
       <span className="text-[10.5px] leading-tight text-muted">{role}</span>
       <AnimatePresence>
+        {misfit && (
+          <motion.span initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 rounded bg-neg/15 px-1.5 text-[10px] leading-[16px] text-neg">
+            Wrong person
+          </motion.span>
+        )}
         {job && (
           <motion.span initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 max-w-full truncate rounded bg-warm/10 px-1.5 text-[10px] leading-[16px] text-warm">
             {job}
@@ -362,7 +368,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
             placeholder={thinking ? `${first} is on it…` : `Tell ${first} what you need…`}
             className="flex-1 resize-none bg-transparent px-1.5 py-1 text-[13px] outline-none placeholder:text-faint"
           />
-          <button onClick={() => send()} disabled={!text.trim() || thinking} aria-label="Send" className="grid size-7 shrink-0 place-items-center rounded-lg bg-fg text-bg transition-opacity disabled:opacity-25">
+          <button onClick={() => send()} disabled={!text.trim() || thinking} aria-label="Send" className="grid size-7 shrink-0 place-items-center rounded-lg bg-gold text-bg transition-opacity disabled:opacity-25">
             <ArrowUp className="size-4" />
           </button>
         </div>
@@ -376,7 +382,7 @@ function ChatRow({ c, index, id, onSuggest }: { c: ChatItem; index: number; id: 
   if (c.k === "me" || c.k === "them")
     return (
       <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={cn("flex flex-col", c.k === "me" ? "items-end" : "items-start")}>
-        <div className={cn("max-w-[88%] rounded-xl px-3 py-2 text-[13px] leading-snug", c.k === "me" ? "bg-fg text-bg" : "border border-line bg-raised text-soft")}>{c.text}</div>
+        <div className={cn("max-w-[88%] rounded-xl px-3 py-2 text-[13px] leading-snug", c.k === "me" ? "bg-gold text-bg" : "border border-line bg-raised text-soft")}>{c.text}</div>
         {c.k === "them" && c.suggest && (
           <button onClick={() => onSuggest(c.suggest!)} className="mt-1 flex items-center gap-1 text-[11px] text-warm hover:underline">
             <Sparkles className="size-3" /> {c.suggest}

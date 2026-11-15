@@ -16,11 +16,11 @@ export function Overlays() {
   const close = () => open(null);
   return (
     <>
-      <Dialog open={overlay === "paper"} onClose={close} className="max-w-[1040px]"><PaperView close={close} /></Dialog>
+      <Dialog open={overlay === "paper"} onClose={close} plate="plate-press" className="max-w-[1040px]"><PaperView close={close} /></Dialog>
       <Dialog open={overlay === "manifesto"} onClose={close} side="right"><Manifesto /></Dialog>
       <Dialog open={overlay === "calendar"} onClose={close} className="max-w-[880px]"><Calendar /></Dialog>
       <Dialog open={overlay === "tactic"} onClose={close} className="max-w-[440px]"><Tactic close={close} /></Dialog>
-      <Dialog open={overlay === "election"} onClose={close} className="max-w-[520px]"><Election /></Dialog>
+      <Dialog open={overlay === "election"} onClose={close} plate="plate-election" className="max-w-[520px]"><Election /></Dialog>
       <Toasts />
     </>
   );

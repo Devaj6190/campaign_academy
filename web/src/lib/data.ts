@@ -1,7 +1,7 @@
 // Seed content for the one hand-made candidate. People and groups are described by local issues, never by party or ideology.
 // All of it is fiction; only the map data (nyc.json) is real.
 
-export type View = "profile" | "war" | "map" | "factions";
+export type View = "case" | "profile" | "war" | "map" | "factions";
 
 export type Faction = {
   id: string;

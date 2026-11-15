@@ -2,7 +2,7 @@
 
 > Working title. "Capitol Classroom" is the other candidate name.
 
-A real-time political war-room sim for students. You take over a live mayoral campaign in New York City thirty days before the election, run it day by day through your staff, your map, your money and your manifesto, and find out on election night whether you won.
+A campaign simulation for students, built on real races. You take over a real New York City campaign at a real moment, with the real candidates, money, polls and voters of that year. At the points where that campaign had to decide something, you decide instead. Your choices change your campaign, the race plays on from there, and at the end you see how your version finished and what really happened.
 
 This document is the idea hub. It holds the idea and nothing else: no research, no tech stack, no task plan. Those live in their own docs.
 
@@ -12,494 +12,116 @@ This document is the idea hub. It holds the idea and nothing else: no research, 
 
 | | |
 |---|---|
-| **Player** | A student who has never worked on a campaign |
-| **Role** | The campaigner at the top of an existing campaign |
+| **Student** | Someone who has never worked on a campaign |
+| **Role** | Running a real campaign from the inside |
+| **Material** | Real races, real candidates, real data from the period |
 | **Setting** | New York City, on an accurate map built from the city's own open data |
-| **Length** | 30 in-game days, each on a running clock |
-| **What you do** | Direct staff, act on the map, spend and raise money, build a manifesto |
-| **How it ends** | Election night: you win or lose the race |
-| **What you learn** | How to delegate, budget, read what different groups of voters want and weigh policy trade-offs, and that running is possible |
+| **Format** | A case: four to six real decision points, each of which changes your campaign |
+| **How it ends** | Your simulated election night, then the real one beside it |
+| **What you learn** | How to delegate, budget, read what different groups of voters want and weigh policy trade-offs |
 
-**Design references**
-
-- **Frostpunk** for the top resource bar, events, the faction view, and how a map can carry the state of a city. The map itself is a real data map, not game art.
-- **The Nemesis system (Shadow of War)** for the war room: a visible hierarchy of characters you click into.
-- **A software factory / agent swarm**, but political: you give direction at the top and real agents carry the work down the chain.
+**What changed.** The first version was a simulation of a fictional candidate in an invented race. This version keeps the simulation and replaces everything it stands on: the people, the situation at each decision, the money and the electorate are taken from the record.
 
 ---
 
-## 2. The core loop
+## 2. The loop
 
 ```mermaid
 flowchart LR
-    N[Morning newspaper] --> R[Read the city<br/>map + factions]
-    R --> D[Decide the day]
-    D --> S[Instruct staff<br/>war room]
-    D --> M[Act on the map<br/>knock, rally, fundraise]
-    D --> P[Work the manifesto]
-    D --> B[Reallocate money]
-    S --> W[World state changes]
-    M --> W
-    P --> W
-    B --> W
-    W --> C{Clock runs out}
-    C -->|next day| N
-    C -->|day 30| E[Election night]
+    B[Briefing<br/>the race as it really stood] --> D[Decision point<br/>a real moment, real constraints]
+    D --> A[Your advisers<br/>the campaign's staff argue the options]
+    A --> P[You decide<br/>each option previews what it moves]
+    P --> W[Your campaign changes<br/>money, standing, voter groups]
+    W -->|the race plays on| D
+    W -->|last decision| E[Election night<br/>your result, then the real one]
 ```
 
-Every action lands in one shared world state. The map, the war room, the factions view, the money bar and the newspaper are all different views of that same state, so anything you do on one screen shows up on the others.
-
-```mermaid
-flowchart TB
-    subgraph Views
-        PRO[Profile]
-        MAP[Map screen]
-        WAR[War room]
-        FAC[Factions]
-        BAR[Money bar]
-        NEWS[Newspaper]
-    end
-    WS[(Shared world state<br/>sentiment by area and faction,<br/>money, staff, manifesto, polls, calendar)]
-    WS --> PRO
-    MAP <--> WS
-    WAR <--> WS
-    FAC --> WS
-    BAR <--> WS
-    WS --> NEWS
-```
+1. **Briefing.** The race on a real date: who is running, the rules, the money, the polls.
+2. **Decision point.** A real moment the campaign faced. What the world did since your last decision is real: rivals enter, scandals break, courts rule.
+3. **Your advisers.** The campaign's staff argue for different options.
+4. **You decide.** Each option shows a small preview of what it will move, up or down, and nothing more.
+5. **Your campaign changes.** Money, poll standing and support among voter groups move, and you see what the real campaign did at that point. The next decision starts from where you left things.
+6. **Election night.** Your simulated result against the threshold you needed, then the certified real result and, decision by decision, how the real campaign's choices turned out.
 
 ---
 
-## 3. Where you start: the candidate portfolio
+## 3. Two layers, kept apart
 
-You do not start from zero. You are handed a campaign that is already in motion.
-
-- **A candidate with a record.** Past votes and positions that some people love and some people hold against them.
-- **A team.** Several staff already hired, with gaps you will need to fill.
-- **A map that already has opinions.** Areas that like you, areas that don't, areas up for grabs.
-- **Money in the bank,** already flowing in and out.
-- **A manifesto that is already started.**
-- **Opponents** with their own strengths.
-
-To the student it looks as though every player is dealt their own candidate, with their own stats, record and staff. The first build ships one hand-made candidate (section 11).
-
-### View: profile
-
-One of the four main views, alongside the war room, the map and factions. It is the first thing you see, and you can return to it any time from the top bar. It is live, not a one-off intro: polling, cash, days left and where you stand update as the race goes on, and the record grows as you add to the manifesto.
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  ┌──────────────┐   ADRIAN COLE                                      │
-│  │              │   Council Member, Queens · running for Mayor       │
-│  │   portrait   │                                                    │
-│  │              │   Runs on     Housing and transit                  │
-│  │              │   Polling     31%  (2nd of 3)   ▲ 1 this week      │
-│  │              │   Days left   30                                   │
-│  └──────────────┘   Cash        $412,000                             │
-│                                                                      │
-│   RECORD                         WHERE YOU STAND                     │
-│   ✓ Housing near transit         Strong   W. Queens, N. Brooklyn     │
-│   ✓ Small-business rent relief   Weak     Staten Island, S. Brooklyn │
-│   ✗ Voted against police cut     Open     Bronx, Upper Manhattan     │
-│   ✓ Bus lane expansion                                               │
-│                                                                      │
-│   OPPONENTS        Victoria Hale 38%      Naomi Brandt 14%           │
-│                                              [ Enter the war room ]  │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 4. Time: days, a clock, and a newspaper
-
-- The campaign runs for **30 days**.
-- Each day runs on a **clock**. There are no turns and no "end turn" button.
-- **Speed controls** let you slow the day down or speed it up. There is **no pause**: the campaign never stops.
-- As the day nears its end, a **small visual reminder** appears so you can finish what you are doing.
-- Each day has **assigned tasks**, and you can **add your own**. Tasks and events sit on a **calendar**.
-
-### The morning newspaper
-
-Each day opens with the paper. It is how events reach you, in the way Frostpunk delivers events, but written as news.
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  THE FIVE BOROUGH LEDGER                 Day 12 · 18 to go   │
-│ ─────────────────────────────────────────────────────────────│
-│  SUBWAY DELAYS HIT QUEENS FOR THIRD DAY                      │
-│  Riders in Jackson Heights and Flushing blame City Hall.     │
-│  Transit riders are paying attention this week.              │
-│                                                              │
-│  HALE PROMISES 2,000 NEW OFFICERS      COLE RALLY DRAWS 900  │
-│  Public-safety voters respond.         Field team credited.  │
-│                                                              │
-│  POLL            Hale 37 ▼1   Cole 33 ▲2   Brandt 14  —      │
-│  WHO LIKES YOU   Renters ▲  Transit riders ▲  Homeowners ▼   │
-└──────────────────────────────────────────────────────────────┘
-```
-
-It carries three things:
-
-1. **What happened yesterday,** including the results of your own actions.
-2. **New events** you may want to respond to.
-3. **Stats on who likes you,** by faction and by area.
-
----
-
-## 5. The shell: what is always on screen
-
-Four main views (profile, war room, map, factions) share one frame.
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│ Profile │  LOSSES  ◄────  ( $412,000 )  ────►  GAINS  │ Day 12 14:20 ◂ 1× ▸│
-├────────────────────────────────────────────────────────────────────────┤
-│ ┌─────────────┐                                                        │
-│ │ TASKS       │                                                        │
-│ │ ☐ Rally, BX │              MAIN VIEW                                 │
-│ │ ☐ Call time │  Profile  ·  War room  ·  Map  ·  Factions             │
-│ │ + add task  │                                                        │
-│ └─────────────┘                                                        │
-│                                                                        │
-├────────────────────────────────────────────────────────────────────────┤
-│  ACTION PANEL  (optional, changes with the screen)                     │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-- **Top bar:** profile, money, day and time, and the speed control (slower / faster, no pause).
-- **Tasks panel:** today's tasks, top left, on every screen.
-- **Main view:** one of the four views. The profile is described in section 3; the other three follow below.
-- **Action panel:** bottom strip whose contents depend on the screen.
-
-### Money: the only resource
-
-Frostpunk puts temperature in the middle of its top bar. Here that spot holds **total cash**.
-
-```
-   LOSSES (spending)                 TOTAL                 GAINS (income)
- ┌───────────────────────┐      ┌───────────┐      ┌───────────────────────┐
- │ Staff      −$9,200/d  │      │           │      │ Small donors +$7,400/d│
- │ Ads        −$6,000/d  │ ◄─── │ $412,000  │ ───► │ Fundraisers  +$8,000/d│
- │ Field      −$4,100/d  │      │           │      │ Large donors +$3,000/d│
- │ Events     −$2,500/d  │      └───────────┘      └───────────────────────┘
- └───────────────────────┘
-```
-
-- **Left of the total:** where money is going, by category.
-- **Right of the total:** where money is coming from, by category.
-- **Hover a category** to see the exact line items inside it.
-- **You can reallocate:** put more here, less there. Where that control lives (top bar or map screen) is still open.
-
----
-
-## 6. Screen: the war room
-
-The staff screen, laid out like the Nemesis hierarchy. You stand at the front; your direct reports stand behind you; their people stand behind them.
-
-```mermaid
-flowchart TB
-    YOU([You · the campaigner])
-    YOU --> CM[Campaign Manager]
-    YOU --> FD[Field Director]
-    YOU --> FIN[Finance Director]
-    YOU --> COM[Communications Director]
-    YOU -.vacant.-> POL[Policy Director]
-
-    FD --> O1[Organizer · Queens]
-    FD --> O2[Organizer · Brooklyn]
-    FD --> VC[Volunteer Coordinator]
-    FIN --> CT[Call-time Manager]
-    FIN --> EV[Events Lead]
-    COM --> PR[Press Secretary]
-    COM --> DG[Digital Lead]
-```
-
-**How it works**
-
-- **Click a direct report** to open them: who they are, what they are good at, what they are working on, and a place to give instructions in plain language.
-- **Direct reports are real agents.** They plan, break your instruction into pieces, and hand those pieces to the people under them.
-- **The people under them are smaller agents** that do one job each.
-- **You can watch the work travel.** An instruction visibly moves down the hierarchy, and reports move back up.
-- **The work is real in its result.** When it finishes, the shared world state changes: sentiment, money, polls, calendar.
-- **Staff speak up unprompted.** From time to time someone brings you news, a warning, a request or an idea, not only when you click them.
-- **You grow the team.** Empty slots can be filled, and who you hire and where you put them matters.
-
-```mermaid
-sequenceDiagram
-    participant P as You
-    participant F as Field Director
-    participant O as Organizer · Queens
-    participant W as World state
-    P->>F: "Win back Jackson Heights before Friday"
-    F->>F: Plans: canvass + tenant meeting
-    F->>O: Run 3 canvass shifts, book the meeting
-    O->>W: Doors knocked, meeting on calendar, $ spent
-    O-->>F: 1,400 doors, 38 volunteers recruited
-    F-->>P: Report + asks for $3k more
-    W-->>P: Map and newspaper update
-```
-
-**What the student learns here:** how to delegate. Clear instructions to the right person get results. Vague instructions, or the right job handed to the wrong person, cost time and money.
-
-**Action panel on this screen:** hire, reassign, message the selected staffer.
-
----
-
-## 7. Screen: the map
-
-An accurate map of New York City, built from the city's own open data. It should read as a real civic data map, not a game board: true district boundaries, real neighbourhood names, real streets and water underneath. The interface around it is our own design; the geography and the facts on it are real.
-
-**What is real and what is simulated**
-
-| Real (from NYC open data and the census) | Simulated (the game) |
-|---|---|
-| District and neighbourhood boundaries | How each area feels about your candidate |
-| Who lives there: age, income, renters and owners, language | How factions are spread across areas |
-| What residents are complaining about right now | Events, opponents, poll numbers |
-| Past election results by area | The effect of your actions |
-
-The simulated layer is always labelled as simulated.
-
-The sketch below shows layout only; the real screen uses true boundaries.
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                     ░░▒▒ BRONX ▒▒░░                          │
-│            ▓▓                                                │
-│          ▓▓▓▓  MANHATTAN      ▒▒▒▒▒▒ QUEENS ██████           │
-│          ▓▓▓▓            ▒▒▒▒▒▒██████████████                │
-│           ▓▓       ████████████▒▒▒▒▒▒▒▒                      │
-│                  ██ BROOKLYN ████▒▒▒▒       ┌──────────────┐ │
-│   ░░░░           ████▒▒▒▒░░░░░░             │ JACKSON HTS  │ │
-│  ░ STATEN ░        ▒▒░░░░░░                 │ Support 58%  │ │
-│   ░░░░░░                                    │ Top issue    │ │
-│                                             │  Rent        │ │
-│   ██ strong   ▒▒ open   ░░ weak             │ Recently     │ │
-│                                             │  Subway delays│ │
-│   View: [All] [Renters] [Seniors] [Unions]  └──────────────┘ │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Sentiment**
-
-- Each area is coloured by how it feels about you.
-- A filter switches the map between **overall** sentiment and sentiment for **one faction**.
-- The map reacts to events and to your actions.
-
-**The information layer** (part of this screen, not a separate one)
-
-Click or hover an area to see information about it. It is presented as facts you read, not as advice:
-
-- Who lives there (real demographic data).
-- Its main problems (drawn from what residents of that district actually report to the city).
-- What happened there recently.
-- How it feels about you and why.
-
-**Acting on the map**
-
-Click an area to do things there. These go onto the calendar:
-
-- **Door knocking**
-- **Rallies and appearances**
-- **Fundraisers**
-
-**Action panel on this screen:** the actions available for the selected area, with cost and time.
-
----
-
-## 8. Screen: factions
-
-A whiteboard-style canvas of circles. Each circle is a group of voters. **Bigger groups get bigger circles.**
-
-```
-        ┌────────────────────────────────────────────────────┐
-        │        ◯ Students                                  │
-        │                    ⬤⬤⬤                             │
-        │    ⬤⬤              ⬤⬤⬤⬤  Renters        ⬤⬤⬤⬤      │
-        │   ⬤⬤⬤ Unions       ⬤⬤⬤                 ⬤⬤⬤⬤⬤     │
-        │    ⬤⬤                                   ⬤⬤⬤⬤ Home-│
-        │              ◯ Donors      ⬤⬤                owners│
-        │   ⬤⬤⬤                     ⬤⬤ Small biz            │
-        │  ⬤⬤⬤⬤ Immigrant                                    │
-        │   ⬤⬤⬤  communities                                 │
-        └────────────────────────────────────────────────────┘
-```
-
-Click a circle to read about that faction:
-
-```
-┌───────────────────────────────────────────────────────────┐
-│  RENTERS                              feels: warm toward you│
-│                                                           │
-│  Two in three New Yorkers rent. This group is young,      │
-│  spread across every borough, and votes when it believes  │
-│  rent is on the ballot.                                   │
-│                                                           │
-│  VALUES     Stable rents. More housing. Tenant protection.│
-│  DISLIKES   Luxury-only development. Landlord tax breaks. │
-└───────────────────────────────────────────────────────────┘
-```
-
-- **A paragraph** on who they are and what they want.
-- **What they value** and **what they dislike**, written as sentences.
-- **Read-only.** Unlike Frostpunk, you cannot change a faction from this screen. You read it, then use what you learned to write better policy and choose better actions.
-- Circle colour can show how the faction currently feels about you.
-
-Factions are groups of people defined by interest or identity, for example renters, homeowners, union members, immigrant communities, small-business owners, wealthy donors.
-
----
-
-## 9. The manifesto
-
-Policy is not a separate mini-game. It lives in one document: your manifesto.
-
-```mermaid
-flowchart LR
-    I[You read the map,<br/>factions and paper] --> T[You type a policy idea<br/>in your own words]
-    T --> AI[AI turns it into a<br/>workable policy,<br/>or suggests a better version]
-    AI --> V{Accept?}
-    V -->|yes| MF[Added to manifesto<br/>permanent]
-    V -->|no| T
-    MF --> FX[Factions and areas react]
-    MF --> MK[Feeds ads, speeches,<br/>door scripts]
-```
-
-- **It does not start empty.** The candidate arrives with a few planks from their record.
-- **You open by building it out** to around five policies, once you have read the profile, the opponents and the city.
-- **Every few days you add more,** as new data and events come in.
-- **You do not write final policy text.** You type what you want; AI returns a suggested or modified version that is concrete and realistic, and shows who it will please and anger.
-- **Nothing can be removed.** Once a plank is in, you own it for the rest of the race.
-- **It drives your messaging.** Marketing, speeches and door scripts draw on what is in the manifesto.
-- **It is daily work,** alongside directing staff and acting on the map, not a separate phase.
-
-**What the student learns here:** how a vague wish becomes a policy, that every policy has winners and losers, and that promises are permanent.
-
----
-
-## 10. Politics, tactics and the ending
-
-**Politics**
-
-- **No real people.** Every candidate, staffer and journalist is fictional.
-- **No party or ideology labels.** Candidates and factions are described by where they stand on local issues such as housing, transit, safety and small business, never as left or right.
-- **No side is favoured.** The same rules apply whatever your candidate stands for.
-
-**Tactics and risk**
-
-- Some moves are safe and slow. Others are bold: going negative with an accurate contrast ad, a large ad buy, staking the week on one endorsement.
-- Nothing dishonest is on offer. The game never rewards deceiving voters.
-- Each bold move shows a **risk factor before you commit**, and that number decides whether it backfires.
-- A backfire is public: it reaches the newspaper, moves factions against you, and can cost you volunteers or money.
-
-```
-┌────────────────────────────────────────────────────┐
-│  CONTRAST AD ON HALE'S COUNCIL ATTENDANCE          │
-│  Accurate, but negative                            │
-│  Cost $8,000          Could gain  +3 with seniors  │
-│  Risk of backlash  █████░░░░░  55%                 │
-│  If it reads as an attack: −6 with seniors,        │
-│  volunteers cancel shifts                          │
-│                       [ Run it ]   [ Hold off ]    │
-└────────────────────────────────────────────────────┘
-```
-
-**Election night**
-
-Day 30 ends in a results screen: the map fills in area by area, the vote totals come in, and you win or lose. This is the last step of the whole game.
-
----
-
-## 11. The first candidate: Adrian Cole
-
-The one hand-made candidate in the first build. Fictional.
-
-**Who he is**
-
-- Two-term City Council member from western Queens, running for Mayor.
-- Son of a bus mechanic and a school aide; former tenant organiser, then a small-business loan officer.
-- **Stands for:** more housing near transit, better buses, level police funding, and help for small business.
-- **Why him:** he is cross-pressured. Nobody is fully happy with him, so every choice has a visible cost.
-
-**His record**
-
-| Past position | Who liked it | Who didn't |
+| | The record | The simulation |
 |---|---|---|
-| Voted for new housing near subway stations | Renters, students | Low-density homeowners |
-| Wrote small-business rent relief | Small-business owners, immigrant communities | Real-estate donors |
-| Voted against cutting the police budget | Seniors, public-safety voters | Young activists |
-| Backed bus lane expansion | Transit riders | Drivers, some merchants |
-| Took union endorsements, skipped a strike picket | Nobody fully | Union members are lukewarm |
+| **What it is** | What was true and what happened | What your choices do to your campaign |
+| **Examples** | Polls, filings, results, what staff said afterwards | Poll points gained, money spent, support in a voter group |
+| **Where it comes from** | Sources, linked on every statement | Invented sizes, fitted to the record |
+| **How it is shown** | Marked as real data | Marked as simulated |
 
-**The race on day 1**
-
-| Candidate | Runs on | Poll | Strength |
-|---|---|---|---|
-| Victoria Hale | Public safety and business | 38% | Money, homeowners, Staten Island |
-| **Adrian Cole** | Housing, transit and small business | 31% | Renters, western Queens |
-| Naomi Brandt | Rent and police reform | 14% | Young activists, students |
-| Undecided | | 17% | |
-
-**The map on day 1**
-
-- **Strong:** western Queens, north Brooklyn.
-- **Weak:** Staten Island, southern Brooklyn, Upper East Side.
-- **Open:** the Bronx, Upper Manhattan, southeast Queens.
-
-**Factions on day 1**
-
-| Faction | Size | Feels about Cole | Why |
-|---|---|---|---|
-| Renters | Very large | Warm | Housing vote |
-| Immigrant communities | Large | Warm | Rent relief, his district |
-| Transit riders | Large | Warm | Bus lanes |
-| Homeowners | Large | Cold | Housing near transit |
-| Seniors | Large | Mixed | Like the police vote, distrust change |
-| Union members | Medium | Lukewarm | Missed the picket |
-| Small-business owners | Medium | Warm | Rent relief |
-| Young activists | Medium | Cool | Police vote; prefer Brandt |
-| Wealthy donors and real estate | Small, rich | Cold | Prefer Hale |
-| Students | Small | Mixed | Split with Brandt |
-
-**Money on day 1**
-
-- $412,000 in the bank.
-- Raising about $18,000 a day, spending about $22,000. He is burning cash.
-
-**Team on day 1**
-
-| Role | Name | Good at | Weak at |
-|---|---|---|---|
-| Campaign Manager | Priya Nair | Planning, keeping people on task | Cautious, slow on risk |
-| Field Director | Marcus Bell | Volunteers, door programs | Overspends |
-| Finance Director | Dana Whitfield | Large donors | Dismissive of small-dollar |
-| Communications Director | Leo Santos | Press, rapid response | Tempted by risky tactics |
-| Policy Director | *vacant* | | First hire to make |
-| Data Director | *vacant* | | Second hire to make |
-
-Under them: borough organizers for Queens and Brooklyn (none yet for the Bronx), a volunteer coordinator, a call-time manager, an events lead, a press secretary and a digital lead.
-
-**Manifesto on day 1**
-
-1. Build housing near every subway station.
-2. Extend small-business rent relief citywide.
-3. Keep police headcount level; add mental-health response teams.
-
-The player's first job is to take this to five.
-
-**Opening problems for the player**
-
-- Brandt is pulling young activists and students; Hale holds homeowners and seniors. Which do you chase?
-- Money runs out before day 30 at the current burn.
-- No organizer in the Bronx, the biggest open area.
-- Unions have not endorsed.
+The simulation is fitted so that making the real campaign's own choices finishes close to the real result. That is its only anchor. It cannot prove what a different choice would have produced, and it says so.
 
 ---
 
-## 12. Open questions
+## 4. Rules that keep it honest
 
-- Where the money-reallocation control lives: top bar or map screen.
-- How fine the map is: the 59 community districts, or the smaller neighbourhood areas inside them.
-- How many speed steps the clock has.
-- Whether opponents act on their own each day or only through newspaper events.
-- How long one in-game day lasts in real time.
+- **Every statement of fact has a source.** Anything estimated is labelled as an estimate.
+- **The tool never recommends.** Advice comes from the advisers, in their own voices. The tool does not say which option was best, before or after.
+- **Previews show direction, not size.** You choose on judgment, then see what moved.
+- **The real campaign's choice is shown only after you decide.** Once you have chosen, you see what they did at that point. How it turned out for them is held to the end, so later events are not spoiled.
+- **The real choice is not always the right one.** Luck and rivals' mistakes are part of the record and are shown as such.
+- **Cases are chosen for the lesson.** Not for who won or what they believed. Party primaries are preferred because the contest is inside one party.
+
+---
+
+## 5. The advisers
+
+The advisers are the campaign's actual staff where the record names them: the campaign manager, the media consultant, the pollster.
+
+- **On the record.** Where a staff member is documented as arguing for something, the adviser says that, with the source.
+- **Predicted.** Where the record is silent, the adviser's argument is written from that person's role and documented background, and is labelled as predicted and not a quotation.
+- **Roles without a name.** Where nobody is documented in a post, the adviser is the post, not an invented person.
+
+Several advisers argue for different options. Delegation is taught here: whose judgment you weigh for which kind of decision, and whether you can tell a strong argument from a confident one.
+
+---
+
+## 6. What a case holds
+
+| Part | Contents |
+|---|---|
+| **The race** | Office, date, candidates, rules, the certified result |
+| **The campaign you run** | The candidate, their platform at the time, their staff |
+| **The starting state** | Money, poll standing and voter-group support at the briefing date, with what each number rests on |
+| **Decision points** | For each: what the world did since the last one, the situation, the options with their previews and effects, the advisers, and the record of what the real campaign did, what followed and what was said afterwards |
+| **The city then** | Results by district, turnout and demographics of the period |
+| **Sources** | Every document, dataset and article the case rests on |
+
+A case is a data file. Adding a case means researching and writing one more file, not building more product.
+
+---
+
+## 7. The screens
+
+| Screen | Shows |
+|---|---|
+| **Case** | The briefing, each decision, your campaign's current state, election night and the debrief |
+| **Profile** | The real candidate and race at the briefing date: record, platform, opponents |
+| **Map** | The city of that year: demographics and past results by district, and how your standing moves across it |
+| **Voter groups** | Who lived where, and your support in each group as your decisions move it |
+| **War room** | The campaign's staff as advisers you can question |
+| **Money** | What you have left to spend under the cap, against what the real campaign spent and when |
+| **Newspaper** | What the press was reporting at that point, paraphrased and cited |
+
+---
+
+## 8. The cases
+
+One deep case first, then four that each add a different lesson. The shortlist and the reasons for each choice are in `docs/research/`.
+
+**First case:** the 2013 Democratic primary for Mayor of New York, run from inside the campaign that started in fourth place.
+
+---
+
+## 9. Open questions
+
+- How the simulated state reaches the map and voter-group screens.
+- Whether live agents play the advisers, or the written arguments are enough.
+- Whether the student can replay the same race from another campaign's side.
+- The named user: high school or college, in class or solo.
 - The final name.

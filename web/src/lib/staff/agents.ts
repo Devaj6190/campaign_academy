@@ -5,7 +5,7 @@ import { z } from "zod";
 import { ACTION_IDS, ACTIONS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
 import type { RunCtx } from "./protocol";
-import { PLACES, type Snapshot } from "./world";
+import { humanize, PLACES, type Snapshot } from "./world";
 
 // Real staff. Each director is a deep agent: it plans with write_todos and hands jobs to its people through the
 // task tool. Each of their people is a subagent that does one job with take_action. All model ids live here.
@@ -110,7 +110,7 @@ Strengths: ${me.good ?? prof.skills.join(", ")}. Weaknesses: ${me.weak ?? "none 
 
 How you work:
 1. Start with write_todos: two to four concrete jobs.
-2. ${team.length ? `Hand each job to the right person on your team with the task tool. Brief them precisely: what, where (district number), who (faction id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
+2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass renters in Jackson Heights"). Then brief them precisely: what, where (district number), who (faction id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
 3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. Never plan past it. If the job needs more, ask in your report.
 4. If the instruction is vague, make a sensible call and say what you assumed. If it is the wrong job for your department, do your best and say who should have had it.
 5. Finish with send_report exactly once. Report only what tool results told you; never invent numbers.
@@ -147,7 +147,9 @@ ${world(w)}`,
             const to = names.get(String(tc.args.subagent_type));
             if (to) {
               pending.set(key, to);
-              emit({ t: "delegate", to, job: String(tc.args.description ?? "").slice(0, 160) });
+              // The first line of the brief is its title; ids that slip through become names.
+              const title = String(tc.args.description ?? "").trim().split("\n")[0].replace(/^(title|job)\s*:\s*/i, "").replace(/^["'*#\s]+|["'*\s.]+$/g, "");
+              emit({ t: "delegate", to, job: humanize(title, w.factions).slice(0, 90) });
             }
           }
         }

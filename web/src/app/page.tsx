@@ -11,7 +11,8 @@ import { MapView } from "@/views/MapView";
 import { Profile } from "@/views/Profile";
 import { WarRoom } from "@/views/WarRoom";
 
-const VIEWS = { profile: Profile, war: WarRoom, map: MapView, factions: Factions };
+// "case" belongs to the real-case screens (kept, not mounted); it falls back to Profile.
+const VIEWS = { case: Profile, profile: Profile, war: WarRoom, map: MapView, factions: Factions };
 
 export default function Home() {
   const view = useGame((s) => s.view);
