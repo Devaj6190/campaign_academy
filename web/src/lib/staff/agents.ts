@@ -33,7 +33,7 @@ export function world(w: Snapshot) {
   const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 50) - (w.sent[b.cd] ?? 50));
   const line = (p: (typeof PLACES)[number]) => `${p.cd} ${p.name} (${p.boro}): support ${Math.round(w.sent[p.cd] ?? 50)}, top complaint "${p.issue}"`;
   return `Day ${w.day} of 30 (${days} left). Cash $${w.cash.toLocaleString("en-US")}. Poll: ${CANDIDATES.map((c) => `${c.short} ${w.poll[c.id] ?? 0}`).join(", ")}.
-Manifesto: ${w.manifesto.map((m, i) => `${i + 1}. ${m}`).join(" ")}
+Manifesto (use it in ads, speeches and door scripts): ${w.manifesto.map((m, i) => { const p = w.planks?.[i]; const who = p && (p.serves.length || p.offends.length) ? ` [serves: ${p.serves.join(", ") || "none"}; costs: ${p.offends.join(", ") || "none"}]` : ""; return `${i + 1}. ${m}${who}`; }).join(" ")}
 Factions (use the id):
 ${factions}
 Districts (use the number). Support is simulated, 0-100:

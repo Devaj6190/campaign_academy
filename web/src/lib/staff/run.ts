@@ -26,6 +26,7 @@ export function snapshot(): Snapshot {
     factions: g.factions.map(({ id, name, feel, size, values, dislikes }) => ({ id, name, feel, size, values, dislikes })),
     staff: g.staff,
     manifesto: g.manifesto,
+    planks: g.planks.map((p) => ({ serves: p.serves.map((r) => r.faction), offends: p.offends.map((r) => r.faction) })),
     hires: s.hires,
     morale: s.morale,
     money: { fatigue: g.money.fatigue, participant: g.money.participant, left: { ads: g.money.envelopes.ads - g.money.spent.ads, field: g.money.envelopes.field - g.money.spent.field, events: g.money.envelopes.events - g.money.spent.events } },

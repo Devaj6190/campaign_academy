@@ -6,6 +6,7 @@ import { cn, money, moneyK } from "@/lib/util";
 import { Dock, DockButton, Inspector, Label, Meter, Section } from "@/components/ui";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import { districtBy } from "@/lib/geo";
+import { RealPlanksBrief } from "@/components/RealPlatform";
 import { ACTIVE, activeRivals, CANDIDATES, dayLabel, ME, rivalDef, type Sourced } from "@/lib/scenario";
 
 export function Profile() {
@@ -157,6 +158,7 @@ function RivalCard({ id, name, tag, note }: { id: string; name: string; tag: str
         <span className={cn(r.plan.status === "planning" && "breathe text-warm")}>{r.plan.status === "planning" ? "Planning tonight…" : r.plan.mode === "live" ? "AI campaign" : ""}</span>
       </div>
       <div className="mt-1.5 text-[12px] text-soft">Strong with: {strong.length ? strong.join(", ") : note.toLowerCase()}</div>
+      <RealPlanksBrief id={id} />
       {!!moves.length && (
         <ul className="mt-2 space-y-1 border-t border-line pt-2 text-[11.5px] text-muted">
           {moves.map((l) => <li key={l.id}><span className="tnum font-mono text-faint">D{l.day}</span> {l.effect.summary}</li>)}

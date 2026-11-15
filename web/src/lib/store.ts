@@ -4,7 +4,7 @@ import type { PlanStatus, PlanTask } from "@/components/ui21/agent-plan";
 import { DISTRICTS } from "./geo";
 import { shares } from "./demographics";
 import { hash } from "./util";
-import { effectOf, type Effect } from "./engine/resolve";
+import type { Effect } from "./engine/resolve";
 import { knockOns } from "./relations";
 import { calibrate, pollOf, type Rival } from "./engine/poll";
 import { publish, type PollRecord } from "./engine/polls";
@@ -13,6 +13,7 @@ import { tacticOutcome, type Deliverer } from "./engine/tactic";
 import { electionResult, type ElectionResult } from "./engine/election";
 import type { Edition } from "./paper/edition";
 import type { MomentState } from "./scenario/moments";
+import type { Plank } from "./manifesto/rules";
 import { addGifts } from "./money/donors";
 import { avgIncome, burn, settle } from "./money/finance";
 import { ASKS, ENVELOPE_OF, START_MONEY, type Envelope, type Money } from "./money/rules";
@@ -27,7 +28,6 @@ export const SPEEDS = [0.5, 1, 2, 4];
 type Line = { who: "me" | "them" | "note"; text: string };
 type Overlay = "paper" | "manifesto" | "calendar" | "tactic" | "election" | "moment" | null;
 export type Toast = { id: number; staff: string; text: string };
-export type Draft = { text: string; up: string[]; down: string[] };
 
 /** One change to the world, stamped with when it happened. Every view that explains "why" reads this. */
 /** knock: how other groups moved because of this one (relations.ts), credited to the group that caused it. */
@@ -55,7 +55,12 @@ type State = {
   money: Money;
   tasks: { id: number; text: string; done: boolean }[];
   calendar: Record<number, string[]>;
+  /** Plank texts, in order (what most readers need). */
   manifesto: string[];
+  /** The planks with who each serves and costs (lib/manifesto). */
+  planks: Plank[];
+  /** A voter group the manifesto should open aimed at (from the Factions screen). */
+  manifestoFocus: string | null;
   factions: Faction[];
   staff: Staff[];
   sent: Record<number, number>;
@@ -102,7 +107,6 @@ type State = {
   open: (o: Overlay) => void;
   instruct: (id: string, text: string) => void;
   hire: (id: string, pick: number) => void;
-  commitPlank: (d: Draft) => void;
   runTactic: (by?: Deliverer) => void;
   speak: () => void;
   dismiss: (id: number) => void;
@@ -209,6 +213,8 @@ export const useGame = create<State>((set, get) => ({
   tasks: ACTIVE.story.tasks.map((text, i) => ({ id: i + 1, text, done: false })),
   calendar: ACTIVE.story.calendar,
   manifesto: ACTIVE.story.manifesto,
+  planks: ACTIVE.story.manifesto.map((text) => ({ text, day: 0, by: "record", serves: [], offends: [] })),
+  manifestoFocus: null,
   factions: START_FACTIONS,
   staff: START_STAFF,
   sent,
@@ -338,13 +344,6 @@ export const useGame = create<State>((set, get) => ({
       staff: s.staff.map((p) => (p.id === id ? { ...p, name: pick === 0 ? "Helen Voss" : "Kai Lindqvist", good: pick === 0 ? "Careful, experienced" : "Brilliant", weak: pick === 0 ? "Expensive" : "Abrasive", doing: "Settling in" } : p)),
       losses: s.losses.map((c, i) => (i === 0 ? { ...c, v: c.v + (pick === 0 ? 900 : 600) } : c)),
     })),
-
-  // A plank is permanent and moves the groups it pleases and angers, through the ledger like everything else.
-  commitPlank: (d) => {
-    set((s) => ({ manifesto: [...s.manifesto, d.text] }));
-    const factions = Object.fromEntries([...d.up.map((id) => [id, 6]), ...d.down.map((id) => [id, -8])]);
-    get().applyEffect(effectOf({ by: "manifesto", action: "plank", label: "Manifesto plank", summary: d.text, factions }), "manifesto");
-  },
 
   // The contrast ad: honest but risky. The risk is computed from the situation and shown first (engine/tactic.ts).
   runTactic: (by = "com") => {

@@ -105,7 +105,7 @@ export function Factions() {
           </div>
         </div>
         <Dock label={sel ? sel.name : "Read-only. Use this to write better policy."}>
-          <DockButton primary icon={<ScrollText />} label={sel ? "Write policy for them" : "Open the manifesto"} onClick={() => open("manifesto")} />
+          <DockButton primary icon={<ScrollText />} label={sel ? "Write policy for them" : "Open the manifesto"} onClick={() => { useGame.setState({ manifestoFocus: sel?.id ?? null }); open("manifesto"); }} />
           {sel && <DockButton icon={<MapIcon />} label="Show on map" onClick={() => showOnMap(sel.id)} />}
         </Dock>
       </section>

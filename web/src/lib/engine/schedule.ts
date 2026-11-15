@@ -82,7 +82,7 @@ export function planRivals() {
 export function overnight(ended: number) {
   if (DEBATE_DAYS.includes(ended)) {
     const g = useGame.getState();
-    const d = debate({ day: ended, manifesto: g.manifesto, ledger: g.ledger, polls: g.polls });
+    const d = debate({ day: ended, manifesto: g.manifesto, planks: g.planks, ledger: g.ledger, polls: g.polls });
     g.applyEffect(d.effect, "debate");
     useGame.setState((s) => ({ news: { ...s.news, debate: d.story } }));
   }

@@ -3,8 +3,11 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Lock, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useGame, type Draft } from "@/lib/store";
-import { cn, hash } from "@/lib/util";
+import { useGame } from "@/lib/store";
+import { canAdd, DAYS_BETWEEN, FREE_PLANKS, type Shaped } from "@/lib/manifesto/rules";
+import { commit, shapeIdea } from "@/lib/manifesto/run";
+import { RealPlatform } from "./RealPlatform";
+import { cn } from "@/lib/util";
 import { tacticRisk, type Deliverer } from "@/lib/engine/tactic";
 import { Avatar, Button, Dialog, Label, Meter } from "./ui";
 import { ShaderBackground } from "./ui21/dithering";
@@ -31,19 +34,26 @@ export function Overlays() {
 
 // Policy lives in one document. Planks are suggested or reshaped from what the player types, and they are permanent.
 function Manifesto() {
-  const planks = useGame((s) => s.manifesto);
+  const planks = useGame((s) => s.planks);
+  const day = useGame((s) => s.day);
   const factions = useGame((s) => s.factions);
-  const commit = useGame((s) => s.commitPlank);
+  const focus = useGame((s) => s.manifestoFocus);
+  const hasDirector = useGame((s) => s.staff.some((p) => p.id === "pol" && p.name));
   const [text, setText] = useState("");
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const name = (id: string) => factions.find((f) => f.id === id)!.name;
+  const [draft, setDraft] = useState<Shaped | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const name = (id: string) => factions.find((f) => f.id === id)?.name ?? id;
+  const gate = canAdd(planks, day);
+  const focusName = focus ? name(focus) : null;
 
-  // model: stand-in for the real call that turns a rough idea into workable policy and scores who it helps and hurts.
-  const shape = () => {
+  const shape = async () => {
     const t = text.trim();
     if (!t) return;
-    const order = [...factions].sort((a, b) => hash(t.length, a.size) - hash(t.length, b.size));
-    setDraft({ text: `${t[0].toUpperCase()}${t.slice(1).replace(/\.$/, "")}, phased in over two years and paid for from a named budget line.`, up: order.slice(0, 2).map((f) => f.id), down: order.slice(-1).map((f) => f.id) });
+    setBusy(true);
+    setNote("");
+    setDraft(await shapeIdea(t, focus ?? undefined));
+    setBusy(false);
   };
 
   return (
@@ -51,38 +61,56 @@ function Manifesto() {
       <div className="border-b border-line px-7 pt-8 pb-6">
         <Label>Manifesto</Label>
         <h2 className="mt-2 font-serif text-[34px] leading-none tracking-tight">What {ME.short} stands for</h2>
-        <p className="mt-3 text-[13px] text-muted">Once a plank goes in, it cannot be removed. Speeches, ads and door scripts are written from this.</p>
+        <p className="mt-3 text-[13px] text-muted">Once a plank goes in, it cannot be removed. Speeches, ads and door scripts are written from this. Build to {FREE_PLANKS}, then one new plank every {DAYS_BETWEEN} days.</p>
       </div>
-      <ol className="min-h-0 flex-1 overflow-y-auto px-7 py-3">
-        {planks.map((p, i) => (
-          <motion.li key={p} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4 border-b border-line py-4 last:border-b-0">
-            <span className="tnum font-mono text-[11px] leading-[22px] text-faint">{String(i + 1).padStart(2, "0")}</span>
-            <span className="flex-1 text-[14px] leading-[22px]">{p}</span>
-            <Lock className="mt-1 size-3.5 shrink-0 text-faint" />
-          </motion.li>
-        ))}
-      </ol>
+      <div className="min-h-0 flex-1 overflow-y-auto px-7 py-3">
+        <ol>
+          {planks.map((p, i) => (
+            <motion.li key={p.text} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4 border-b border-line py-4 last:border-b-0">
+              <span className="tnum font-mono text-[11px] leading-[22px] text-faint">{String(i + 1).padStart(2, "0")}</span>
+              <div className="flex-1">
+                <div className="text-[14px] leading-[22px]">{p.text}</div>
+                {(p.serves.length > 0 || p.offends.length > 0) && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {p.serves.map((r) => <span key={r.faction} title={r.why} className="rounded-full border border-pos/25 px-2 py-0.5 text-[11px] text-pos">Serves {name(r.faction).toLowerCase()}</span>)}
+                    {p.offends.map((r) => <span key={r.faction} title={r.why} className="rounded-full border border-neg/25 px-2 py-0.5 text-[11px] text-neg">Costs {name(r.faction).toLowerCase()}</span>)}
+                  </div>
+                )}
+                <div className="mt-1 text-[11px] text-faint">{p.by === "record" ? "On the record at the start" : `Added on day ${p.day}${p.by === "pol" ? " · shaped by the Policy Director" : " · a staff draft"}`}</div>
+              </div>
+              <Lock className="mt-1 size-3.5 shrink-0 text-faint" />
+            </motion.li>
+          ))}
+        </ol>
+        <RealPlatform />
+      </div>
       <div className="border-t border-line p-5">
         <AnimatePresence mode="wait" initial={false}>
           {draft ? (
             <motion.div key="draft" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-xl border border-line-strong bg-raised p-4">
-              <div className="flex items-center justify-between"><Label>Suggested version</Label><span className="text-[10.5px] text-faint">Placeholder, not a model yet</span></div>
+              <div className="flex items-center justify-between"><Label>{draft.by === "pol" ? "Your Policy Director's version" : "A staff draft"}</Label><span className="text-[10.5px] text-faint">{draft.mode === "live" ? "AI draft; effects computed by the game" : "Rough draft from the groups' stated values"}</span></div>
               <p className="mt-2 text-[14px] leading-relaxed">{draft.text}</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {draft.up.map((id) => <span key={id} className="rounded-full border border-pos/25 px-2 py-0.5 text-[11.5px] text-pos">Pleases {name(id).toLowerCase()}</span>)}
-                {draft.down.map((id) => <span key={id} className="rounded-full border border-neg/25 px-2 py-0.5 text-[11.5px] text-neg">Angers {name(id).toLowerCase()}</span>)}
+                {draft.serves.map((r) => <span key={r.faction} title={r.why} className="rounded-full border border-pos/25 px-2 py-0.5 text-[11.5px] text-pos">Serves {name(r.faction).toLowerCase()}</span>)}
+                {draft.offends.map((r) => <span key={r.faction} title={r.why} className="rounded-full border border-neg/25 px-2 py-0.5 text-[11.5px] text-neg">Costs {name(r.faction).toLowerCase()}</span>)}
+                {!draft.serves.length && !draft.offends.length && <span className="text-[11.5px] text-faint">No clear winners or losers: it may not move anyone.</span>}
               </div>
+              {draft.tradeoff && <p className="mt-2 text-[12px] text-muted">{draft.tradeoff}</p>}
+              {note && <p className="mt-2 text-[12px] text-neg">{note}</p>}
               <div className="mt-4 flex items-center gap-2">
-                <Button variant="primary" onClick={() => { commit(draft); setDraft(null); setText(""); }}><Lock className="size-3.5" />Add permanently</Button>
+                <Button variant="primary" disabled={!gate.ok} onClick={() => { const err = commit(draft); if (err) setNote(err); else { setDraft(null); setText(""); useGame.setState({ manifestoFocus: null }); } }}><Lock className="size-3.5" />Add permanently</Button>
                 <Button variant="ghost" onClick={() => setDraft(null)}>Discard</Button>
               </div>
             </motion.div>
           ) : (
             <motion.div key="compose" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Label>Propose a policy</Label>
+              <div className="flex items-baseline justify-between"><Label>Propose a policy{focusName ? ` for ${focusName.toLowerCase()}` : ""}</Label>{!gate.ok && <span className="text-[11px] text-warm">Next plank on day {gate.next}</span>}</div>
               <div className="mt-2 rounded-xl border border-line-strong bg-raised p-2 transition-colors focus-within:border-white/30">
                 <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Say what you want in your own words, e.g. make buses free" className="w-full resize-none bg-transparent px-1.5 py-1 text-[13px] outline-none placeholder:text-faint" />
-                <div className="flex justify-end"><Button size="sm" variant="primary" disabled={!text.trim()} onClick={shape}><Sparkles className="size-3.5" />Shape into policy</Button></div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-faint">{hasDirector ? "Your Policy Director will shape it." : "No Policy Director yet: a staffer drafts it, less sharply."}</span>
+                  <Button size="sm" variant="primary" disabled={!text.trim() || busy} onClick={shape}><Sparkles className="size-3.5" />{busy ? "Shaping…" : "Shape into policy"}</Button>
+                </div>
               </div>
             </motion.div>
           )}

@@ -14,6 +14,8 @@ export type Snapshot = {
   factions: Pick<Faction, "id" | "name" | "feel" | "size" | "values" | "dislikes">[];
   staff: Staff[];
   manifesto: string[];
+  /** Who each plank serves and costs, by faction id (same order as manifesto). */
+  planks?: { serves: string[]; offends: string[] }[];
   /** Profiles for people hired during the game (seed staff use roster.ts). */
   hires: Record<string, Profile>;
   morale: Record<string, number>;

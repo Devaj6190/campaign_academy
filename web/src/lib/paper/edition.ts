@@ -195,7 +195,7 @@ export function buildEdition(w: World, kind: Kind = "daily"): Edition {
   const editorial: Story = {
     kicker: "Editorial",
     headline: `On ${issue}, three answers`,
-    body: `New Yorkers keep telling the city about ${issue}. The candidates offer different answers. ${ME.short}'s platform: ${w.manifesto.slice(0, 2).join(" ")} ${activeRivals(w.day).map((id) => `${nameOf(id)} runs on ${RIVALS[id].runsOn}.`).join(" ")} This page endorses no one; voters should judge each campaign by what it does in their neighborhood, not by what it promises.`,
+    body: `New Yorkers keep telling the city about ${issue}. The candidates offer different answers. ${ME.short}'s platform, most recently: ${w.manifesto.slice(-2).join(" ")} ${activeRivals(w.day).map((id) => `${nameOf(id)} runs on ${RIVALS[id].runsOn}.`).join(" ")} This page endorses no one; voters should judge each campaign by what it does in their neighborhood, not by what it promises.`,
   };
   const moved = previous ? w.factions.map((f) => ({ f, d: (latest.groups[f.id]?.feel ?? 50) - (previous.groups[f.id]?.feel ?? 50) })).sort((a, b) => b.d - a.d) : w.factions.map((f) => ({ f, d: f.feel - 50 })).sort((a, b) => b.d - a.d);
   const letter = (f: Faction, pleased: boolean): Story => ({
