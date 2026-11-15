@@ -25,8 +25,11 @@ export function useTicker() {
     // The import may resolve after an unmount (React mounts twice in development): only watch if still mounted.
     let off: (() => void) | undefined;
     let live = true;
+    let offMemos: (() => void) | undefined;
     void import("@/lib/staff/speak").then((m) => { if (live) off = m.watch(); });
-    return () => { live = false; off?.(); };
+    // Staff memos for the next case decision are written as its stretch begins, so the decision never waits on them.
+    void import("@/lib/staff/memos").then((m) => { if (live) offMemos = m.watchMemos(); });
+    return () => { live = false; off?.(); offMemos?.(); };
   }, []);
   const running = useCase((s) => s.running);
   const speed = useCase((s) => s.speed);

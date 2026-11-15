@@ -6,7 +6,7 @@ import { ACTION_IDS, ACTIONS, BOOKING_KINDS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
 import { bounce, Ledger } from "./numbers";
 import { memoryFile, THOUGHT_MAX, type RunCtx } from "./protocol";
-import { humanize, PLACES, short, type Snapshot } from "./world";
+import { humanize, PLACES, short, type Snapshot, describeWorld } from "./world";
 
 // Real staff. Each director is a deep agent: it plans with write_todos and hands jobs to its people through the
 // task tool. Each of their people is a subagent that does one job with take_action. All model ids live here.
@@ -33,21 +33,8 @@ const post = (p: { name?: string; role: string; onRecord?: string }) =>
 
 const frame = (w: Snapshot) => `on ${w.candidate}'s campaign in ${w.race}. This is a nonpartisan teaching simulation built on the real race: the people, dates and standings up to today are real, and what your work achieves is simulated`;
 
-export function world(w: Snapshot) {
-  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-  const poll = Object.entries(w.poll).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([id, v]) => `${w.names[id] ?? id} ${Math.round(v)}`).join(", ");
-  const factions = w.factions.map((f) => `${f.id} (${f.name}): ${Math.round(f.feel)}% support ${w.candidate}; ${f.size}% of likely voters`).join("\n");
-  const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 0) - (w.sent[b.cd] ?? 0));
-  const line = (p: (typeof PLACES)[number]) => `${p.cd} ${p.name} (${p.boro}): support ${Math.round(w.sent[p.cd] ?? 0)}%`;
-  return `Today is ${w.date}; ${w.daysLeft} days to the primary. Left to spend under the cap: ${usd(w.cash)}. Poll: ${poll}.
-The candidate's calendar (he can do ${w.daily} things a day): ${w.booked.length ? w.booked.map((b) => `${b.date} ${b.label}`).join("; ") : "nothing booked"}.
-Platform: ${w.manifesto.map((m, i) => `${i + 1}. ${m}`).join(" ")}
-Voter groups (use the id). They overlap: one voter is in several.
-${factions}
-Districts (use the number). Support is simulated, in percent:
-${PLACES.map(line).join("\n")}
-Weakest five: ${weakest.slice(0, 5).map((p) => p.name).join(", ")}.`;
-}
+/** The campaign as staff read it (lib/staff/world.ts); exported here too for the rival agent, which imports it from this module. */
+export const world = describeWorld;
 
 export const catalog = (w: Snapshot) => ACTION_IDS.map((id) => `- ${id}: ${ACTIONS[id].about} ~$${(ACTIONS[id].cost * w.scale.money).toLocaleString("en-US")}${ACTIONS[id].needs.district ? " [needs district]" : ""}${ACTIONS[id].needs.faction ? " [needs voter group]" : ""}`).join("\n");
 

@@ -2,6 +2,7 @@ import { skip } from "../cases/clock";
 import { useRivals } from "../cases/rivals";
 import { currentCase, useCase } from "../cases/store";
 import { KEEP, memoriesFor, remember } from "./memory";
+import { checkMemosOffline } from "./memoCheck";
 import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
 import { budgetIn, memoryFile, RunCtx, type Proposal, type RunEvent } from "./protocol";
@@ -269,6 +270,11 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
   if (fuCtx.spent || fuEvents.some((e) => e.t === "action")) problems.push("follow-up: offline, it did work instead of offering it");
   if (fuP?.t === "proposals" && !/1,213 doors/.test(fuP.text)) problems.push(`follow-up: offline, it did not say what was done: "${fuP.text}"`);
   report.push(`follow-up: waits for its day and a free director; offline it reports the result and offers ${fuP?.t === "proposals" ? fuP.options.length : 0} next steps`);
+
+  // Staff memos on case decisions, with no key (the live version: npm run check:memos).
+  const memo = await checkMemosOffline();
+  problems.push(...memo.problems);
+  report.push(memo.report.at(-1)!);
 
   // Memory.
   useCase.getState().restart();
