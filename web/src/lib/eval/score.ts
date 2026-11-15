@@ -58,7 +58,7 @@ export function summarise(all: (Rec | FinalRec)[]): string {
       out.push(`| ${d}${rs.find((r) => r.decision === d && r.kind === "adviser") ? ` (${rs.find((r) => r.decision === d)!.person})` : ""} | ${cells.join(" | ")} |`);
     }
     const probed = rs.filter((r) => r.recognised !== undefined);
-    if (probed.length) out.push("", `Masked cards recognised as the real race: ${probed.filter((r) => r.recognised).length}/${probed.length}.`);
+    if (probed.length) out.push("", `Masked and twin cards recognised as the real race: ${probed.filter((r) => r.recognised).length}/${probed.length}.`);
     const memo = rs.filter((r) => r.memos?.length && r.chosen);
     if (memo.length) out.push(`Choices that matched one of the two staff memos: ${memo.filter((r) => r.memos!.some((m) => m.option === r.chosen)).length}/${memo.length}.`);
     const read = rs.filter((r) => r.mode === "live" && r.cond !== "recall");

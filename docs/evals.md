@@ -201,6 +201,29 @@ What it showed:
 - **The agent follows the facts, not the wording.** Changed facts moved it off the 2013 choice 72% of the time, while the same facts in other words left its choice alone 94% of the time. That is the strongest grounding result so far. Positioning and the hospital are where memory holds on longest: they kept the 2013 choice on half or more of their changed cards.
 - **Where memory and the card disagree, the card wins.** At the second ad, memory picked the wrong option twice; the card picked the real one both times. At budget the reverse: memory knows the real choice (3/3), and the card mostly did not take it (1/3). Either way the agent is not just reading its memory.
 - **The twins were recognised too: 18 of 18.** The probe named the race from its shape: a fourth-place progressive citywide official, a council-leader front-runner, a late entrant with a scandal, a hospital protest. But that probe was leading: it told the model names had been replaced. It is neutral from run 5. Recognising the race when asked is not the same as deciding from memory: on twins the agent chose differently from the card at Weiner (1/3) and budget (0/3).
+### Run 5: masked and twin cards with a neutral probe, N = 3 (commit b69da82, 15 November)
+
+The probe no longer says that names were replaced; it asks only whether the decision is taken from a real election.
+
+| Condition | On the real choice | Recognised as the real race |
+|---|---|---|
+| masked | 14/18 | 18/18 |
+| twin | 12/18 | 18/18 |
+
+| Decision | masked | twin |
+|---|---|---|
+| positioning | 3/3 | 3/3 |
+| weiner | 2/3 | 0/3 |
+| hospital | 3/3 | 3/3 |
+| budget | 0/3 | 0/3 |
+| firstad | 3/3 | 3/3 |
+| base | 3/3 | 3/3 |
+
+What it showed:
+- **Nothing hides this race.** Even asked neutrally, the model named the 2013 New York primary on every masked card and every twin, mapping each invented person to the real one ("Ellen Marsh is Christine Quinn"). The shape of the race is as identifying as the names.
+- **So the twins cannot give the clean score they were built for.** The grounding evidence for this case has to come from the changed facts against their control, and from the decisions where memory is wrong.
+- **Recognising the race does not make the agent replay it.** At Weiner, where the twin's late entrant has an expenses scandal instead of the real one, the agent left the 2013 choice in five of the six twin runs across runs 4 and 5, although the probe recognised every twin. Which twin detail moved it is not known.
+
 ### Free run 1: the whole system, one run (commit b28d704, 15 November)
 
 Run before the memo-leak fix and before tuning 1. The campaigner held 32 weekly meetings and gave 64 orders; the staff carried out 294 jobs; the rivals made 46 moves.
