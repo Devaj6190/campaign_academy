@@ -6,6 +6,7 @@ import { Button, Label, Meter, Section } from "@/components/ui";
 import { run } from "@/lib/cases/clock";
 import { changeAt, currentCase, decisionFilter, useCase, worldAt } from "@/lib/cases/store";
 import type { Advice, Case, Claim, Decision, Judgment, Shift, Skill, World } from "@/lib/cases/types";
+import { useMemos } from "@/lib/staff/memos";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 import { PlatformPanel } from "./Platform";
@@ -237,6 +238,35 @@ export function Changes({ c, s }: { c: Case; s: Shift }) {
 }
 
 /** One decision: the record, the advisers, the choice. Shown in the Case tab and as the card that opens when the clock reaches it. */
+/**
+ * What two of the student's directors argue on this decision, from this campaign. Written in the background by live
+ * agents (lib/staff/memos.ts); simulated views of the post, beside the fixed advisers, never the tool's advice.
+ */
+function StaffMemos({ d, label }: { d: Decision; label: (id: string) => string | undefined }) {
+  const entry = useMemos((s) => s.byDecision[d.id]);
+  const staff = useGame((s) => s.staff);
+  if (!entry) return null;
+  const nameOf = (id: string) => { const p = staff.find((x) => x.id === id); return p ? (p.onRecord || !p.name || p.name === p.role ? `The ${p.role}` : p.name) : id; };
+  return (
+    <Section big title="Your staff's memos">
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        {entry.memos.map((m) => (
+          <div key={m.director} className="rounded-lg border border-line bg-raised p-3.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[13.5px] font-medium">{nameOf(m.director)}</span>
+              <span className="text-[11px] text-faint">{staff.find((x) => x.id === m.director)?.role}</span>
+            </div>
+            <p className="mt-1 text-[12px] text-gold">Argues for: {label(m.option)}</p>
+            <p className="mt-2 text-[13.5px] leading-relaxed text-soft">{m.text}</p>
+          </div>
+        ))}
+        {entry.status === "writing" && <p className="text-[13px] text-muted">{entry.memos.length ? "The second memo is being written…" : "Your staff are writing their memos…"} You can decide without them.</p>}
+      </div>
+      <p className="mt-2 text-[12px] text-muted">Simulated: what your own staff think, from this campaign. Not advice from the case, and not what anyone said in 2013.</p>
+    </Section>
+  );
+}
+
 export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: number }) {
   const { decide, picks, at, running } = useCase();
   const live = index === at - 1;
@@ -267,6 +297,8 @@ export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: num
           {d.advice.some((a) => a.short) && <More on={advice} set={setAdvice} />}
         </Section>
       )}
+
+      <StaffMemos d={d} label={label} />
 
       <Section big title={decided ? "Your decision" : "What do you do?"}>
         <div className="space-y-2" role="radiogroup">

@@ -50,13 +50,17 @@ export function budgetIn(text: string): number | null {
   return parts.length ? parts.reduce((a, b) => a + b, 0) : null;
 }
 
+/** A post's memory as the file its agent reads (deepagents loads it into the agent's instructions). */
+export const memoryFile = (lines: string[] | undefined) =>
+  `# What I remember of this campaign\n${lines?.length ? lines.map((l) => `- ${l}`).join("\n") : "- Nothing yet: this is my first order from this campaigner."}\n`;
+
 /** How long a thought may be: one or two sentences. Asked of the model in words, and enforced when emitted. */
 export const THOUGHT_MAX = 200;
 export type PlanItem = { title: string; status: "pending" | "in-progress" | "completed" };
 export type Line = { who: "me" | "them"; text: string };
 
 /** followOf: the original order when this run is an approved follow-up; targets and clarity come from it. */
-export type RunRequest = { director: string; text: string; snapshot: Snapshot; history: Line[]; budget: number; runId: number; followOf?: string; /** A picked option: carry out exactly these, with no planning. */ steps?: Step[] };
+export type RunRequest = { director: string; text: string; snapshot: Snapshot; history: Line[]; budget: number; runId: number; followOf?: string; /** A picked option: carry out exactly these, with no planning. */ steps?: Step[]; /** What the director and their people remember of this campaign, by post id. */ memory?: Record<string, string[]>; /** The director coming back about its own earlier work: offer next steps, do nothing. */ followUp?: boolean };
 
 export type RunEvent =
   | { t: "start"; mode: "live" | "offline" }
@@ -69,7 +73,7 @@ export type RunEvent =
   | { t: "job-done"; to: string; summary: string }
   /** The campaigner asked rather than ordered: an answer in the director's voice and two or three ways to act on it. Nothing is spent. */
   | { t: "proposals"; text: string; options: Proposal[] }
-  | { t: "report"; text: string; ask: Ask | null; coaching: string; clarity: number; fit: number; missing: string[]; spent: number; raised: number }
+  | { t: "report"; text: string; ask: Ask | null; coaching: string; clarity: number; fit: number; missing: string[]; spent: number; raised: number; /** One thing the director chose to remember from this order. */ note?: string }
   | { t: "error"; text: string }
   | { t: "done" };
 
@@ -210,7 +214,7 @@ export class RunCtx {
     this.emit({ t: "proposals", text: text.trim(), options });
   }
 
-  report(text: string, ask: Ask | null, coaching: string) {
+  report(text: string, ask: Ask | null, coaching: string, note?: string) {
     if (this.reported) return;
     this.reported = true;
     const m = this.req.snapshot.scale.money;
@@ -225,6 +229,7 @@ export class RunCtx {
       missing: this.quality.missing,
       spent: this.spent,
       raised: this.raised,
+      note: note?.replace(/\s+/g, " ").trim().slice(0, THOUGHT_MAX) || undefined,
     });
   }
 }

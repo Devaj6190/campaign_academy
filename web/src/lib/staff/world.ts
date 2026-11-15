@@ -103,3 +103,20 @@ export const humanize = (text: string, factions: { id: string; name: string }[])
 
 /** How to refer to someone in a sentence: a first name, or "the Field Director" for a post shown by its title. */
 export const short = (p: { name?: string; role: string }) => (!p.name ? "someone" : p.name === p.role ? `the ${p.role}` : p.name.split(" ")[0]);
+
+/** The campaign as staff read it: the date, money, poll, calendar, platform, voter groups and districts. */
+export function describeWorld(w: Snapshot) {
+  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const poll = Object.entries(w.poll).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([id, v]) => `${w.names[id] ?? id} ${Math.round(v)}`).join(", ");
+  const factions = w.factions.map((f) => `${f.id} (${f.name}): ${Math.round(f.feel)}% support ${w.candidate}; ${f.size}% of likely voters`).join("\n");
+  const weakest = [...PLACES].sort((a, b) => (w.sent[a.cd] ?? 0) - (w.sent[b.cd] ?? 0));
+  const line = (p: (typeof PLACES)[number]) => `${p.cd} ${p.name} (${p.boro}): support ${Math.round(w.sent[p.cd] ?? 0)}%`;
+  return `Today is ${w.date}; ${w.daysLeft} days to the primary. Left to spend under the cap: ${usd(w.cash)}. Poll: ${poll}.
+The candidate's calendar (he can do ${w.daily} things a day): ${w.booked.length ? w.booked.map((b) => `${b.date} ${b.label}`).join("; ") : "nothing booked"}.
+Platform: ${w.manifesto.map((m, i) => `${i + 1}. ${m}`).join(" ")}
+Voter groups (use the id). They overlap: one voter is in several.
+${factions}
+Districts (use the number). Support is simulated, in percent:
+${PLACES.map(line).join("\n")}
+Weakest five: ${weakest.slice(0, 5).map((p) => p.name).join(", ")}.`;
+}
