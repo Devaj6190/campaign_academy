@@ -6,8 +6,8 @@ import { useCase } from "@/lib/cases/store";
 import { cn } from "@/lib/util";
 
 // Makes a number's change visible: when `value` moves, the number pulses and a chip with the difference floats beside
-// it for a moment ("−$18,000", "+0.2"). Changes close together add up into one chip. Quiet on the first render and when
-// the case restarts, so loading a screen never flashes everything.
+// it for a moment ("−$18,000", "+0.2"). Changes close together add up into one chip. Quiet on the first render, when
+// the case restarts and when a saved campaign loads ("campaign:loaded"), so loading a screen never flashes everything.
 
 /** How long a chip stays, and how long after a change another one adds to it rather than starting a new chip. */
 const SHOW_MS = 2600;
@@ -15,6 +15,8 @@ const SHOW_MS = 2600;
 /** True for a moment after the case restarts: a restart is not a change to show. */
 let resetAt = 0;
 useCase.subscribe((s, p) => { if (s.at < p.at || s.date < p.date) resetAt = Date.now(); });
+// A saved campaign loaded, or a reset: the numbers jump from where the page started, which is not a change to show.
+if (typeof window !== "undefined") window.addEventListener("campaign:loaded", () => { resetAt = Date.now(); });
 
 export function useChange(value: number, epsilon = 0) {
   const last = useRef<number | null>(null);

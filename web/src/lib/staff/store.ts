@@ -77,6 +77,8 @@ export const useStaff = create<StaffState>(() => ({
 
 let uid = 1;
 export const nextId = () => uid++;
+/** After a saved campaign is loaded: new ids start past the highest loaded one (lib/save.ts). 0 starts them over. */
+export const bumpUid = (n: number) => { uid = n ? Math.max(uid, n + 1) : 1; };
 
 export const pushChat = (id: string, item: ChatItem) => useStaff.setState((s) => ({ chat: { ...s.chat, [id]: [...(s.chat[id] ?? []), item] } }));
 

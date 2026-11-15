@@ -71,8 +71,8 @@ export async function writeMemos(index: number) {
       memory: memory[p.id] ?? [],
     };
     memos.push(await writer(req));
-    // A restart while writing: these belong to a campaign that no longer exists.
-    if (!useMemos.getState().byDecision[d.id]) return;
+    // A restart or a loaded save while writing: these belong to a campaign that no longer exists.
+    if (useMemos.getState().byDecision[d.id]?.status !== "writing") return;
     put(d.id, { status: memos.length < 2 ? "writing" : "ready", memos: [...memos] });
   }
   put(d.id, { status: "ready", memos });

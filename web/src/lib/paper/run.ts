@@ -26,6 +26,8 @@ type PaperState = {
 };
 
 let uid = 1;
+/** After a saved campaign is loaded: new edition ids start past the highest loaded one (lib/save.ts). 0 starts them over. */
+export const bumpUid = (n: number) => { uid = n ? Math.max(uid, n + 1) : 1; };
 
 export const usePaper = create<PaperState>((set) => ({
   open: false,
