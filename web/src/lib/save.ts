@@ -35,6 +35,9 @@ const SLOTS: { name: string; store: Store; keys: string[] }[] = [
   { name: "tasks", store: useTasks, keys: ["tasks"] },
 ];
 
+/** Tells the screens the campaign was just replaced, not changed: the top bar does not flash the jump (components/Changed). */
+const loaded = () => globalThis.dispatchEvent?.(new Event("campaign:loaded"));
+
 export type Save = { v: number; caseId: string; savedAt: string; stores: Record<string, Record<string, unknown>> };
 
 const pick = (o: Record<string, unknown>, keys: string[]) => Object.fromEntries(keys.map((k) => [k, o[k]]));
@@ -93,6 +96,7 @@ export function restore(save: unknown): boolean {
   bumpFeed(Math.max(0, ...staff.feed.map((f) => f.id)));
   bumpEditions(Math.max(0, ...(st.paper.editions as { id: number }[]).map((e) => e.id)));
   resetSeen();
+  loaded();
   // Memos the save had not finished are written again: a new picks object wakes the memo watcher (watchMemos), which
   // ran when the case store moved, before the save's memos were in.
   useCase.setState((s) => ({ picks: { ...s.picks } }));
@@ -107,6 +111,7 @@ export function resetAll() {
   bumpEditions(0);
   resetSeen();
   clearSave();
+  loaded();
 }
 
 export function readSave(): unknown {
