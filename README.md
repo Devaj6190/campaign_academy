@@ -5,7 +5,7 @@
 The first case is the 2013 Democratic primary for Mayor of New York. You run it from inside Bill de Blasio's campaign, which started in fourth place. The calendar runs. At the six moments where the real campaign had to decide something, the clock stops and you decide instead. Between decisions you direct a staff of live AI agents, the rival campaigns move against you, and a morning paper reports it all. On election night you see your result beside the certified one.
 
 > **About this README (15 Nov 2026).** This is the big rough draft. Everything is in; it gets made beautiful next, and the Devpost is written from it. It is not the final README (that is issue #56).
-> - It describes `main` at `6f4bcfc`, plus three unmerged PRs: the evals with held-out results (PR #75, §9), the end-of-election debrief agent (PR #73, §5b) and the appearances notice (PR #74).
+> - It describes `main` at `881fdc9`, after the evals with held-out results (#75, §9), the end-of-election debrief agent (#73, §5b) and the appearances notice (#74) merged. The image-led version is `README_PROPOSED.md`.
 > - It folds in every doc in the repo.
 > - Where a doc and the code disagree, the code on `main` wins.
 >
@@ -818,7 +818,7 @@ In development, the browser console has `window.caseStore` and `window.game`.
 | [`docs/plans/demo-polish.md`](docs/plans/demo-polish.md) | The demo-polish plan: poll chart, "What changed", War room rings, election-night bars, save and resume, demo start, reset. Built |
 | [`docs/ui-text-pass.md`](docs/ui-text-pass.md) | The UI text pass: short versions with "Read more", type sizes |
 | [`docs/AGENT_COORDINATION.md`](docs/AGENT_COORDINATION.md) | How the agents coordinate through GitHub issues and the board (#32) |
-| `docs/evals.md` (on `feat/evals`) | The full evals report, summarised in §9 |
+| [`docs/evals.md`](docs/evals.md) | The full evals report, summarised in §9 |
 
 ---
 

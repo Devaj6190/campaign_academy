@@ -97,4 +97,6 @@ npx eslint src
 npx next build
 ```
 
+The evals (#28) run outside the browser: `npm run eval -- replay --n 3`, `npm run eval -- free --runs 1` and, once only, `npm run eval -- heldout --frozen`. They need `ANTHROPIC_API_KEY` and trace to LangSmith when `LANGSMITH_API_KEY` is set. Code in `src/lib/eval/`, results in `eval/runs/`, report in `docs/evals.md`.
+
 In development the browser console has two handles: `window.caseStore` (the case store) and `window.game` (interface state).

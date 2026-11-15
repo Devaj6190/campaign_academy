@@ -129,7 +129,7 @@ export const preview = (cd: number, id: ActionId, faction?: string) => resolve(s
 
 /** The candidate does it. Refused when he is out of appearances for the day or the money is not there. */
 export function appear(cd: number, id: ActionId, faction?: string): { ok: boolean; text: string } {
-  if (appearancesToday() >= DAILY) return { ok: false, text: "No appearances left today. Send staff, or let the clock run to tomorrow." };
+  if (appearancesToday() >= DAILY) return { ok: false, text: "Today's two appearances are done." };
   const e = preview(cd, id, faction);
   if (e.cost > worldNow().w.budget) return { ok: false, text: "The campaign does not have the money for that." };
   apply(e);
