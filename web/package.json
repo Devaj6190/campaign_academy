@@ -19,6 +19,8 @@
   "dependencies": {
     "@google/genai": "2.32.0",
     "@langchain/anthropic": "^1.6.5",
+    "@spectrum-ts/core": "12.14.0",
+    "@spectrum-ts/imessage": "12.14.0",
     "deepagents": "^1.16.5",
     "lucide-react": "^1.73.0",
     "maplibre-gl": "^6.18.0",

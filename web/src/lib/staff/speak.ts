@@ -157,6 +157,8 @@ async function say(t: Trigger, day: number) {
   } catch {}
   useGame.setState((s) => ({ toasts: [...s.toasts.slice(-2), { id: Date.now(), staff: p.id, text: said.text }], unread: { ...s.unread, [p.id]: true } }));
   pushChat(p.id, { k: "them", text: said.text, suggest: said.suggest || undefined });
+  // And on the student's phone, when they linked one (lib/photon/client, #53).
+  void import("../photon/client").then((m) => m.textFromStaff(p.id, said.text, said.suggest || undefined));
   const who = short(p);
   feed(p.id, `${who[0].toUpperCase()}${who.slice(1)}: "${said.text}"`, "warm");
 }
