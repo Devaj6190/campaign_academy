@@ -1,11 +1,11 @@
 "use client";
 
-import { Map as MLMap, NavigationControl, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
+import { Map as MLMap, NavigationControl, setWorkerUrl, type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import adResult from "@/lib/cases/mayor2013-ad.json";
 import type { NightRow } from "@/lib/cases/night";
-import { censusShare, cityShare, mapValue, supportIn, useCase, worldNow } from "@/lib/cases/store";
+import { censusShare, cityShare, decisionOf, mapValue, movedBy, supportIn, useCase, worldNow } from "@/lib/cases/store";
 import { DISTRICTS } from "@/lib/geo";
 import { useGame } from "@/lib/store";
 
@@ -57,6 +57,34 @@ async function loadStyle(): Promise<StyleSpecification | string> {
   }
 }
 
+/** Where a district's arrow sits: the middle of its largest piece. */
+// ponytail: the average of the outline's points, which can fall outside an L-shaped district. Use polylabel if one does.
+const CENTRES = new Map(DISTRICTS.map((d) => {
+  const ring = d.polys.map((p) => p[0]).sort((a, b) => b.length - a.length)[0] ?? [];
+  const sum = ring.reduce((a, [x, y]) => [a[0] + x, a[1] + y], [0, 0]);
+  return [d.cd, [sum[0] / (ring.length || 1), sum[1] / (ring.length || 1)] as [number, number]];
+}));
+
+/** A small filled triangle, pointing up or down, for the districts a decision moved. */
+function arrow(up: boolean, color: string): ImageData {
+  const s = 28, c = document.createElement("canvas");
+  c.width = c.height = s;
+  const g = c.getContext("2d")!;
+  g.beginPath();
+  if (up) { g.moveTo(s / 2, 4); g.lineTo(s - 4, s - 5); g.lineTo(4, s - 5); } else { g.moveTo(4, 5); g.lineTo(s - 4, 5); g.lineTo(s / 2, s - 4); }
+  g.closePath();
+  g.fillStyle = color;
+  g.strokeStyle = "rgba(8,8,10,0.95)";
+  g.lineWidth = 3;
+  g.lineJoin = "round";
+  g.stroke();
+  g.fill();
+  return g.getImageData(0, 0, s, s);
+}
+
+/** A change in points as the map labels it: "+4.0" or "−0.6". */
+const signed = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}`;
+
 /** One Assembly District's certified 2013 votes (Board of Elections recaps, checked against the borough totals). */
 export type RealRow = { ad: number; total: number; share: number; deblasio: number; thompson: number; quinn: number; liu: number; weiner: number };
 /** `night`: the hover is on the election-night layer, so the row is the district to look up in the simulated result. */
@@ -64,7 +92,7 @@ export type Tip = { x: number; y: number; cd: number; real?: RealRow; night?: bo
 /** What the map shows: the student's campaign by community district, their election night, or the certified result. */
 export type Layer = "campaign" | "night" | "real";
 
-const LAYERS: Record<Layer, string[]> = { campaign: ["district-fill", "district-line", "district-pulse", "district-selected"], night: ["night-fill", "real-line"], real: ["real-fill", "real-line"] };
+const LAYERS: Record<Layer, string[]> = { campaign: ["district-fill", "district-line", "district-pulse", "district-selected", "district-moves"], night: ["night-fill", "real-line"], real: ["real-fill", "real-line"] };
 const show = (m: MLMap, layer: Layer) => {
   for (const id of new Set(Object.values(LAYERS).flat())) m.setLayoutProperty(id, "visibility", LAYERS[layer].includes(id) ? "visible" : "none");
 };
@@ -91,18 +119,27 @@ export function MapCanvas({ onHover, onSelect, layer = "campaign", night }: { on
     for (const r of n.rows) m.setFeatureState({ source: "real", id: r.ad }, { in: reported.has(r.ad), s: r.share });
   };
 
-  // Paint each district: the campaign's support there, or, under a group filter, how many of that group live there
-  // against the group's citywide share (census).
+  // Paint each district: the campaign's support there; under a group filter, how many of that group live there
+  // against the group's citywide share (census); under a decision filter, how far that decision moved it, scaled so
+  // the district that moved most sits at the end of the colour scale.
   const paint = () => {
     const m = map.current;
     if (!m || !ready.current) return;
     const g = worldNow().c.groups.find((x) => x.id === useGame.getState().filter && x.census);
     const avg = g ? cityShare(g.census!) : 0;
+    const dec = decisionOf(useGame.getState().filter);
+    const moved = dec ? movedBy(dec.change) : null;
+    const most = moved ? Math.max(0.05, ...Object.values(moved).map(Math.abs)) : 1;
     for (const d of DISTRICTS) {
       if (d.park) continue;
-      const v = g ? 47.5 + (censusShare(d.cd, g.census!) - avg) * 0.9 : mapValue(supportIn(d.cd) ?? 0);
+      const v = moved ? 47.5 + ((moved[d.cd] ?? 0) / most) * 27.5 : g ? 47.5 + (censusShare(d.cd, g.census!) - avg) * 0.9 : mapValue(supportIn(d.cd) ?? 0);
       m.setFeatureState({ source: "districts", id: d.cd }, { v, op: 0.6 });
     }
+    // Arrows only in the decision view, and only on districts that moved by a tenth of a point or more.
+    (m.getSource("moves") as GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: DISTRICTS.filter((d) => !d.park && moved && Math.abs(moved[d.cd] ?? 0) >= 0.05).map((d) => ({ type: "Feature" as const, properties: { v: moved![d.cd], label: signed(moved![d.cd]) }, geometry: { type: "Point" as const, coordinates: CENTRES.get(d.cd)! } })),
+    });
   };
 
   useEffect(() => {
@@ -123,6 +160,18 @@ export function MapCanvas({ onHover, onSelect, layer = "campaign", night }: { on
         m.addLayer({ id: "district-line", type: "line", source: "districts", filter: ["!", ["get", "park"]], paint: { "line-color": "rgba(255,255,255,0.22)", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 14, 1.6] } }, firstLabel);
         m.addLayer({ id: "district-pulse", type: "line", source: "districts", paint: { "line-color": "#f0a23b", "line-blur": 3, "line-width": ["case", ["boolean", ["feature-state", "pulse"], false], 6, 0], "line-opacity": ["case", ["boolean", ["feature-state", "pulse"], false], 0.9, 0], "line-width-transition": { duration: 500 }, "line-opacity-transition": { duration: 900 } } });
         m.addLayer({ id: "district-selected", type: "line", source: "districts", filter: ["==", ["get", "cd"], -1], paint: { "line-color": "#ffffff", "line-width": 2.4 } });
+        // What a decision moved: an arrow and the change in points on each district that moved. The biggest moves are
+        // placed first, so where labels would collide the small ones give way. Without the street map there is no
+        // lettering to draw with, and the arrows stand alone.
+        m.addSource("moves", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        m.addImage("move-up", arrow(true, "#f0a23b"), { pixelRatio: 2 });
+        m.addImage("move-down", arrow(false, "#7fa2ee"), { pixelRatio: 2 });
+        const font = m.getStyle().glyphs ? (m.getStyle().layers.find((l) => l.type === "symbol" && l.layout?.["text-font"])?.layout as { "text-font"?: string[] } | undefined)?.["text-font"] : undefined;
+        m.addLayer({
+          id: "district-moves", type: "symbol", source: "moves",
+          layout: { "icon-image": ["case", [">=", ["get", "v"], 0], "move-up", "move-down"], "symbol-sort-key": ["-", ["abs", ["get", "v"]]], ...(font ? { "text-field": ["get", "label"], "text-font": font, "text-size": 12, "text-anchor": "left", "text-offset": [0.75, 0], "text-optional": true } : {}) } as never,
+          paint: { "text-color": ["case", [">=", ["get", "v"], 0], "#f6cf95", "#b7ccf7"], "text-halo-color": "rgba(8,8,10,0.92)", "text-halo-width": 1.5 } as never,
+        });
         // The real 2013 result by Assembly District, coloured by de Blasio's share. Hidden until the case is finished.
         m.addSource("real", { type: "geojson", data: adResult as never });
         m.addLayer({ id: "real-fill", type: "fill", source: "real", paint: { "fill-color": SHARE(["get", "share"]) as never, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.85, 0.68] as never } }, firstLabel);

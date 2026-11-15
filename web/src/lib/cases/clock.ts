@@ -3,7 +3,7 @@ import type { Case } from "./types";
 
 // The campaign clock. It runs on the case's real calendar, one day at a time, between decisions. It never runs past
 // a decision: on the decision's date it stops and the decision card opens, and it starts again only when the student
-// has chosen and says so. Mornings with news pause it for the paper (the caller opens it). When a stretch gets
+// has chosen and says so. Mornings with news pause it for the paper (the caller announces it). When a stretch gets
 // under way, the rivals plan their moves for it (lib/cases/rivals).
 
 /** One day of the campaign at 1x, in milliseconds. */

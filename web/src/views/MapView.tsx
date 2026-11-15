@@ -6,16 +6,20 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button, Dock, DockButton, Inspector, Label, Meter, Section, Tag, ViewHeader } from "@/components/ui";
 import { night, tally, useNight } from "@/lib/cases/night";
 import { FACTIONS_2013 } from "@/lib/cases/mayor2013-factions";
-import { censusShare, cityShare, longDate, mapValue, supportIn, useCaseNow } from "@/lib/cases/store";
+import { censusShare, cityShare, decisionFilter, decisionOf, lastDecided, longDate, mapValue, movedBy, supportIn, useCaseNow } from "@/lib/cases/store";
 import { DISTRICTS, FETCHED, districtBy } from "@/lib/geo";
 import { APPEARANCES, DAILY, appear, appearancesToday, preview, sendStaff } from "@/lib/staff/run";
 import { useGame } from "@/lib/store";
 import { cn, heat, tone } from "@/lib/util";
+import { Changes } from "./CaseView";
 import type { Layer, RealRow, Tip } from "./map/MapCanvas";
 
 // ponytail: the one case with a baked result layer (mayor2013-ad.json); make this a field on the case when a second has one.
 const REAL_RESULT: Record<string, string> = { "nyc-2013-dem-mayor": "Real result 2013" };
 const RIVALS = ["deblasio", "thompson", "quinn", "liu", "weiner"] as const satisfies readonly (keyof RealRow)[];
+
+/** A change in points, signed: "+1.4" or "−0.6". */
+const pts = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}`;
 
 const ICONS: Record<string, ReactNode> = { canvass: <DoorOpen />, rally: <Megaphone />, house_party: <HandCoins /> };
 
@@ -50,6 +54,12 @@ export function MapView() {
   // The voter group filter: the case's groups that the census can place on the map.
   const placed = theCase.groups.filter((g) => g.census);
   const group = layer === "campaign" ? placed.find((g) => g.id === filter) : undefined;
+  // What one decision moved, district by district. Opened from a decision's "See it on the map" or the control above the map.
+  const dec = layer === "campaign" ? decisionOf(filter) : null;
+  const moved = dec ? movedBy(dec.change) : null;
+  const last = lastDecided();
+  const options: [string, string][] = [["all", "Your support"], ...(last ? [[decisionFilter(last.id), "Last decision"] as [string, string]] : []), ...placed.map((g) => [g.id, g.name] as [string, string])];
+  const current = dec ? decisionFilter(dec.d.id) : (group?.id ?? "all");
   const hovered = districtBy(tip?.cd ?? null);
   // The candidate in person: a few appearances a day in the selected district (lib/staff/run). Simulated.
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -61,18 +71,18 @@ export function MapView() {
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader
           title={isNight ? "Election night" : "New York City"}
-          sub={isNight ? "Your result in the 65 Assembly Districts: each one's certified 2013 result, moved by your citywide finish. Colour shows your share." : real ? "The certified result in the 65 Assembly Districts. Colour shows de Blasio's share of the vote in each one." : group ? `Where ${group.name} live. Colour shows each district's share of residents in this group, against the group's share of the whole city (census).` : "59 community districts on the real street map. Colour shows where your campaign is stronger or weaker than its citywide standing."}
+          sub={isNight ? "Your result in the 65 Assembly Districts: each one's certified 2013 result, moved by your citywide finish. Colour shows your share." : real ? "The certified result in the 65 Assembly Districts. Colour shows de Blasio's share of the vote in each one." : dec ? `What your decision "${dec.d.title}" moved. Colour and arrows show where you gained and lost ground because of it, in points.` : group ? `Where ${group.name} live. Colour shows each district's share of residents in this group, against the group's share of the whole city (census).` : "59 community districts on the real street map. Colour shows where your campaign is stronger or weaker than its citywide standing."}
           right={
             <div className="flex shrink-0 items-center gap-5">
               <div className="hidden items-center gap-2 text-[11px] text-muted @[700px]:flex">
-                {real || isNight ? "25%" : group ? "Fewer live here" : "Below your average"}
+                {real || isNight ? "25%" : dec ? "Lost ground" : group ? "Fewer live here" : "Below your average"}
                 <i className="h-1 w-24 rounded-full" style={{ background: `linear-gradient(90deg, ${heat(20)}, ${heat(47)}, ${heat(75)})` }} />
-                {real || isNight ? "55%" : group ? "More" : "Above"}
+                {real || isNight ? "55%" : dec ? "Gained" : group ? "More" : "Above"}
               </div>
               {layer === "campaign" && (
                 <div role="group" aria-label="Colour the map by" className="flex h-8 overflow-hidden rounded-md border border-line-strong text-[12.5px]">
-                  {[["all", "Your support"], ...placed.map((g) => [g.id, g.name])].map(([id, label]) => (
-                    <button key={id} aria-pressed={(group?.id ?? "all") === id} onClick={() => select({ filter: id, district: null })} className={cn("px-3 whitespace-nowrap transition-colors", (group?.id ?? "all") === id ? "bg-hover text-gold-bright" : "bg-raised text-muted hover:text-fg")}>
+                  {options.map(([id, label]) => (
+                    <button key={id} aria-pressed={current === id} onClick={() => select({ filter: id, district: null })} className={cn("px-3 whitespace-nowrap transition-colors", current === id ? "bg-hover text-gold-bright" : "bg-raised text-muted hover:text-fg")}>
                       {label}
                     </button>
                   ))}
@@ -102,7 +112,7 @@ export function MapView() {
         {tip && hovered && !hovered.park && (
           <div className="pointer-events-none fixed z-50 rounded-md border border-line-strong bg-raised px-2.5 py-1.5 text-[12px] shadow-xl" style={{ left: tip.x + 14, top: tip.y + 14 }}>
             {hovered.name}
-            <span className="tnum ml-2 font-mono text-muted">{group ? `${Math.round(censusShare(hovered.cd, group.census!))}% of residents` : `${Math.round(supportIn(hovered.cd) ?? 0)}%`}</span>
+            <span className="tnum ml-2 font-mono text-muted">{moved ? `${pts(moved[hovered.cd] ?? 0)} points` : group ? `${Math.round(censusShare(hovered.cd, group.census!))}% of residents` : `${Math.round(supportIn(hovered.cd) ?? 0)}%`}</span>
           </div>
         )}
         {tip?.real && (() => {
@@ -142,7 +152,7 @@ export function MapView() {
         )}
       </section>
 
-      <Inspector>{isNight && n ? <NightPanel n={n} shown={shown} /> : sel && layer === "campaign" ? <DistrictPanel cd={sel.cd} /> : group ? <GroupPanel id={group.id} /> : <CityPanel real={real} />}</Inspector>
+      <Inspector>{isNight && n ? <NightPanel n={n} shown={shown} /> : sel && layer === "campaign" ? <DistrictPanel cd={sel.cd} moved={moved && dec ? { v: moved[sel.cd] ?? 0, title: dec.d.title } : undefined} /> : dec && moved ? <DecisionPanel dec={dec} moved={moved} /> : group ? <GroupPanel id={group.id} /> : <CityPanel real={real} />}</Inspector>
     </div>
   );
 }
@@ -227,6 +237,41 @@ function GroupPanel({ id }: { id: string }) {
   );
 }
 
+/** One decision on the map: what the student chose, what it changed, and the districts it moved most. */
+function DecisionPanel({ dec, moved }: { dec: NonNullable<ReturnType<typeof decisionOf>>; moved: Record<number, number> }) {
+  const { c } = useCaseNow();
+  const select = useGame((s) => s.select);
+  const rows = DISTRICTS.filter((d) => !d.park && d.demo).map((d) => ({ d, v: moved[d.cd] ?? 0 })).sort((a, b) => b.v - a.v);
+  const still = rows.every((r) => Math.abs(r.v) < 0.05);
+  const list = (xs: typeof rows) =>
+    xs.map(({ d, v }) => (
+      <button key={d.cd} onClick={() => select({ district: d.cd })} className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-hover">
+        <span className="min-w-0 flex-1 truncate text-[13px] text-soft">{d.name}</span>
+        <span className={cn("tnum font-mono text-[12px]", v >= 0 ? "text-pos" : "text-neg")}>{pts(v)}</span>
+      </button>
+    ));
+  const lost = rows.filter((r) => r.v <= -0.05).slice(-5).reverse();
+  return (
+    <>
+      <div className="border-b border-line px-5 py-5">
+        <Label>Decision · {longDate(dec.d.date)}</Label>
+        <h2 className="mt-1.5 text-[17px] leading-snug font-medium tracking-tight">{dec.d.title}</h2>
+        <p className="mt-1 text-[12.5px] text-muted">You chose: <span className="text-soft">{dec.label}</span></p>
+      </div>
+      <Section title="What it changed" right={<Tag kind="sim" />}><Changes c={c} s={dec.change} /></Section>
+      {still ? (
+        <Section title="On the map"><p className="text-[12.5px] leading-relaxed text-muted">No district moved: this decision did not shift a voter group or your citywide standing.</p></Section>
+      ) : (
+        <>
+          <Section title="Gained most">{list(rows.filter((r) => r.v >= 0.05).slice(0, 5))}</Section>
+          {!!lost.length && <Section title="Lost most">{list(lost)}</Section>}
+          <p className="px-5 pb-4 text-[11px] text-faint">Points of support. A district moves when the decision moves a voter group that lives there. Where the decision left your citywide figure unchanged, ground gained in some districts shows as ground lost in others.</p>
+        </>
+      )}
+    </>
+  );
+}
+
 function CityPanel({ real }: { real: boolean }) {
   useCaseNow(); // re-rank when the case moves
   const select = useGame((s) => s.select);
@@ -264,7 +309,7 @@ function CityPanel({ real }: { real: boolean }) {
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
-function DistrictPanel({ cd }: { cd: number }) {
+function DistrictPanel({ cd, moved }: { cd: number; moved?: { v: number; title: string } }) {
   const { c, w } = useCaseNow();
   const d = districtBy(cd)!;
   const v = Math.round(supportIn(cd) ?? 0);
@@ -288,6 +333,7 @@ function DistrictPanel({ cd }: { cd: number }) {
             <span className="text-[12px] text-muted">of all voters</span>
           </div>
           <Meter value={v * 2} color={tone(v * 2)} className="mt-3" />
+          {moved && <p className="mt-3 text-[12.5px] text-muted">Your decision &ldquo;{moved.title}&rdquo; moved it <span className={cn("tnum font-mono", moved.v >= 0 ? "text-pos" : "text-neg")}>{pts(moved.v)}</span> points.</p>}
         </Section>
       )}
       {!!groups.length && (

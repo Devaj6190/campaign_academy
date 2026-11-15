@@ -711,9 +711,9 @@ function Vacancy({ p }: { p: Staff }) {
           {box?.list.map((o, i) => (
             <motion.div key={o.name} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0, transition: { delay: i * 0.06 } }} className="rounded-lg border border-line bg-raised p-3">
               <div className="flex items-center gap-3">
-                <Avatar name={`Applicant ${i + 1}`} size={34} />
+                <Avatar name={o.name} size={34} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-medium">Applicant {i + 1}</div>
+                  <div className="text-[13px] font-medium">{o.name}</div>
                 </div>
                 <Button size="sm" onClick={() => hire(p.id, o)}>Hire</Button>
               </div>

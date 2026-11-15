@@ -301,7 +301,7 @@ export function hire(post: string, c: Candidate) {
   const p = useGame.getState().staff.find((x) => x.id === post);
   if (!p || p.name) return;
   const base = profileFor(post, p.role);
-  useGame.setState((g) => ({ staff: g.staff.map((x) => (x.id === post ? { ...x, name: x.role, good: c.good, weak: c.weak } : x)) }));
+  useGame.setState((g) => ({ staff: g.staff.map((x) => (x.id === post ? { ...x, name: c.name, good: c.good, weak: c.weak } : x)) }));
   useStaff.setState((s) => {
     const candidates = { ...s.candidates };
     delete candidates[post];

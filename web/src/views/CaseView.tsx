@@ -4,7 +4,7 @@ import { ArrowDown, ArrowRight, ArrowUp, Check, ChevronDown, ExternalLink, Map a
 import { useState } from "react";
 import { Button, Label, Meter, Section } from "@/components/ui";
 import { run } from "@/lib/cases/clock";
-import { changeAt, currentCase, useCase, worldAt } from "@/lib/cases/store";
+import { changeAt, currentCase, decisionFilter, useCase, worldAt } from "@/lib/cases/store";
 import type { Advice, Case, Claim, Decision, Judgment, Shift, Skill, World } from "@/lib/cases/types";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
@@ -221,7 +221,7 @@ export function AdviceCard({ c, a, option, full }: { c: Case; a: Advice; option?
   );
 }
 
-function Changes({ c, s }: { c: Case; s: Shift }) {
+export function Changes({ c, s }: { c: Case; s: Shift }) {
   const rows: [string, string, boolean][] = [];
   if (s.budget) rows.push(["Money left to spend", usd(s.budget), s.budget > 0]);
   for (const [id, v] of Object.entries(s.poll ?? {})) if (v) rows.push([id === c.follow ? "Your poll standing" : `${c.candidates.find((x) => x.id === id)?.name ?? id} in the polls`, `${pts(v)} points`, id === c.follow ? v > 0 : v < 0]);
@@ -244,7 +244,6 @@ export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: num
   const decided = !!pick;
   const w = worldAt(c, picks, index);
   const [option, setOption] = useState(pick?.option ?? "");
-  const [why, setWhy] = useState(pick?.why ?? "");
   const last = index === c.decisions.length - 1;
   const label = (id: string) => d.options.find((o) => o.id === id)?.label;
   const [advice, setAdvice] = useState(false);
@@ -295,26 +294,14 @@ export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: num
             );
           })}
         </div>
-        {!decided && (
-          <>
-            <textarea
-              value={why}
-              onChange={(e) => setWhy(e.target.value)}
-              rows={2}
-              placeholder="Why? One or two sentences on what in the situation drives your choice."
-              className="mt-3 w-full resize-none rounded-lg border border-line-strong bg-raised p-3 text-[13.5px] outline-none placeholder:text-faint focus:border-gold"
-            />
-            <Button variant="primary" className="mt-3" disabled={!option || why.trim().length < 10} onClick={() => decide(d.id, { option, why: why.trim() })}>Decide</Button>
-          </>
-        )}
-        {decided && <p className="mt-3 text-[13px] text-muted">Your reasoning: {pick.why}</p>}
+        {!decided && <Button variant="primary" className="mt-3" disabled={!option} onClick={() => decide(d.id, { option })}>Decide</Button>}
       </Section>
 
       {decided && (
         <>
           <Section big title="What changed">
             <Changes c={c} s={changeAt(c, picks, d)} />
-            <Button className="mt-4" onClick={() => { useCase.setState({ card: false }); useGame.getState().go("map"); }}><MapIcon className="size-3.5" /> See it on the map</Button>
+            <Button className="mt-4" onClick={() => { useCase.setState({ card: false }); useGame.getState().select({ filter: decisionFilter(d.id), district: null }); useGame.getState().go("map"); }}><MapIcon className="size-3.5" /> See it on the map</Button>
           </Section>
           <Section big title="What the real campaign did">
             <p className="text-[13px] text-muted">{d.taken === null ? "Not one of your options" : d.taken === pick.option ? "The same call you made" : "A different call"}</p>
@@ -375,7 +362,7 @@ function Debrief({ c }: { c: Case }) {
               <div key={d.id} className="rounded-lg border border-line bg-raised p-4">
                 <div className="flex justify-between gap-3 text-[14px]"><span className="font-medium">{i + 1}. {d.title}</span><span className="shrink-0 text-[11.5px] text-gold">{SKILLS[d.skill]}</span></div>
                 <div className="mt-2 grid gap-1 text-[13px] text-muted">
-                  <div>You: <span className="text-soft">{you?.label ?? "No decision"}</span>{picks[d.id]?.why && <span> · {picks[d.id].why}</span>}</div>
+                  <div>You: <span className="text-soft">{you?.label ?? "No decision"}</span></div>
                   <div>The real campaign: <span className="text-soft">{they?.label ?? "Something not on the list"}</span>{you && they && you.id === they.id && <span className="text-pos"> · the same call</span>}</div>
                 </div>
                 <div className="mt-3 space-y-3 border-t border-line pt-3">

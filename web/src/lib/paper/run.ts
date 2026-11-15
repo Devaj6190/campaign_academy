@@ -16,6 +16,8 @@ import { rulesStances, STANCE, type Stance, type StanceResult } from "./stances"
 
 type PaperState = {
   open: boolean;
+  /** This morning's edition is out and the student has neither opened it nor put it aside. The notice glows and the clock waits. */
+  unread: boolean;
   editions: Edition[];
   /** The edition on screen, by id; null is the latest. */
   showing: number | null;
@@ -27,21 +29,29 @@ let uid = 1;
 
 export const usePaper = create<PaperState>((set) => ({
   open: false,
+  unread: false,
   editions: [],
   showing: null,
   set: (open) => {
     if (open) publish();
-    set({ open, showing: null });
+    set({ open, showing: null, ...(open ? { unread: false } : {}) });
   },
   show: (showing) => set({ showing }),
 }));
 
 // Restarting the case rewinds the clock and empties the work layer: the old archive belongs to another campaign.
 useCase.subscribe((s, p) => {
-  if (s.at < p.at || s.work.length < p.work.length || s.date < p.date) usePaper.setState({ editions: [], showing: null });
+  if (s.at < p.at || s.work.length < p.work.length || s.date < p.date) usePaper.setState({ editions: [], showing: null, unread: false });
 });
 
 const patch = (id: number, fn: (e: Edition) => Edition) => usePaper.setState((s) => ({ editions: s.editions.map((e) => (e.id === id ? fn(e) : e)) }));
+
+/** A morning with news: the edition goes out and waits to be read. It does not open by itself. */
+export function announce() {
+  publish();
+  // With the paper already open the new edition is on screen: there is nothing to announce.
+  usePaper.setState({ unread: !usePaper.getState().open });
+}
 
 /** Put out this morning's edition, once per day. */
 export function publish() {

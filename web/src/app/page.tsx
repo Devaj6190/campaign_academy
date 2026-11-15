@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { DecisionCard, useTicker } from "@/components/Clock";
-import { Paper } from "@/components/Paper";
+import { Paper, PaperNotice } from "@/components/Paper";
 import { Sidebar } from "@/components/Sidebar";
 import { Toasts } from "@/components/Toasts";
 import { TopBar } from "@/components/TopBar";
@@ -36,6 +36,7 @@ export default function Home() {
         </main>
       </div>
       <Paper />
+      <PaperNotice />
       <DecisionCard />
       <Toasts />
     </div>

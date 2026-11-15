@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Check, ChevronDown, Megaphone, MessageSquare, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Megaphone, MessageSquare, Newspaper, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { DAILY, appearancesToday } from "@/lib/staff/run";
 import { currentCase, longDate, shortDate, useCase } from "@/lib/cases/store";
@@ -29,6 +30,40 @@ export function Paper() {
   const { open, set } = usePaper();
   const close = () => set(false);
   return <Dialog open={open} onClose={close} plate="plate-press" className="max-w-[760px]">{open && <Page close={close} />}</Dialog>;
+}
+
+/**
+ * The morning paper is out. A notice in the corner glows until the student opens the paper or puts it aside; nothing
+ * covers the screen. The clock waits meanwhile (see useTicker in Clock.tsx).
+ */
+export function PaperNotice() {
+  const unread = usePaper((s) => s.unread);
+  const e = usePaper((s) => s.editions.at(-1));
+  return (
+    <AnimatePresence>
+      {unread && e && (
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 14 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          className="fixed bottom-5 left-5 z-50 w-[340px] min-[1200px]:left-[276px]"
+        >
+          <div role="status" className="signal flex gap-3 rounded-xl border border-line-strong bg-raised p-3.5 shadow-[0_18px_44px_-14px_rgba(0,0,0,0.9)]">
+            <button onClick={() => usePaper.getState().set(true)} className="group flex min-w-0 flex-1 gap-3 text-left">
+              <span className="grid size-9 shrink-0 place-items-center rounded-full border border-gold/50 text-gold-bright [&_svg]:size-4"><Newspaper /></span>
+              <span className="min-w-0">
+                <span className="block font-display text-[12px] text-gold/80">The Five Borough Ledger · {shortDate(e.date)}</span>
+                <span className="mt-0.5 line-clamp-2 block font-serif text-[15.5px] leading-snug transition-colors group-hover:text-gold-bright">{e.lead ? split(e.lead.text)[0] : "The race for mayor opens"}</span>
+                <span className="mt-1 block text-[11.5px] text-muted">Press to read. The clock waits.</span>
+              </span>
+            </button>
+            <button onClick={() => usePaper.setState({ unread: false })} aria-label="Read it later" title="Read it later" className="grid size-6 shrink-0 place-items-center rounded text-faint transition-colors hover:text-fg"><X className="size-3.5" /></button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 function Page({ close }: { close: () => void }) {
