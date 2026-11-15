@@ -91,7 +91,9 @@ export async function speakUp() {
   if (seen === null) { const { c, w } = worldNow(); seen = { poll: w.poll[c.follow] ?? 0, groups: { ...w.groups } }; }
   const last = useStaff.getState().spoken._last;
   if (last !== undefined && day - last < GAP) return;
-  const t = triggers(day)[0];
+  // Numbers that just moved are news; standing worries can wait their turn.
+  const all = triggers(day);
+  const t = all.find((x) => x.moved) ?? all[0];
   if (!t) return;
   await say(t, day);
 }
@@ -138,6 +140,8 @@ const OWNER: Record<string, string> = { delegating: "cm", budgeting: "fin", "vot
  */
 export function watch() {
   const offCase = useCase.subscribe((s, p) => {
+    // A restarted case starts the staff's read of the numbers over.
+    if (s.at < p.at || s.date < p.date) seen = null;
     const made = Object.keys(s.picks).find((id) => !(id in p.picks));
     if (!made) return;
     const { c } = worldNow();

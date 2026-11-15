@@ -9,7 +9,8 @@
     "lint": "eslint",
     "postinstall": "node scripts/copy-map-worker.mjs",
     "check:engine": "node scripts/check-engine.mjs",
-    "refit:case": "node scripts/refit-case.mjs"
+    "refit:case": "node scripts/refit-case.mjs",
+    "check:staff": "node scripts/check-staff.mjs"
   },
   "dependencies": {
     "@langchain/anthropic": "^1.6.5",

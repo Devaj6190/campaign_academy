@@ -61,9 +61,19 @@ function pickFaction(w: Snapshot, text: string, action: ActionId) {
   return [...w.factions].filter((f) => f.size >= 20).sort((a, b) => a.feel - b.feel)[0]?.id ?? w.factions[0].id;
 }
 
-/** A question rather than an order: the campaigner wants options, not work. */
-export const isQuestion = (text: string) =>
-  /\?\s*$/.test(text.trim()) || /^\s*(what|which|where|who|how|should|could|would|can|any)\b/i.test(text) || /\b(ideas?|suggest(ions?)?|options?|advice|thoughts|recommend|what do you think)\b/i.test(text);
+/** Words that ask for ideas rather than work. */
+const IDEAS = /\b(ideas?|suggest(ions?)?|options?|advice|advise|thoughts|recommend(ations?)?|what do you think|your (view|take|read))\b/i;
+
+/**
+ * A question rather than an order: the campaigner wants options, not work. A polite request ("Can you canvass Crown
+ * Heights this week?", "Please run call time") is an order, unless it asks for ideas ("Can you suggest something?").
+ */
+export const isQuestion = (text: string) => {
+  const t = text.trim();
+  if (IDEAS.test(t)) return true;
+  if (/^(please\b|(can|could|would|will) (you|we)\b|let'?s\b)/i.test(t)) return false;
+  return /\?\s*$/.test(t) || /^(what|which|where|who|how|why|should|is|are|do|does|any)\b/i.test(t);
+};
 
 /** Without a model: two or three options from the post's usual work, aimed where the campaign is weakest. */
 function offlineProposals(ctx: RunCtx, first: string) {
