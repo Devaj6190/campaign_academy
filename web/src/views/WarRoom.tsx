@@ -16,23 +16,22 @@ import { FACTIONS_2013 } from "@/lib/cases/mayor2013-factions";
 import { currentCase, shortDate, shortMoney, staffMoney, useCase } from "@/lib/cases/store";
 import { short, shortPlace } from "@/lib/staff/world";
 import { useGame } from "@/lib/store";
-import { cn, initials } from "@/lib/util";
+import { cn } from "@/lib/util";
 import { Cite } from "./CaseView";
 
-// Fixed logical canvas, seen from one camera: three terraces rising to the back.
+// Fixed logical canvas, seen from one camera: a stepped stone structure, centred, three levels rising to the back.
 // You stand on the top one, direct reports on the middle one, their people on the floor in front.
-const W = 900, H = 690;
-/** A figure at scale 1, feet at the bottom centre. */
-const FIG = { w: 64, h: 124 };
+const W = 900, H = 710;
 /**
- * One terrace: where feet stand, how big the camera sees people there, and its shape.
- * `back` to `edge` is the top face, `edge` to `base` the riser that carries the names. `inset` narrows the back edge.
+ * One level: where feet stand (`feet`), how tall the camera sees people there (`h`), and its stone.
+ * `back` to `edge` is the ledge people stand on; below `edge` is the wall, which carries their names down to `out`,
+ * where the lines to their reports leave. `x0`..`x1` is the wall's width; `inset` narrows the ledge's back edge.
  * Names are 16px on this canvas because it is scaled down to fit: at a 1440×900 window that renders at about 13px.
  */
 const TIERS = [
-  { feet: 115, s: 0.8, back: 90, edge: 122, base: 168, x0: 350, x1: 550, inset: 15, label: 150 },
-  { feet: 326, s: 0.92, back: 168, edge: 336, base: 402, x0: 60, x1: 840, inset: 50, label: 126 },
-  { feet: 570, s: 1, back: 402, edge: 580, base: H + 400, x0: -600, x1: 1500, inset: 60, label: 98 },
+  { feet: 126, h: 110, back: 118, edge: 132, out: 184, bottom: 333, x0: 340, x1: 560, inset: 12, label: 150 },
+  { feet: 351, h: 125, back: 333, edge: 359, out: 429, bottom: 589, x0: 55, x1: 845, inset: 22, label: 126 },
+  { feet: 609, h: 140, back: 589, edge: 617, out: 0, bottom: H + 400, x0: -600, x1: 1500, inset: 60, label: 98 },
 ];
 type Pt = { x: number; t: number };
 const YOU: Pt = { x: 450, t: 0 };
@@ -46,24 +45,25 @@ function layout(staff: Staff[]) {
   return pos;
 }
 
-// Bezier from the foot of a boss's terrace to the top of a report's head. Reversed for reports travelling back up.
+// Bezier from under a boss's name on the wall to the top of a report's head. Reversed for reports travelling back up.
 function edge(a: Pt, b: Pt, up = false) {
-  const y1 = TIERS[a.t].base + 2, y2 = TIERS[b.t].feet - FIG.h * TIERS[b.t].s - 8, ym = (y1 + y2) / 2;
+  const y1 = TIERS[a.t].out, y2 = TIERS[b.t].feet - TIERS[b.t].h - 6, ym = (y1 + y2) / 2;
   return up ? `M${b.x} ${y2}C${b.x} ${ym},${a.x} ${ym},${a.x} ${y1}` : `M${a.x} ${y1}C${a.x} ${ym},${b.x} ${ym},${b.x} ${y2}`;
 }
 
-// Head photos, one file per post in /art/staff. Real photos for the posts the record names, generated ones for invented staff.
-// ponytail: no photo of Bill Hyers was found, so `cm` falls back to a drawn head. Add "cm" here when cm.jpg exists.
-const FACES = new Set(["fd", "fin", "com", "sch", "oq", "ob", "vc", "ct", "ev", "pr", "dg"]);
+// Standing figures, one cut-out per post in /art/staff. Bodies are generated. Walzak and Singleton carry the head from a
+// news photo; no photo of Hyers was found, so that figure stands with his back to the camera.
+const ART = "/art/staff/";
+const FIGURES = new Set(["cm", "fd", "fin", "com", "sch", "oq", "ob", "vc", "ct", "ev", "pr", "dg"]);
 const SPARES = 4;
-/** Whoever holds the post: its own photo for the first holder, one from the bench for someone hired later. */
-const faceFor = (p: Staff, hired: boolean) =>
-  !p.name ? undefined : hired ? `/art/staff/spare${1 + ([...p.name].reduce((a, c) => a + c.charCodeAt(0), 0) % SPARES)}.jpg` : FACES.has(p.id) ? `/art/staff/${p.id}.jpg` : undefined;
+/** Whoever holds the post: its own figure for the first holder, one from the bench for someone hired later. */
+const figureFor = (p: Staff, hired: boolean) =>
+  !p.name ? undefined : hired || !FIGURES.has(p.id) ? `${ART}spare${1 + ([...p.name].reduce((a, c) => a + c.charCodeAt(0), 0) % SPARES)}.webp` : `${ART}${p.id}.webp`;
 const CREDIT: Record<string, string> = {
-  com: "Photo: courtesy of the Mayor's Office, via amNY",
-  dg: "Photo: Personal Democracy Forum",
+  cm: "Figure: AI-generated and shown from behind. No photo was found.",
+  com: "Head: photo courtesy of the Mayor's Office, via amNY. Body: AI-generated.",
+  dg: "Head: photo from Personal Democracy Forum. Body: AI-generated.",
 };
-const SKIRT = new Set(["fin", "vc", "pr"]);
 
 // Things a student might plausibly say to each post, to get them started. Places and voter groups are the case's own.
 const IDEAS: Record<string, string[]> = {
@@ -120,27 +120,36 @@ export function WarRoom() {
           </motion.div>
           <Fit w={W} h={H}>
            <motion.div className="absolute inset-0" style={{ rotateX, rotateY, x, y, transformPerspective: 1400 }}>
-            {/* The light over your place at the top. */}
-            <div className="pointer-events-none absolute" style={{ left: YOU.x - 230, top: -56, width: 460, height: 240, background: "radial-gradient(closest-side, rgb(214 178 110 / 0.26), transparent)" }} />
+            {/* The hall behind: back wall, columns and the light from above, fading out into the page. */}
+            <div className="pointer-events-none absolute [mask-image:radial-gradient(ellipse_40%_58%_at_50%_42%,black_40%,transparent)]" style={{ left: -110, top: -40, width: 1120, height: 506, backgroundImage: `url(${ART}room.jpg)`, backgroundSize: "100% 100%" }} />
             <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 overflow-visible" aria-hidden>
               <defs>
                 <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3" /></filter>
-                <linearGradient id="tier-top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0a0806" /><stop offset="1" stopColor="#1e1911" /></linearGradient>
-                <linearGradient id="tier-riser" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#15110b" /><stop offset="1" stopColor="#070605" /></linearGradient>
-                {/* Shared by every figure: the body's shading, its rim light, and the oval a head photo is cut to. */}
-                <linearGradient id="fig-body" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#3a301d" /><stop offset="0.45" stopColor="#1a160e" /><stop offset="1" stopColor="#0c0a07" /></linearGradient>
-                <linearGradient id="fig-you" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="var(--color-gold-bright)" /><stop offset="1" stopColor="var(--color-gold-deep)" /></linearGradient>
-                <linearGradient id="fig-rim" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="var(--color-gold-bright)" stopOpacity="0.9" /><stop offset="0.6" stopColor="var(--color-gold)" stopOpacity="0.15" /></linearGradient>
-                <clipPath id="fig-head"><ellipse cx="32" cy="21" rx="16" ry="20" /></clipPath>
+                <pattern id="stone" patternUnits="userSpaceOnUse" width="440" height="200"><image href={`${ART}stone.jpg`} width="440" height="200" preserveAspectRatio="none" /></pattern>
+                {/* Light falls from above the top level; every wall darkens away from it and toward its foot. */}
+                <radialGradient id="wall-shade" gradientUnits="userSpaceOnUse" cx={YOU.x} cy="60" r="560"><stop offset="0" stopColor="#070605" stopOpacity="0" /><stop offset="0.6" stopColor="#070605" stopOpacity="0.42" /><stop offset="1" stopColor="#070605" stopOpacity="0.93" /></radialGradient>
+                <linearGradient id="wall-foot" x1="0" y1="0" x2="0" y2="1"><stop offset="0.5" stopColor="#070605" stopOpacity="0" /><stop offset="1" stopColor="#070605" stopOpacity="0.7" /></linearGradient>
+                <linearGradient id="ledge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#241e14" /><stop offset="1" stopColor="#6a5a3b" /></linearGradient>
+                <linearGradient id="lip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#000" stopOpacity="0.7" /><stop offset="1" stopColor="#000" stopOpacity="0" /></linearGradient>
+                <linearGradient id="gold-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="var(--color-gold-deep)" stopOpacity="0.2" /><stop offset="0.5" stopColor="var(--color-gold-bright)" /><stop offset="1" stopColor="var(--color-gold-deep)" stopOpacity="0.2" /></linearGradient>
               </defs>
-              {TIERS.map((t, i) => (
-                <g key={i}>
-                  <polygon points={`${t.x0 + t.inset},${t.back} ${t.x1 - t.inset},${t.back} ${t.x1},${t.edge} ${t.x0},${t.edge}`} fill="url(#tier-top)" />
-                  <rect x={t.x0} y={t.edge} width={t.x1 - t.x0} height={Math.min(t.base - t.edge, 70)} fill="url(#tier-riser)" />
-                  <line x1={t.x0 + t.inset} x2={t.x1 - t.inset} y1={t.back} y2={t.back} stroke="var(--color-line)" />
-                  <line x1={t.x0} x2={t.x1} y1={t.edge} y2={t.edge} stroke="var(--color-gold)" strokeOpacity={0.55} />
-                </g>
-              ))}
+              {TIERS.map((t, i) => {
+                const w = t.x1 - t.x0, wall = Math.min(t.bottom - t.edge, 300);
+                return (
+                  <g key={i}>
+                    <rect x={t.x0} y={t.edge} width={w} height={wall} fill="url(#stone)" />
+                    <rect x={t.x0} y={t.edge} width={w} height={wall} fill="url(#wall-shade)" />
+                    <rect x={t.x0} y={t.edge} width={w} height={wall} fill="url(#wall-foot)" />
+                    <polygon points={`${t.x0 + t.inset},${t.back} ${t.x1 - t.inset},${t.back} ${t.x1},${t.edge} ${t.x0},${t.edge}`} fill="url(#ledge)" />
+                    <polygon points={`${t.x0 + t.inset},${t.back} ${t.x1 - t.inset},${t.back} ${t.x1},${t.edge} ${t.x0},${t.edge}`} fill="url(#wall-shade)" />
+                    {/* The gold inlay along the front edge, and the shadow the ledge throws on its own wall. */}
+                    <rect x={Math.max(t.x0, -40)} y={t.edge - 1} width={Math.min(w, W + 80)} height={2.2} fill="url(#gold-edge)" />
+                    <rect x={t.x0} y={t.edge + 1.2} width={w} height={9} fill="url(#lip)" />
+                    {/* Where the wall behind meets this ledge. */}
+                    <rect x={t.x0 + t.inset} y={t.back} width={w - 2 * t.inset} height={7} fill="url(#lip)" />
+                  </g>
+                );
+              })}
               {staff.map((p) => {
                 const state = busy[p.id];
                 return (
@@ -166,7 +175,7 @@ export function WarRoom() {
             </svg>
             <Node at={YOU} name="You" role="The campaigner" you />
             {staff.map((p) => (
-              <Node key={p.id} at={pos[p.id]} name={p.name} role={p.role} face={faceFor(p, !!hires[p.id])} skirt={SKIRT.has(p.id) && !hires[p.id]} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} thinking={!!active[p.id]} selected={p.id === person} busy={!!busy[p.id]} unread={unread[p.id]} onClick={() => pick(p.id)} />
+              <Node key={p.id} at={pos[p.id]} name={p.name} role={p.role} figure={figureFor(p, !!hires[p.id])} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} thinking={!!active[p.id]} selected={p.id === person} busy={!!busy[p.id]} unread={unread[p.id]} onClick={() => pick(p.id)} />
             ))}
            </motion.div>
           </Fit>
@@ -219,78 +228,48 @@ function ModeBadge() {
   );
 }
 
-/**
- * A standing person, drawn once and shared: the head is a photo when there is one, initials when there is not.
- * Every photo gets the same warm grade, so a news photo and a generated one sit together.
- */
-function Figure({ name, face, you, skirt }: { name?: string; face?: string; you?: boolean; skirt?: boolean }) {
-  const ghost = !name;
-  const body = ghost ? { fill: "none", stroke: "var(--color-faint)", strokeDasharray: "3 3" } : { fill: you ? "url(#fig-you)" : "url(#fig-body)", stroke: "url(#fig-rim)", strokeWidth: 0.8 };
-  return (
-    <svg viewBox={`0 0 ${FIG.w} ${FIG.h}`} className="absolute inset-0 size-full overflow-visible transition-transform duration-300 group-hover:-translate-y-0.5" aria-hidden>
-      {skirt ? (
-        <>
-          <path d="M25 102L26 120H31V102ZM33 102V120H38L39 102Z" {...body} />
-          <path d="M19 84L16 104H48L45 84Z" {...body} />
-        </>
-      ) : (
-        <path d="M19 86L20 120H30L32 94L34 120H44L45 86Z" {...body} />
-      )}
-      <path d="M18 120H31V124H18ZM33 120H46V124H33Z" {...body} />
-      {/* Arms, then the jacket over them. */}
-      <path d="M14 54Q8 56 8 63L7 90Q7 95 11 95Q15 95 15 90L18 62ZM50 54Q56 56 56 63L57 90Q57 95 53 95Q49 95 49 90L46 62Z" {...body} />
-      <path d="M14 57Q14 47 25 46H39Q50 47 50 57L46 90H18Z" {...body} />
-      {!ghost && (
-        <>
-          <path d="M27 46L32 62L37 46Z" fill={you ? "#fff" : "var(--color-soft)"} opacity={you ? 0.9 : 0.75} />
-          <path d="M31 49H33L34.5 59L32 62L29.5 59Z" fill="var(--color-gold-deep)" />
-          <path d="M27 46L32 62L37 46" fill="none" stroke="var(--color-gold)" strokeOpacity={0.5} strokeWidth={0.8} />
-        </>
-      )}
-      <rect x="28" y="37" width="8" height="10" {...body} strokeWidth={0} fill={ghost ? "none" : you ? "var(--color-gold)" : "#2a2317"} />
-      <ellipse cx="32" cy="21" rx="16" ry="20" {...body} />
-      {face && <image href={face} x="16" y="1" width="32" height="40" preserveAspectRatio="xMidYMid slice" clipPath="url(#fig-head)" style={{ filter: "grayscale(0.85) sepia(0.5) contrast(1.05) brightness(0.92)" }} />}
-      {face && <ellipse cx="32" cy="21" rx="16" ry="20" fill="none" stroke="var(--color-gold)" strokeOpacity={0.7} strokeWidth={0.8} />}
-      {!face && !ghost && !you && <text x="32" y="26" textAnchor="middle" className="fill-gold-bright font-display font-semibold" fontSize="13">{initials(name)}</text>}
-      {ghost && <path d="M32 15V27M26 21H38" stroke="var(--color-faint)" strokeWidth={1.2} />}
-    </svg>
-  );
-}
-
-function Node({ at, name, role, face, skirt, job, misfit, morale, thinking, you, selected, busy, unread, onClick }: { at: Pt; name?: string; role: string; face?: string; skirt?: boolean; job?: string; misfit?: boolean; morale?: number; thinking?: boolean; you?: boolean; selected?: boolean; busy?: boolean; unread?: boolean; onClick?: () => void }) {
+function Node({ at, name, role, figure, job, misfit, morale, thinking, you, selected, busy, unread, onClick }: { at: Pt; name?: string; role: string; figure?: string; job?: string; misfit?: boolean; morale?: number; thinking?: boolean; you?: boolean; selected?: boolean; busy?: boolean; unread?: boolean; onClick?: () => void }) {
   const t = TIERS[at.t];
-  const w = FIG.w * t.s, h = FIG.h * t.s;
+  const k = t.h / 140;
   // The ring on the floor carries the state, as the old halo round the badge did.
   const ring = selected ? "#fff" : misfit ? "var(--color-neg)" : busy || thinking ? "var(--color-warm)" : "var(--color-gold)";
   const lit = selected || misfit || busy || thinking;
+  // You are a gilded figure under the light; an empty post is the dark shape of whoever will fill it.
+  const tone = you
+    ? "grayscale(1) sepia(1) saturate(2.2) brightness(1.5) contrast(1.05) drop-shadow(0 0 6px rgb(214 178 110 / 0.5))"
+    : !name
+      ? "brightness(0) drop-shadow(0 0 1px rgb(214 178 110 / 0.75))"
+      : `drop-shadow(0 3px 3px rgb(0 0 0 / 0.7)) brightness(${selected ? 1.12 : 0.94})`;
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       disabled={you}
       className="group absolute flex -translate-x-1/2 flex-col items-center text-center"
-      style={{ left: at.x, top: t.feet - h, width: t.label }}
+      style={{ left: at.x, top: t.feet - t.h, width: t.label }}
     >
-      <span className={cn("relative block transition-[filter] duration-300", selected && "brightness-125")} style={{ width: w, height: h }}>
-        <svg viewBox="-46 -13 92 26" className="absolute left-1/2 -translate-x-1/2 overflow-visible" style={{ width: 92 * t.s, height: 26 * t.s, bottom: -13 * t.s }} aria-hidden>
-          <ellipse rx="30" ry="8" fill="#000" opacity="0.55" />
-          <ellipse rx="42" ry="11" fill="none" stroke={ring} strokeWidth={selected ? 2.4 : lit ? 1.6 : 1} strokeOpacity={lit ? 1 : 0.3} className={cn("transition-[stroke] duration-300", thinking && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 5px ${ring})` } : undefined} />
+      <span className="relative block" style={{ width: 64 * k, height: t.h }}>
+        <svg viewBox="-46 -13 92 26" className="absolute left-1/2 -translate-x-1/2 overflow-visible" style={{ width: 92 * k, height: 26 * k, bottom: -11 * k }} aria-hidden>
+          <ellipse rx="32" ry="8" fill="#000" opacity="0.7" />
+          <ellipse rx="42" ry="11" fill="none" stroke={ring} strokeWidth={selected ? 2.4 : lit ? 1.6 : 1} strokeOpacity={lit ? 1 : 0.35} className={cn("transition-[stroke] duration-300", thinking && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 5px ${ring})` } : undefined} />
         </svg>
-        <Figure name={name} face={face} you={you} skirt={skirt} />
-        {unread && <i className="absolute top-0 size-2.5 rounded-full border-2 border-bg bg-warm" style={{ right: w * 0.2 }} />}
-        {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute size-2.5 rounded-full border-2 border-bg bg-neg" style={{ left: w * 0.2, top: h * 0.26 }} />}
+        {/* eslint-disable-next-line @next/next/no-img-element -- a cut-out sized by the scene, not a content image */}
+        <img src={figure ?? `${ART}generic.webp`} alt="" draggable={false} className={cn("absolute bottom-0 left-1/2 h-full w-auto max-w-none -translate-x-1/2 transition-[filter,transform] duration-300 group-hover:-translate-y-0.5", !name && "opacity-80")} style={{ filter: tone }} />
+        {!name && <Plus className="absolute top-[30%] left-1/2 size-4 -translate-x-1/2 text-gold" />}
+        {unread && <i className="absolute top-0 size-2.5 rounded-full border-2 border-bg bg-warm" style={{ right: 12 * k }} />}
+        {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute top-0 size-2.5 rounded-full border-2 border-bg bg-neg" style={{ left: 12 * k }} />}
       </span>
-      {/* The name sits on the riser under the feet. */}
-      <span className={cn("text-[16px] leading-tight font-medium", !name && "text-faint")} style={{ marginTop: t.edge - t.feet + 5 }}>{name ?? "Vacant"}</span>
+      {/* The name is on the wall under the feet. */}
+      <span className={cn("text-[16px] leading-tight font-medium [text-shadow:0_1px_3px_#000]", !name && "text-faint")} style={{ marginTop: t.edge - t.feet + 6 }}>{name ?? "Vacant"}</span>
       {/* A post shown by its title has no separate name to print. */}
-      {role !== name && <span className="text-[16px] leading-tight text-muted">{role}</span>}
+      {role !== name && <span className="text-[16px] leading-tight text-muted [text-shadow:0_1px_3px_#000]">{role}</span>}
       <AnimatePresence>
         {misfit && (
-          <motion.span key="misfit" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 rounded bg-neg/15 px-1.5 text-[15px] leading-[20px] whitespace-nowrap text-neg">
+          <motion.span key="misfit" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 rounded bg-neg/25 px-1.5 text-[15px] leading-[20px] whitespace-nowrap text-neg">
             Wrong person
           </motion.span>
         )}
         {job && (
-          <motion.span key="job" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 max-w-full truncate rounded bg-warm/10 px-1.5 text-[15px] leading-[20px] text-warm">
+          <motion.span key="job" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 max-w-full truncate rounded bg-warm/20 px-1.5 text-[15px] leading-[20px] text-warm">
             {job}
           </motion.span>
         )}
@@ -411,7 +390,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Section title="Profile">
           {p.onRecord && <p className="mb-2 text-[12px] leading-relaxed text-muted">The record names {p.name} in this post.<Cite c={c} id={p.onRecord} /> What this post says and does here is simulated{p.good || p.weak ? ", and so are its strengths and weaknesses below: they describe the post in this exercise, not the person" : ""}.</p>}
-          {(hired || FACES.has(p.id)) && <p className="mb-2 text-[12px] text-faint">{(!hired && CREDIT[p.id]) || "Portrait: AI-generated. This person is invented."}</p>}
+          <p className="mb-2 text-[12px] text-faint">{(!hired && CREDIT[p.id]) || "Figure: AI-generated. This person is invented."}</p>
           <dl className="space-y-2 text-[13px]">
             {[["Good at", p.good], ["Weak at", p.weak], ["Working on", job ?? p.doing ?? "Nothing yet"]].filter(([, v]) => v).map(([k, v]) => (
               <div key={k} className="flex gap-3"><dt className="w-[76px] shrink-0 text-muted">{k}</dt><dd className="text-soft">{v}</dd></div>
