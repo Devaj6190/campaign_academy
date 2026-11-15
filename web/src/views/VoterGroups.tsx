@@ -17,7 +17,8 @@ import { cn } from "@/lib/util";
 
 // Factions: who the primary's voters are, how big each group is, where you stand with them and how they pull on
 // each other. Sizes and the February and September figures are real poll numbers (lib/cases/mayor2013-factions).
-// Where you stand now is simulated. What a group wants, and so every line, is inferred (mayor2013-leanings, -links).
+// Where you stand now is simulated. Every line rests on a poll table (mayor2013-links); what a group wants is
+// inferred (mayor2013-leanings).
 // The screen carries no real / simulated / estimate tags, at Devaj's decision on 15 November 2026.
 
 type P = { x: number; y: number; r: number };
@@ -71,7 +72,7 @@ const word = (support: number, citywide: number) => (support >= citywide + 2 ? "
 // The two kinds of line must never be mistaken for each other: gold and unbroken with a dot where two groups want the
 // same thing; red and broken with a cross where one wants what the other does not.
 const LINE = { shared: "var(--color-gold-bright)", opposed: "var(--color-neg)" } as const;
-const SAYS = { shared: "Both want", opposed: "Split on" } as const;
+const SAYS = { shared: "Agree on", opposed: "Split on" } as const;
 
 function Tie({ a, b, kind, strength }: { a: P; b: P; kind: Link["kind"]; strength: "faint" | "strong" | "off" }) {
   const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
@@ -175,7 +176,7 @@ export function VoterGroups() {
         <div className="pointer-events-none absolute bottom-24 left-7 flex max-w-[calc(100%-3.5rem)] flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
           <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-warm" />Ahead of your {Math.round(mine)}%</span>
           <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-cool" />Behind</span>
-          <span className="flex items-center gap-1.5"><svg width="30" height="10" aria-hidden><line x1="1" y1="5" x2="29" y2="5" stroke={LINE.shared} strokeWidth="2" /><circle cx="15" cy="5" r="3.2" fill={LINE.shared} /></svg>Same wants</span>
+          <span className="flex items-center gap-1.5"><svg width="30" height="10" aria-hidden><line x1="1" y1="5" x2="29" y2="5" stroke={LINE.shared} strokeWidth="2" /><circle cx="15" cy="5" r="3.2" fill={LINE.shared} /></svg>Agree</span>
           <span className="flex items-center gap-1.5"><svg width="30" height="10" aria-hidden><line x1="1" y1="5" x2="29" y2="5" stroke={LINE.opposed} strokeWidth="2" strokeDasharray="5 4" /><path d="M12 2l6 6M18 2l-6 6" stroke={LINE.opposed} strokeWidth="1.6" /></svg>Opposed</span>
           <span title="A voter belongs to several groups at once, so shares do not add to 100.">Groups overlap</span>
         </div>

@@ -50,11 +50,19 @@ export function ClockControls() {
   const speed = useCase((s) => s.speed);
   useCase((s) => s.at);
   useCase((s) => s.picks);
+  const unread = usePaper((s) => s.unread);
   if (finished()) return null;
   if (waiting())
     return (
       <button onClick={() => useCase.setState({ card: true })} className="btn-gold h-7 rounded-full px-3 text-[12px] whitespace-nowrap" title="The clock is stopped until you decide">
         Decision waiting
+      </button>
+    );
+  // The same on a news morning: a running clock waits for the paper's notice, so the button says so and opens the paper.
+  if (running && unread)
+    return (
+      <button onClick={() => usePaper.getState().set(true)} className="btn-gold h-7 rounded-full px-3 text-[12px] whitespace-nowrap" title="The clock waits until you read the paper or put it aside">
+        Paper waiting
       </button>
     );
   const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];

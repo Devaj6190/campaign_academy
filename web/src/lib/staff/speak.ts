@@ -152,6 +152,14 @@ async function say(t: Trigger, day: number) {
 const OWNER: Record<string, string> = { delegating: "cm", budgeting: "fin", "voter-groups": "com", policy: "pol" };
 
 /**
+ * The order a decision hands to the staff: the chosen option, worded as an instruction. It is offered with the
+ * owner's remark and nothing is spent until the campaigner sends it. With a key the post words its own; this is the
+ * fallback, and the rules planner reads its work from the option's own words.
+ * ponytail: a choice to hold back ("Leave him alone") still offers an order, and the post then does its usual work.
+ */
+export const orderFor = (o: { label: string }) => `Put our decision to work: "${o.label}"`;
+
+/**
  * Staff react to events as they happen, not only as days pass: a decision the campaigner just made, and a new lead
  * story in the morning paper. Each speaks once per event, through the same say() as everything else. Mount once.
  */
@@ -170,7 +178,7 @@ export function watch() {
     const g = useGame.getState();
     const owner = OWNER[d.skill] ?? "cm";
     const who = g.staff.some((x) => x.id === owner && x.name) ? owner : "cm";
-    void say({ key: `decided-${d.id}`, who, situation: `The campaigner has just decided "${d.title}" and chose: ${o.label}. ${o.detail}`, text: `On "${d.title}": ${o.label}. Fine. Here is what that means for my side of the campaign.`, suggest: "" }, dayNow());
+    void say({ key: `decided-${d.id}`, who, situation: `The campaigner has just decided "${d.title}" and chose: ${o.label}. ${o.detail} Your suggested instruction is the first piece of work your post would do to carry that choice out.`, text: `On "${d.title}": ${o.label}. Fine. My side can start on that as soon as you give the order.`, suggest: orderFor(o) }, dayNow());
   });
   let editions = 0;
   let offPaper: (() => void) | undefined;
