@@ -2,6 +2,7 @@ import { FACTIONS_2013, factionNow, type Faction } from "../cases/mayor2013-fact
 import { LEANINGS_2013 } from "../cases/mayor2013-leanings";
 import type { Work } from "../cases/store";
 import type { Case, World } from "../cases/types";
+import type { Stance } from "./stances";
 
 // The Five Borough Ledger on the 2013 case: one page per morning, built only from the case and its work layer.
 //
@@ -37,6 +38,8 @@ export type Edition = {
   numbers: string[];
   mode: "template" | "live";
   decision?: Decision;
+  /** Ways to answer the lead, drafted when the student first asks (stances.ts). */
+  stances?: Stance[];
   /** What happened when the campaign answered the front page. */
   answer?: string;
 };
