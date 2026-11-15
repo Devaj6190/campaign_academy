@@ -114,7 +114,7 @@ The honest summary: the agents are grounded in the evidence they are given, but 
 
 ## Validation
 
-Devank wrote to about 60 political science professors and students while we built it. *(TODO: how many replied, and how many tried it.)*
+Devank wrote to about 60 political science professors and students while we built it. Six replied, and three students tried the tool during the hackathon.
 
 **Prof. Samuel S.-H. Wang** (Princeton Neuroscience Institute, founder of the Princeton Election Consortium) replied with two points to be careful about:
 
@@ -167,7 +167,7 @@ An AI-powered tool a political science student would use every week of a course,
 |---|---|
 | **Organization** | Princeton University |
 | **Person consulted** | Prof. Samuel S.-H. Wang, Princeton Neuroscience Institute; founder of the Princeton Election Consortium |
-| **Evidence** | His email reply of 14 November 2026 (see [Validation](#validation)): *"the big unknown is how effective advertising and other paid media are"* |
+| **Evidence** | A direct quote from his email reply of 14 November 2026 (see [Validation](#validation)): *"the big unknown is how effective advertising and other paid media are"* |
 
 - **Real-world need.** Courses on campaigns teach from the outside. The professor's two cautions, paid media and budgeting, are about exactly the calls students never get to make.
 - **What we built around it.** Every action has its own price, the student sets a weekly spending plan across doors, rallies, press, mail and digital ads, and the effect of each kind of spending is fitted to the record and labelled as simulated, not presented as known.
