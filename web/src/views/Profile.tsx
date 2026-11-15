@@ -7,6 +7,7 @@ import { useCase, useCaseNow } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 import { Claims } from "./CaseView";
+import { PlankDesk } from "@/components/PlankDesk";
 import { PlatformSection } from "./Platform";
 
 // The real candidate and race of the current case. Everything here is read from the case file; the only
@@ -65,6 +66,7 @@ export function Profile() {
             <div className="mt-8"><Claims c={c} items={me.about} /></div>
 
             <div className="mt-10"><PlatformSection c={c} step={step} picks={picks} /></div>
+            <div className="mt-10"><PlankDesk /></div>
           </div>
         </div>
         <Dock>

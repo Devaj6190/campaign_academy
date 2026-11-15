@@ -50,7 +50,8 @@ export function snapshot(): Snapshot {
     sent: Object.fromEntries(PLACES.map((p) => [p.cd, supportIn(p.cd) ?? mine])),
     factions: FACTIONS_2013.map((f) => ({ id: f.id, name: f.name, feel: factionNow(f, w.groups, mine, c.start.poll[c.follow] ?? 0, boost), size: f.share, values: [], dislikes: [] })),
     staff: g.staff,
-    manifesto: platformAt(c, k.at, k.picks).map((p) => p.text),
+    // The platform on record so far, then the planks the student has added.
+    manifesto: [...platformAt(c, k.at, k.picks).map((p) => p.text), ...k.work.filter((x) => x.by === "platform").map((x) => x.note ?? x.label)],
     hires: s.hires,
     morale: s.morale,
     scale: { money: SCALE.money, local: SCALE.local * room, group: SCALE.group * room },
@@ -86,7 +87,8 @@ function packet(from: string, to: string) {
  * group where it simulates one, otherwise to the poll group. Both also move the citywide figure by the share of
  * the city they reach.
  */
-function apply(e: Effect) {
+/** `cap`: the most this one effect may move the citywide figure either way (used for platform planks). */
+export function apply(e: Effect, cap = Infinity) {
   const { c } = worldNow();
   const groups: Record<string, number> = {}, factions: Record<string, number> = {};
   let citywide = 0;
@@ -98,7 +100,7 @@ function apply(e: Effect) {
     else factions[id] = (factions[id] ?? 0) + d;
     citywide += (d * f.share) / 100;
   }
-  useCase.getState().addWork({ by: e.by, label: e.label, note: e.summary.replace(/ \(Not their strength.*$/, ""), cost: e.cost, raised: e.raised, poll: { [c.follow]: citywide }, groups, factions, districts: e.sent });
+  useCase.getState().addWork({ by: e.by, label: e.label, note: e.summary.replace(/ \(Not their strength.*$/, ""), cost: e.cost, raised: e.raised, poll: { [c.follow]: Math.max(-cap, Math.min(cap, citywide)) }, groups, factions, districts: e.sent });
 }
 
 // --- The candidate in person, from the map ---
