@@ -4,6 +4,7 @@ import { createDeepAgent, registerHarnessProfile, type SubAgent } from "deepagen
 import { z } from "zod";
 import { ACTION_IDS, ACTIONS, BOOKING_KINDS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
+import { withoutHindsight } from "./memo";
 import { bounce, Ledger } from "./numbers";
 import { memoryFile, THOUGHT_MAX, type RunCtx } from "./protocol";
 import { humanize, PLACES, short, type Snapshot, describeWorld } from "./world";
@@ -76,6 +77,8 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
   const ledger = (ctx.ledger = new Ledger().add(world(w), catalog(w), req.text, req.followOf, req.budget, ...req.history.map((l) => l.text), ...Object.values(req.memory ?? {}).flat()));
   /** The figures in `text` nobody gave. The run's own totals count as given. */
   const invented = (text: string, ...also: (number | null)[]) => ledger.add(ctx.spent, ctx.raised, ctx.left, ctx.committed, ...also).unknown(text);
+  // What the campaigner reads: no figure nobody gave, and nothing past today's date in the real race.
+  const say = (text: string) => withoutHindsight(ledger.clean(text));
   let bounced = 0;
 
   const subagents: SubAgent[] = team.map((p) => ({
@@ -101,7 +104,7 @@ ${world(w)}`,
       const bad = invented(reply, ask_amount);
       if (bad.length && bounced++ < 1) { console.log(`[staff] ${me.id} report sent back for figures: ${bad.join(", ")}`); return bounce(bad); }
       if (bad.length) console.log(`[staff] ${me.id} report trimmed of figures: ${bad.join(", ")}`);
-      ctx.report(ledger.clean(reply) || "Done. The details are in the receipts.", ask_amount && ask_reason ? { amount: ask_amount, reason: ledger.clean(ask_reason) || "to finish the job" } : null, ledger.clean(coaching), remember ? ledger.clean(remember) : undefined);
+      ctx.report(say(reply) || "Done. The details are in the receipts.", ask_amount && ask_reason ? { amount: ask_amount, reason: say(ask_reason) || "to finish the job" } : null, say(coaching), remember ? say(remember) : undefined);
       return "Report delivered.";
     },
     {
@@ -122,7 +125,7 @@ ${world(w)}`,
       const bad = invented(reply);
       if (bad.length && bounced++ < 1) { console.log(`[staff] ${me.id} answer sent back for figures: ${bad.join(", ")}`); return bounce(bad); }
       if (bad.length) console.log(`[staff] ${me.id} answer trimmed of figures: ${bad.join(", ")}`);
-      ctx.propose(ledger.clean(reply) || "Here is what I would put on the table.", options.map((o) => ({ title: o.title, why: ledger.clean(o.why), steps: o.steps.map((s) => ({ by: s.who === "me" ? me.id : names.get(s.who), action: s.action, district: s.district ? Number(s.district) : undefined, faction: s.faction ?? undefined, on: s.on ?? undefined, kind: s.kind ?? undefined })) })));
+      ctx.propose(say(reply) || "I can't know how this race ends: that is up to what we do from today. Here is what I would put on the table.", options.map((o) => ({ title: o.title, why: say(o.why), steps: o.steps.map((s) => ({ by: s.who === "me" ? me.id : names.get(s.who), action: s.action, district: s.district ? Number(s.district) : undefined, faction: s.faction ?? undefined, on: s.on ?? undefined, kind: s.kind ?? undefined })) })));
       return "Options delivered. Stop here: the campaigner will pick one.";
     },
     {
@@ -171,6 +174,8 @@ Strengths: ${me.good ?? prof.skills.join(", ")}. Weaknesses: ${me.weak ?? "none 
 
 You remember this campaign: your memory file is loaded with these instructions. Use it. When an order or a question touches something already tried, say how that went, and do not repeat what failed without saying so. Do not recite it otherwise.
 
+It is ${w.date} in the 2013 race. You know nothing after this date: never say how the real race went, who won, or what happened later, even if the campaigner asks. If they ask, say no one on the campaign can know that yet and it depends on what you do from here.
+
 Who you are: a professional with views, not an order-taker. Everything the campaigner reads from you is in your voice. If an order is a poor use of money or time given the numbers below, say so plainly in one sentence, in your first thought and again in your report, then carry it out anyway: the campaigner decides. If it is a good call, you may say so in a few words. Never flatter.
 
 ${req.followUp ? `This time nobody has asked you anything: you are coming back to the campaigner, unprompted, about work your team finished a few days ago. The message below says what it did and how things stand now. Do not plan, delegate or act, and spend nothing. Call propose exactly once: your reply says, in your voice, what that work added up to and how things have moved since (only the figures you are given), then your two or three best next steps as options. Then stop.
@@ -182,7 +187,7 @@ ${req.followUp ? `This time nobody has asked you anything: you are coming back t
 How you work on an order:
 1. Start with write_todos: two to four concrete jobs. In the same message, before the call, write one or two sentences of plain text (under ${THOUGHT_MAX} characters) on why you are splitting the work this way. The campaigner reads it as your thinking, so make it the real reason, with places and groups in words.
 2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass union households in Jackson Heights"). On the second line write "Why:" and one sentence (under ${THOUGHT_MAX} characters, places and groups in words) on why this job and why this person. Then brief them precisely: what, where (district number), who (voter group id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
-3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. This is the limit, whatever other figure the order mentions. Never plan past it. If the job needs more, ask in your report.
+3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. This is the limit, whatever other figure the order mentions. Never plan past it. If the job needs more, ask in your report. Your whole team shares this one budget, and every tool result says what is left of it ("Left in this order's budget"). Do not give people separate dollar caps in their briefs: only the order's total is enforced. This is not the same figure as the money the whole campaign has left.
 4. If the instruction is vague, make a sensible call and say what you assumed. If it is the wrong job for your department, do your best and say who should have had it.
 5. Finish with send_report exactly once. Report only what tool results told you; never invent numbers. In the report, name places and voter groups in words; never print a district number or a group id.
 
@@ -239,7 +244,7 @@ ${world(w)}`,
         if (m.tool_call_id && pending.has(m.tool_call_id)) {
           const to = pending.get(m.tool_call_id)!;
           pending.delete(m.tool_call_id);
-          emit({ t: "job-done", to, summary: (ledger.clean(textOf(m.content)) || "Done.").slice(0, 280) });
+          emit({ t: "job-done", to, summary: (say(textOf(m.content)) || "Done.").slice(0, 280) });
         }
       }
     }

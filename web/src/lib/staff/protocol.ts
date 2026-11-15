@@ -1,4 +1,5 @@
 import { ACTIONS, BOOKING, type ActionId, type BookingKind } from "../engine/catalog";
+import { withoutHindsight } from "./memo";
 import { clarity, describeTeam, fitScore, profileOf, resolve, type Effect } from "../engine/resolve";
 import { hash } from "../util";
 import type { Ledger } from "./numbers";
@@ -40,7 +41,8 @@ export function budgetIn(text: string): number | null {
   for (const m of text.matchAll(MONEY)) {
     const raw = (m[1] ?? m[3]).replace(/,/g, ""), unit = (m[2] ?? m[4] ?? m[5] ?? "").toLowerCase();
     const n = Number(raw) * (unit === "k" || unit === "thousand" ? 1e3 : unit === "m" || unit === "million" ? 1e6 : 1);
-    if (!Number.isFinite(n) || n <= 0) continue;
+    // "$0" is a limit of nothing, not a missing one.
+    if (!Number.isFinite(n) || n < 0) continue;
     const before = text.slice(Math.max(0, m.index - 48), m.index), after = text.slice(m.index + m[0].length, m.index + m[0].length + 30);
     const limit = LIMIT.test(before) || LIMIT_AFTER.test(after);
     if (!limit || (FORBID.test(before) && !/more than\s*$/i.test(before))) continue;
@@ -108,7 +110,7 @@ export class RunCtx {
   think(who: string, text: string) {
     const said = text.replace(/\s+/g, " ").replace(/^\W*(thinking|why)\W*:\s*/i, "").trim();
     // A thought streams as it is written and cannot be sent back, so a sentence with a figure nobody gave is dropped.
-    const t = this.ledger ? this.ledger.clean(said) : said;
+    const t = withoutHindsight(this.ledger ? this.ledger.clean(said) : said);
     if (!t) return;
     if (t.length <= THOUGHT_MAX) return this.emit({ t: "thought", who, text: t });
     const cut = t.lastIndexOf(" ", THOUGHT_MAX - 1);
@@ -122,13 +124,13 @@ export class RunCtx {
     if (action === "schedule_event") return this.book(by, p);
     this.load[by] = (this.load[by] ?? 0) + 1;
     const effect = resolve(w, by, action, p, { quality: this.quality.mult, seed: this.req.runId * 31 + this.n++, load: this.load[by] });
-    if (effect.cost > this.left) return { ok: false, text: `Not done: it costs $${effect.cost.toLocaleString("en-US")} and only $${this.left.toLocaleString("en-US")} of this budget is left. Ask the campaigner for more.` };
+    if (effect.cost > this.left) return { ok: false, text: `Not done: it costs $${effect.cost.toLocaleString("en-US")} and only $${this.left.toLocaleString("en-US")} is left in this order's budget. Ask the campaigner for more.` };
     if (effect.cost > w.cash - this.spent + this.raised) return { ok: false, text: "Not done: the campaign does not have the cash." };
     this.spent += effect.cost;
     this.raised += effect.raised;
     this.effects.push(effect);
     this.emit({ t: "action", effect });
-    return { ok: true, text: `${effect.summary} Cost $${effect.cost.toLocaleString("en-US")}. Budget left $${this.left.toLocaleString("en-US")}.` };
+    return { ok: true, text: `${effect.summary} Cost $${effect.cost.toLocaleString("en-US")}. Left in this order's budget: $${this.left.toLocaleString("en-US")}.` };
   }
 
   /**
@@ -149,7 +151,7 @@ export class RunCtx {
     // What the appearance will cost when the candidate does it, as near as can be said now.
     const est = resolve(w, "candidate", BOOKING[kind].action, { district: p.district, faction: p.faction }, { quality: 1, seed: this.req.runId, load: 1 }).cost;
     const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
-    if (est > this.left) return { ok: false, text: `Not booked: ${BOOKING[kind].label} costs about ${usd(est)} on the day and only ${usd(this.left)} of this budget is left. Book something cheaper (door knocking and meetings cost least) or ask the campaigner for more.` };
+    if (est > this.left) return { ok: false, text: `Not booked: ${BOOKING[kind].label} costs about ${usd(est)} on the day and only ${usd(this.left)} is left in this order's budget. Book something cheaper (door knocking and meetings cost least) or ask the campaigner for more.` };
     this.committed += est;
     this.load[by] = (this.load[by] ?? 0) + 1;
     const base = resolve(w, by, "schedule_event", { district: p.district, faction: p.faction }, { quality: this.quality.mult, seed: this.req.runId * 31 + this.n++, load: this.load[by] });
@@ -159,7 +161,7 @@ export class RunCtx {
     const effect: Effect = { ...base, booking: { date, kind }, calendar: `${BOOKING[kind].label} · ${where}`, summary: `Booked the candidate for ${BOOKING[kind].label} in ${where} on ${when}, about ${usd(est)} on the day.` };
     this.effects.push(effect);
     this.emit({ t: "action", effect });
-    return { ok: true, text: `${effect.summary}${moved} It happens that day and is paid for then. Budget left ${usd(this.left)}. He can do ${w.daily} things a day.` };
+    return { ok: true, text: `${effect.summary}${moved} It happens that day and is paid for then. Left in this order's budget: ${usd(this.left)}. He can do ${w.daily} things a day.` };
   }
 
   /** What one step costs. The engine's price depends only on the action and who does it, so it is exact ahead of time. */
