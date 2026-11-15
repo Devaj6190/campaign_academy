@@ -65,6 +65,7 @@ Each is a first guess, in one place.
 | Points a plank moves in a group it serves or costs; the most one plank moves citywide | `PLANK`, `PLANK_CITYWIDE` in `lib/manifesto/rules.ts` | 1.5, 2, 0.4 |
 | Candidate appearances per day | `DAILY` in `lib/staff/run.ts` | 2 |
 | Length of a day; speeds | `DAY_MS`, `SPEEDS` in `lib/cases/clock.ts` | 2 seconds; 1, 2, 5 |
+| Poll points a rival's move must cost you before the top bar's poll strip glows | `RIVAL_HIT` in `components/TopBar.tsx` | 0.1 |
 | Days between polls in the morning paper | `POLL_EVERY` in `lib/paper/edition.ts` | 7 |
 | Days between unprompted staff remarks | `GAP`, `REPEAT` in `lib/staff/speak.ts` | 8, 30 |
 
