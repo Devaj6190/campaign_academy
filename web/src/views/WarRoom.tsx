@@ -186,12 +186,12 @@ function Node({ at, name, role, job, misfit, morale, thinking, you, selected, bu
       {role !== name && <span className="text-[10.5px] leading-tight text-muted">{role}</span>}
       <AnimatePresence>
         {misfit && (
-          <motion.span initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 rounded bg-neg/15 px-1.5 text-[10px] leading-[16px] text-neg">
+          <motion.span key="misfit" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 rounded bg-neg/15 px-1.5 text-[10px] leading-[16px] text-neg">
             Wrong person
           </motion.span>
         )}
         {job && (
-          <motion.span initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 max-w-full truncate rounded bg-warm/10 px-1.5 text-[10px] leading-[16px] text-warm">
+          <motion.span key="job" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 max-w-full truncate rounded bg-warm/10 px-1.5 text-[10px] leading-[16px] text-warm">
             {job}
           </motion.span>
         )}
