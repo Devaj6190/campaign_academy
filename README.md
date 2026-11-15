@@ -122,7 +122,33 @@ One deep case first, then four that each add a different lesson. The shortlist a
 
 ---
 
-## 9. Open questions
+## 9. Do the agents decide as the real people did?
+
+We tested it with no student. A campaigner agent plays Bill de Blasio, and the staff, rivals and memos are the live agents. Each real person is played from verified research, knowing only what was true before each date. Their choices are compared with what the real people chose in 2013. The full report, with every run, is `docs/evals.md`.
+
+**The catch: the model already knows this race.** Asked with no card at all what de Blasio's campaign did, it names the real choice at five of the six decisions. So plain agreement (about 90% on the cards) mostly measures memory. Hiding names didn't help: the model recognised the race on all but one masked card, and on every "twin" moved to an invented city, from the shape of the race alone.
+
+**So we measured something memory can't fake: whether the choices follow the facts on the card.**
+
+| Test | Result |
+|---|---|
+| Card rewritten so the facts point away from the 2013 choice: the agent moved | **78%** (28 of 36) |
+| Control, same facts in other words: the agent kept its choice | **94%** (17 of 18) |
+| Memory wrong, card given: still chose what really happened | **11 of 11** (all at the last decision, the second ad) |
+| The whole campaign on its own, January to September | 6 of 6 real choices, 32 weekly staff meetings, 294 staff jobs |
+
+Simulated vote share, as context only, since the engine is fitted to the real result: 42.4, against a certified 40.81.
+
+What this shows:
+- The agent follows evidence, not wording. It changes course when the facts change and holds when only the words change.
+- Where its memory is wrong, the card carries it to the real choice. At the budget decision it's the other way round: memory knows the real answer every time, and the card leads the agent elsewhere.
+- Memory still wins at the hospital protest. On rewritten cards the agent kept the 2013 choice, citing details the card never gave.
+
+What it cannot show: that the agents would decide as these people did in a race the model has never read about. Two prompt changes aimed at grounding made no measurable difference. Eleven held-out decisions, written before any run and run once at the end, are reported in `docs/evals.md`.
+
+---
+
+## 10. Open questions
 
 - How strong staff work and rival moves should be next to the decisions. The current sizes are first guesses.
 - Whether the student can replay the same race from another campaign's side.
