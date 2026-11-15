@@ -120,7 +120,8 @@ export const netPerDay = (s: Pick<State, "losses" | "money" | "day">) => avgInco
 /** Voter groups as the race opens: their feeling toward the student from the scenario (estimates in a real race). */
 const START_FACTIONS: Faction[] = FACTIONS.map((f) => ({ ...f, feel: ACTIVE.story.feel?.[f.id] ?? f.feel }));
 /** Staff as the race opens: posts the record names get those names (what they say in the game is simulated). */
-const START_STAFF: Staff[] = STAFF.map((p) => (ACTIVE.story.staff?.[p.id] ? { ...p, name: ACTIVE.story.staff[p.id].name, onRecord: ACTIVE.story.staff[p.id].source } : p));
+// In a real race every other post is shown by its title: no invented person sits in a real campaign.
+const START_STAFF: Staff[] = STAFF.map((p) => (ACTIVE.story.staff?.[p.id] ? { ...p, name: ACTIVE.story.staff[p.id].name, onRecord: ACTIVE.story.staff[p.id].source } : ACTIVE.kind === "real" && p.name ? { ...p, name: p.role } : p));
 
 const sent: Record<number, number> = {};
 const { strong: STRONG, weak: WEAK } = ACTIVE.story;
@@ -346,7 +347,7 @@ export const useGame = create<State>((set, get) => ({
 
   hire: (id, pick) =>
     set((s) => ({
-      staff: s.staff.map((p) => (p.id === id ? { ...p, name: pick === 0 ? "Helen Voss" : "Kai Lindqvist", good: pick === 0 ? "Careful, experienced" : "Brilliant", weak: pick === 0 ? "Expensive" : "Abrasive", doing: "Settling in" } : p)),
+      staff: s.staff.map((p) => (p.id === id ? { ...p, name: ACTIVE.kind === "real" ? s.staff.find((x) => x.id === id)!.role : pick === 0 ? "Helen Voss" : "Kai Lindqvist", good: pick === 0 ? "Careful, experienced" : "Brilliant", weak: pick === 0 ? "Expensive" : "Abrasive", doing: "Settling in" } : p)),
       losses: s.losses.map((c, i) => (i === 0 ? { ...c, v: c.v + (pick === 0 ? 900 : 600) } : c)),
     })),
 

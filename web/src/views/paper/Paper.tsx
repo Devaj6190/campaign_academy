@@ -114,7 +114,7 @@ function Front({ e, close }: { e: Edition; close: () => void }) {
               <Button size="sm" variant="ghost" onClick={() => setNote(respond(e, "pass"))}><X className="size-3.5" />Let it pass</Button>
             </div>
           )}
-          {(note || e.decision) && <p className="mt-3 text-[12px] text-muted">{note || (e.decision === "respond" ? `${ME.short} responded.` : e.decision === "staff" ? "Handed to Leo." : "The campaign let it pass.")}</p>}
+          {(note || e.decision) && <p className="mt-3 text-[12px] text-muted">{note || (e.decision === "respond" ? `${ME.short} responded.` : e.decision === "staff" ? "Handed to communications." : "The campaign let it pass.")}</p>}
           {e.lead.cd && <button onClick={() => { select({ district: e.lead.cd! }); go("map"); close(); }} className="mt-3 flex items-center gap-1 text-[12px] text-muted hover:text-fg"><MapPin className="size-3.5" />See it on the map</button>}
         </div>
         <aside className="border-l border-line pl-6">

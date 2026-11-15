@@ -153,6 +153,8 @@ function Tactic({ close }: { close: () => void }) {
   const run = useGame((s) => s.runTactic);
   const adsLeft = useGame((s) => s.money.envelopes.ads - s.money.spent.ads);
   const comms = useGame((s) => s.staff.find((p) => p.id === "com")?.name ?? "Your communications director");
+  const staffAll = useGame((s) => s.staff);
+  const staffName = (id: string) => { const p = staffAll.find((x) => x.id === id); return p?.name && p.name !== p.role ? p.name.split(" ")[0] : p?.role ?? id; };
   const result = useGame((s) => s.tacticResult);
   const world = useGame();
   const [by, setBy] = useState<Deliverer>("com");
@@ -180,7 +182,7 @@ function Tactic({ close }: { close: () => void }) {
       </dl>
       <div className="mt-5 flex items-center gap-1.5 text-[12px]">
         <span className="mr-1 text-muted">Who delivers it</span>
-        {([["com", "Leo (comms)"], ["pr", "Jo (press)"]] as const).map(([id, label]) => (
+        {([["com", `${staffName("com")} (comms)`], ["pr", `${staffName("pr")} (press)`]] as const).map(([id, label]) => (
           <button key={id} onClick={() => setBy(id)} className={cn("rounded-full border px-2.5 py-0.5 transition-colors", by === id ? "border-white/40 bg-white/[0.08] text-fg" : "border-line-strong text-muted hover:text-fg")}>{label}</button>
         ))}
       </div>

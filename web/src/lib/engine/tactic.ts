@@ -15,7 +15,7 @@ export function tacticRisk(w: World, by: Deliverer) {
   if (seniors?.dislikes.some((d) => /disorder|change|attack|negative/i.test(d))) reasons.push(["Seniors, the target, dislike disorder and sudden change", 0.15]);
   const before = w.ledger.filter((l) => l.source === "tactic").length;
   if (before) reasons.push([`You have already gone negative ${before === 1 ? "once" : `${before} times`}`, 0.12 * before]);
-  reasons.push(by === "com" ? ["Leo delivers it: sharp, but reporters expect a hit job", 0.1] : ["Jo delivers it: reporters trust her", -0.12]);
+  reasons.push(by === "com" ? ["Communications delivers it: sharp, but reporters expect a hit job", 0.1] : ["The press secretary delivers it: reporters trust them", -0.12]);
   const lead = Math.max(0, ...RIVAL_IDS.map((id) => w.poll[id] ?? 0)) - (w.poll[ME.id] ?? 0);
   if (lead > 5) reasons.push([`You trail by ${lead}: voters expect a challenger to draw contrasts`, -0.08]);
   const risk = Math.max(0.1, Math.min(0.85, reasons.reduce((a, [, v]) => a + v, 0)));
@@ -32,7 +32,7 @@ export function tacticOutcome(w: World, by: Deliverer): { backfired: boolean; ef
     label: "Contrast ad",
     cost: 8000,
     momentum: backfired ? -0.4 : 0.3,
-    summary: backfired ? `The contrast ad (delivered by ${by === "com" ? "Leo" : "Jo"}) read as an attack. Seniors turned away.` : `The contrast ad (delivered by ${by === "com" ? "Leo" : "Jo"}) landed. Seniors took note.`,
+    summary: backfired ? `The contrast ad (delivered by ${by === "com" ? "communications" : "the press secretary"}) read as an attack. Seniors turned away.` : `The contrast ad (delivered by ${by === "com" ? "communications" : "the press secretary"}) landed. Seniors took note.`,
     factions: { seniors: backfired ? -6 : 3 },
   });
   return { backfired, effect };

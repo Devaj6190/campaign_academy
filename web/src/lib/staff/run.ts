@@ -9,6 +9,7 @@ import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
 import { bumpMorale, nextId, pushChat, useStaff, type FeedItem } from "./store";
 import { shortPlace, type Snapshot } from "./world";
 import { ME } from "../scenario";
+import { ACTIVE } from "../scenario";
 
 // Drives one instruction from the browser: sends it, reads the event stream, and applies each event to the game.
 
@@ -34,7 +35,8 @@ export function snapshot(): Snapshot {
 }
 
 const nameOf = (id: string) => useGame.getState().staff.find((p) => p.id === id)?.name ?? "Someone";
-const first = (id: string) => nameOf(id).split(" ")[0];
+/** "Dana", or "the Field Director" for a post shown by its title. */
+const first = (id: string) => { const p = useGame.getState().staff.find((x) => x.id === id); return p?.name && p.name === p.role ? `the ${p.role}` : nameOf(id).split(" ")[0]; };
 
 export function feed(who: string, text: string, tone?: FeedItem["tone"]) {
   const { day, min } = useGame.getState();
@@ -218,7 +220,7 @@ export function hire(post: string, c: Candidate) {
   const p = useGame.getState().staff.find((x) => x.id === post);
   if (!p || p.name) return;
   const base = profileFor(post, p.role);
-  useGame.setState((g) => ({ staff: g.staff.map((x) => (x.id === post ? { ...x, name: c.name, good: c.good, weak: c.weak, doing: "Settling in" } : x)) }));
+  useGame.setState((g) => ({ staff: g.staff.map((x) => (x.id === post ? { ...x, name: ACTIVE.kind === "real" ? x.role : c.name, good: c.good, weak: c.weak, doing: "Settling in" } : x)) }));
   useStaff.setState((s) => {
     const candidates = { ...s.candidates };
     delete candidates[post];

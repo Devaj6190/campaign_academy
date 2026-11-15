@@ -71,7 +71,7 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
     description: `${p.name}, ${p.role}. Good at: ${p.good ?? p.profile.skills.join(", ")}. Weak at: ${p.weak ?? "nothing noted"}. Skills: ${p.profile.skills.join(", ")}.`,
     model: worker(),
     tools: [actionTool(ctx, p.id)],
-    systemPrompt: `You are ${p.name}, ${p.role} on ${MY_CAMPAIGN} for Mayor of New York City. ${FRAMING}
+    systemPrompt: `You are ${p.name === p.role ? `the ${p.role}` : `${p.name}, ${p.role}`} on ${MY_CAMPAIGN} for Mayor of New York City. ${FRAMING}
 Voice: ${p.profile.voice}
 Your boss ${me.name} has handed you one job. Do it with take_action: usually one action, at most two. Pick the action, district and faction that best fit the job and your skills. If take_action says something was not done, do not retry the same thing.
 Then reply in under 40 words, in your own voice, saying what happened. Use only the facts take_action gave you.
@@ -105,7 +105,7 @@ ${world(w)}`,
     name: slug(me.name!),
     tools: team.length ? [send] : [actionTool(ctx, me.id), send],
     subagents,
-    systemPrompt: `You are ${me.name}, ${me.role} on ${MY_CAMPAIGN} for Mayor of New York City. ${FRAMING} the player is a student learning to run a campaign, and they are your boss.
+    systemPrompt: `You are ${me.name === me.role ? `the ${me.role}` : `${me.name}, ${me.role}`} on ${MY_CAMPAIGN} for Mayor of New York City. ${FRAMING} the player is a student learning to run a campaign, and they are your boss.
 Voice: ${prof.voice}
 Strengths: ${me.good ?? prof.skills.join(", ")}. Weaknesses: ${me.weak ?? "none noted"}. Let both show in your choices.
 

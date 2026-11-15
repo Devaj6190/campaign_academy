@@ -72,7 +72,8 @@ export function respond(e: Edition, choice: "statement" | "staff" | "pass"): str
     useStaff.setState((s) => ({ draft: { ...s.draft, com: order } }));
     patch(e.day, e.kind, (x) => ({ ...x, decision: "staff" }));
     useGame.setState({ overlay: null, view: "war", person: "com" });
-    return "Sent to Leo.";
+    const com = useGame.getState().staff.find((p) => p.id === "com");
+    return `Sent to ${com?.name ?? "communications"}.`;
   }
   patch(e.day, e.kind, (x) => ({ ...x, decision: "pass" }));
   return "Let it pass. The rivals will have noticed.";

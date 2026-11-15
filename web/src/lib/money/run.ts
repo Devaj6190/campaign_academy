@@ -71,7 +71,7 @@ export function approveProposal() {
   const p = useGame.getState().money.proposal;
   if (!p || p.state !== "open") return;
   useGame.setState((x) => ({ money: { ...x.money, next: { ads: p.ads, field: p.field, events: p.events }, proposal: { ...p, state: "approved" } } }));
-  feed("fin", `You approved Dana's budget: ads $${p.ads.toLocaleString("en-US")}, field $${p.field.toLocaleString("en-US")}, events $${p.events.toLocaleString("en-US")} a day from tomorrow.`, "pos");
+  feed("fin", `You approved the Finance Director's budget: ads $${p.ads.toLocaleString("en-US")}, field $${p.field.toLocaleString("en-US")}, events $${p.events.toLocaleString("en-US")} a day from tomorrow.`, "pos");
   if (p.fundraising[0]) instruct("fin", p.fundraising[0]);
 }
 

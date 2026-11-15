@@ -102,6 +102,7 @@ export function FinancePanel() {
   const pay = nextPaymentDay(g.day);
   const p = m.proposal?.state === "open" ? m.proposal : null;
   const join = g.joinPublicFinancing;
+  const finName = g.staff.find((p) => p.id === "fin")?.name ?? "The Finance Director";
   const filings = [
     { name: ME.short, raised: m.raisedTotal + m.matchPaid, spent: m.spentTotal, cash: g.cash, note: m.participant === false ? "not in public financing" : "in public financing" },
     ...activeRivals(g.day).map((id) => ({ name: nameOf(id), raised: g.rivals[id].raised, spent: g.rivals[id].spent, cash: g.rivals[id].cash, note: `${rivalDef(id).participant ? "in public financing" : "not in public financing"}${rivalDef(id).estimates?.includes("participant") ? " (estimate)" : ""}` })),
@@ -123,7 +124,7 @@ export function FinancePanel() {
 
       {p && (
         <div className="mb-4 rounded-lg border border-line-strong p-3">
-          <Label>Dana&apos;s budget for the week</Label>
+          <Label>{finName}&apos;s budget for the week</Label>
           <p className="mt-1.5 text-[12.5px] leading-relaxed text-soft">{p.note}</p>
           <div className="mt-2 grid grid-cols-3 gap-2 text-[12px]">
             {ENVELOPES.map((e) => (
@@ -139,7 +140,7 @@ export function FinancePanel() {
             <Button size="sm" variant="primary" onClick={approveProposal}>Approve</Button>
             <Button size="sm" variant="ghost" onClick={dismissProposal}>Not now</Button>
           </div>
-          <p className="mt-1.5 text-[11px] text-faint">Approving sets tomorrow&apos;s budgets and sends Dana after the first fundraising step. To change it, set the budgets yourself in Spending.</p>
+          <p className="mt-1.5 text-[11px] text-faint">Approving sets tomorrow&apos;s budgets and sends {finName} after the first fundraising step. To change it, set the budgets yourself in Spending.</p>
         </div>
       )}
 
