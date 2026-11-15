@@ -8,7 +8,7 @@ import { Avatar, Button, Dock, DockButton, Label, Meter, Section, ViewHeader } f
 import { AgentPlan, type PlanTask } from "@/components/ui21/agent-plan";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import type { Staff } from "@/lib/data";
-import { BOOKING } from "@/lib/engine/catalog";
+import { ACTIONS, BOOKING } from "@/lib/engine/catalog";
 import type { Effect } from "@/lib/engine/resolve";
 import { profileFor } from "@/lib/staff/roster";
 import { answerAsk, hire, letGo, loadCandidates, pick, reassign } from "@/lib/staff/run";
@@ -562,6 +562,7 @@ function Reply({ c, index, id, effects }: { c: Extract<ChatItem, { k: "report" }
 /** The director's answer to a question, and its options as cards. Picking one sends its order; nothing is spent before. */
 function Proposals({ c, index, id }: { c: Extract<ChatItem, { k: "proposals" }>; index: number; id: string }) {
   const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
+  const staff = useGame((s) => s.staff);
   const done = c.picked !== undefined;
   return (
     <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start">
@@ -575,8 +576,16 @@ function Proposals({ c, index, id }: { c: Extract<ChatItem, { k: "proposals" }>;
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 text-[13px] font-medium">{chosen && <Check className="size-3.5 shrink-0 text-gold-bright" />}{o.title}</div>
                   {o.why && <p className="mt-0.5 text-[11.5px] leading-snug text-muted">{o.why}</p>}
+                  <ul className="mt-1.5 space-y-0.5">
+                    {o.steps.map((st, k) => {
+                      const who = staff.find((x) => x.id === st.by);
+                      const group = st.faction ? FACTIONS_2013.find((f) => f.id === st.faction)?.name : undefined;
+                      const what = st.action === "schedule_event" ? `Book the candidate: ${BOOKING[st.kind ?? "rally"].label}` : ACTIONS[st.action].label;
+                      return <li key={k} className="text-[11px] leading-snug text-faint">{what}{st.district ? ` · ${shortPlace(st.district)}` : ""}{group ? ` · ${group}` : ""}{who ? ` · ${short(who)}` : ""}</li>;
+                    })}
+                  </ul>
                 </div>
-                {!!o.cost && <span className="tnum shrink-0 font-mono text-[11px] text-warm">~{usd(o.cost)}</span>}
+                <span className="tnum shrink-0 font-mono text-[11px] text-warm" title="The engine's price for exactly these steps">{usd(o.cost)}</span>
               </div>
               {!done && (
                 <Button size="sm" variant="primary" className="mt-2" onClick={() => pick(id, index, i)}>
@@ -587,7 +596,7 @@ function Proposals({ c, index, id }: { c: Extract<ChatItem, { k: "proposals" }>;
           );
         })}
       </div>
-      {!done && <span className="mt-1 pl-1 text-[11px] text-faint">Nothing is spent until you pick one, or give your own order.</span>}
+      {!done && <span className="mt-1 pl-1 text-[11px] text-faint">Each price is exact for the steps listed. Nothing is spent until you pick one, or give your own order.</span>}
     </motion.div>
   );
 }

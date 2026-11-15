@@ -66,3 +66,13 @@ Return only a JSON array of three objects with keys: name, pitch (one sentence),
     return { list: fallback, mode: "offline" };
   }
 }
+
+/** A director's closing line after carrying out an option the campaigner picked. Facts come only from `results`. */
+export async function wrapUp(r: { name: string; campaign: string; voice: string; option: string; results: string[] }): Promise<string> {
+  if (!live()) return "";
+  const res = await model().invoke([
+    { role: "system", content: `You are ${r.name} on ${r.campaign}. This is a nonpartisan teaching simulation built on the real race: speak as a professional in that post, never as an impersonation of a real person. Voice: ${r.voice}` },
+    { role: "user", content: `Your boss picked your option "${r.option}" and it is done. What happened:\n${r.results.map((x) => `- ${x}`).join("\n")}\n\nReport back in under 40 words, in your voice, with your honest view: what it adds up to and what you would do next. Use only the facts above; state no figure that is not there. One paragraph, no greeting.` },
+  ]);
+  return text(res.content).replace(/^["']|["']$/g, "");
+}

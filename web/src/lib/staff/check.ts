@@ -1,6 +1,6 @@
 import { useCase } from "../cases/store";
-import { isQuestion, runOffline } from "./offline";
-import { budgetIn, RunCtx, type RunEvent } from "./protocol";
+import { isQuestion, runOffline, runSteps } from "./offline";
+import { budgetIn, RunCtx, type Proposal, type RunEvent } from "./protocol";
 import { BASE_BUDGET, DAILY, runBookings, snapshot } from "./run";
 
 // Checks on the staff agents that need no API key (issue #41). Run with `npm run check:staff`.
@@ -8,6 +8,7 @@ import { BASE_BUDGET, DAILY, runBookings, snapshot } from "./run";
 // 2. With no key, a question to any director gets two or three options and spends nothing; an order does work.
 // 3. A scheduled event is a real appearance: it is booked on a date, paid for on the day and reserved from the order's
 //    budget until then, happens as the candidate's own work, and never puts more on one day than he can do.
+// 4. An option's price is the engine's: picking it carries out exactly its steps and costs exactly what the card said.
 
 const ORDERS = [
   "Canvass Crown Heights this week with a $20,000 budget",
@@ -59,18 +60,44 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
 
   useCase.getState().restart();
   useCase.setState({ at: 1, step: 1 });
+  const priced: { d: string; opt: Proposal }[] = [];
   for (const d of ["cm", "fd", "fin", "com"]) {
     const q = await offline(d, "What should we do this week?");
     const p = q.events.find((e) => e.t === "proposals");
     const n = p?.t === "proposals" ? p.options.length : 0;
     if (n < 2 || n > 3) problems.push(`${d}: a question got ${n} options, not two or three`);
     if (q.spent || q.events.some((e) => e.t === "action")) problems.push(`${d}: a question spent money or did work`);
-    if (p?.t === "proposals" && p.options.some((o) => !o.title || !o.order)) problems.push(`${d}: an option has no title or no order`);
+    if (p?.t === "proposals" && p.options.some((o) => !o.title || !o.steps.length)) problems.push(`${d}: an option has no title or no steps`);
+    if (p?.t === "proposals") for (const opt of p.options) priced.push({ d, opt });
     const o = await offline(d, "Canvass Crown Heights and run call time this week");
     if (!o.events.some((e) => e.t === "action")) problems.push(`${d}: an order did no work`);
     if (o.events.some((e) => e.t === "proposals")) problems.push(`${d}: an order was answered with options`);
     report.push(`${d}: question → ${n} options, $0 spent; order → ${o.events.filter((e) => e.t === "action").length} jobs, $${o.spent.toLocaleString("en-US")}`);
   }
+
+  // Every option offered above, plus two built by hand with several steps and a booking: the price on the card is
+  // what picking it costs, to the dollar, and exactly its steps are carried out.
+  const today0 = useCase.getState().date;
+  const soon = new Date(Date.parse(today0) + 2 * 86_400_000).toISOString().slice(0, 10);
+  const byHand = new RunCtx({ director: "fd", text: "What should we do in Brooklyn?", snapshot: snapshot(), history: [], budget: BASE_BUDGET, runId: 3 }, (e) => { if (e.t === "proposals") for (const opt of e.options) priced.push({ d: "fd", opt }); });
+  byHand.propose("Two ways.", [
+    { title: "Canvass and train in Crown Heights", steps: [{ action: "canvass", district: 308 }, { action: "volunteer_training", district: 308 }, { action: "phone_bank" }] },
+    { title: "Put the candidate on doors", steps: [{ action: "schedule_event", district: 308, on: soon, kind: "doors" }, { action: "coalition_meeting", by: "nobody" }] },
+  ]);
+  let exact = 0;
+  for (const { d, opt } of priced) {
+    const events: RunEvent[] = [];
+    const ctx = new RunCtx({ director: d, text: opt.order, snapshot: snapshot(), history: [], budget: opt.cost, runId: 5, steps: opt.steps }, (e) => events.push(e));
+    await runSteps(ctx, "offline", undefined, 0);
+    const paid = ctx.spent + ctx.committed;
+    const did = events.flatMap((e) => (e.t === "action" ? [e.effect.action] : []));
+    if (paid !== opt.cost) problems.push(`pricing: "${opt.title}" was offered at $${opt.cost.toLocaleString("en-US")} and cost $${paid.toLocaleString("en-US")}`);
+    else exact++;
+    if (did.join() !== opt.steps.map((s) => s.action).join()) problems.push(`pricing: "${opt.title}" did ${did.join()} instead of its steps ${opt.steps.map((s) => s.action).join()}`);
+    if (events.some((e) => e.t === "report" && /Not all/.test(e.text))) problems.push(`pricing: "${opt.title}" did not go through on its own price`);
+  }
+  if (priced.length < 10) problems.push(`pricing: only ${priced.length} options to test, wanted ten`);
+  report.push(`pricing: ${exact} of ${priced.length} options cost exactly the price on the card, and ran exactly their steps`);
 
   // An order's own limit holds: a run given $20,000 works, and cannot spend past it.
   const tight = await offline("fd", "Canvass Crown Heights and train volunteers. Under $20,000.", budgetIn("Under $20,000.")!);

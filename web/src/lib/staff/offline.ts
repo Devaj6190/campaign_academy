@@ -80,22 +80,45 @@ function offlineProposals(ctx: RunCtx, first: string) {
   const { req } = ctx;
   const w = req.snapshot;
   const actions = [...new Set([...pickActions(req.text, req.director), ...(DEFAULTS[req.director] ?? [])])].slice(0, 3);
-  const options = actions.map((a) => {
+  const drafts = actions.map((a) => {
     const act = ACTIONS[a];
-    const cd = act.needs.district ? pickDistricts(w, req.text)[0] : undefined;
-    const fid = act.needs.faction || act.group ? pickFaction(w, req.text, a) : undefined;
-    const group = fid ? w.factions.find((f) => f.id === fid)?.name : undefined;
-    const place = cd ? shortPlace(cd) : undefined;
-    const cost = act.cost * w.scale.money * 3;
-    const where = [place && `in ${place}`, group && `for ${group}`].filter(Boolean).join(" ");
-    return {
-      title: cap(`${act.label.toLowerCase()} ${where}`.trim()),
-      order: `${act.label} ${where} this week. Budget $${cost.toLocaleString("en-US")}.`.replace(/\s+/g, " "),
-      cost,
-      why: act.about,
-    };
+    const district = act.needs.district ? pickDistricts(w, req.text)[0] : undefined;
+    const faction = act.needs.faction || act.group ? pickFaction(w, req.text, a) : undefined;
+    const group = faction ? w.factions.find((f) => f.id === faction)?.name : undefined;
+    const where = [district && `in ${shortPlace(district)}`, group && `for ${group}`].filter(Boolean).join(" ");
+    return { title: cap(`${act.label.toLowerCase()} ${where}`.trim()), why: act.about, steps: [{ action: a, district, faction }] };
   });
-  ctx.propose(`${cap(first)} here. You asked, so here's what I'd put on the table. Pick one and I'll get moving.`, options);
+  ctx.propose(`${cap(first)} here. You asked, so here's what I'd put on the table. Pick one and I'll get moving.`, drafts);
+}
+
+/**
+ * Carry out a picked option: exactly its steps, in order, with no planning. `say` writes the closing line in the
+ * director's own voice when there is a model; without one, or if it fails, a plain line stands.
+ */
+export async function runSteps(ctx: RunCtx, mode: "live" | "offline", say?: (results: string[]) => Promise<string>, pace = 1) {
+  const { req, emit } = ctx;
+  const steps = req.steps ?? [];
+  const wait = (ms: number) => sleep(ms * pace);
+  emit({ t: "start", mode });
+  const items = steps.map((s) => ({ title: ctx.describe(s), status: "pending" as const }));
+  emit({ t: "plan", items });
+  const results: string[] = [];
+  let failed = "";
+  for (const [i, s] of steps.entries()) {
+    emit({ t: "plan", items: items.map((it, k) => ({ ...it, status: k < i ? "completed" : k === i ? "in-progress" : "pending" })) });
+    if (s.by !== req.director) emit({ t: "delegate", to: s.by, job: items[i].title });
+    await wait(600);
+    const r = ctx.act(s.by, s.action, { district: s.district, faction: s.faction, on: s.on, kind: s.kind });
+    if (r.ok) results.push(r.text.split(" Cost ")[0]);
+    else failed = r.text;
+    await wait(600);
+    if (s.by !== req.director) emit({ t: "job-done", to: s.by, summary: r.ok ? r.text.split(" Cost ")[0] : r.text });
+  }
+  emit({ t: "plan", items: items.map((it) => ({ ...it, status: "completed" })) });
+  let text = failed ? `Not all of it went through. ${failed}` : "Done, exactly as we agreed.";
+  if (!failed && say) { try { text = (await say(results)) || text; } catch { /* the plain line stands */ } }
+  ctx.report(text, null, "");
+  emit({ t: "done" });
 }
 
 export async function runOffline(ctx: RunCtx, pace = 1) {

@@ -113,23 +113,36 @@ ${world(w)}`,
       }),
     },
   );
+  const doers = ["me", ...names.keys()] as [string, ...string[]];
   const propose = tool(
     async ({ reply, options }) => {
-      ctx.propose(reply, options);
+      ctx.propose(reply, options.map((o) => ({ title: o.title, why: o.why, steps: o.steps.map((s) => ({ by: s.who === "me" ? me.id : names.get(s.who), action: s.action, district: s.district ? Number(s.district) : undefined, faction: s.faction ?? undefined, on: s.on ?? undefined, kind: s.kind ?? undefined })) })));
       return "Options delivered. Stop here: the campaigner will pick one.";
     },
     {
       name: "propose",
       description: "Answer a question from the campaigner with your view and two or three concrete options. Use it instead of doing any work whenever they ask rather than order. Call it once; it ends your turn.",
       schema: z.object({
-        reply: z.string().describe("Under 60 words, in your own voice: answer what they asked, with your honest view. Disagree if the numbers say so. Name places and groups in words."),
+        reply: z.string().describe("Under 60 words, in your own voice: answer what they asked, with your honest view. Disagree if the numbers say so. Name places and groups in words. Do not state what the options cost: the campaigner sees the real price on each card."),
         options: z
           .array(
             z.object({
               title: z.string().describe("At most eight plain words, places and groups in words (e.g. \"Canvass Black voters in Crown Heights\")"),
-              order: z.string().describe("The exact order the campaigner could send you to do it: what, where, for whom, by when, and a budget in dollars"),
-              cost: z.number().describe("Rough cost in dollars"),
-              why: z.string().describe(`One sentence, under ${THOUGHT_MAX} characters: why this, given the numbers`),
+              why: z.string().describe(`One sentence, under ${THOUGHT_MAX} characters: why this, given the numbers. No dollar figures.`),
+              steps: z
+                .array(
+                  z.object({
+                    who: z.enum(doers).describe("Who does it: someone on your team, or \"me\""),
+                    action: z.enum(ACTION_IDS),
+                    district: z.enum(DISTRICT_IDS).nullable().describe("Community district number, when the action needs a place"),
+                    faction: z.enum(w.factions.map((f) => f.id) as [string, ...string[]]).nullable().describe("Voter group id, when the action targets a group"),
+                    on: z.string().nullable().describe("Only for schedule_event: the date, YYYY-MM-DD, after today. Otherwise null"),
+                    kind: z.enum(BOOKING_KINDS).nullable().describe("Only for schedule_event: what the candidate does there. Otherwise null"),
+                  }),
+                )
+                .min(1)
+                .max(3)
+                .describe("The one to three actions that make up this option, from the catalog. Picking the option carries out exactly these, and the engine prices them."),
             }),
           )
           .min(2)
