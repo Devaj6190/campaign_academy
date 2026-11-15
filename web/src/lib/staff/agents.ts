@@ -4,6 +4,7 @@ import { createDeepAgent, registerHarnessProfile, type SubAgent } from "deepagen
 import { z } from "zod";
 import { ACTION_IDS, ACTIONS, BOOKING_KINDS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
+import { bounce, Ledger } from "./numbers";
 import { THOUGHT_MAX, type RunCtx } from "./protocol";
 import { humanize, PLACES, short, type Snapshot } from "./world";
 
@@ -54,7 +55,9 @@ function actionTool(ctx: RunCtx, by: string) {
   return tool(
     async ({ why, action, district, faction, on, kind }) => {
       ctx.think(by, humanize(why, ctx.req.snapshot.factions));
-      return ctx.act(by, action, { district: district ? Number(district) : undefined, faction: faction ?? undefined, on: on ?? undefined, kind: kind ?? undefined }).text;
+      const text = ctx.act(by, action, { district: district ? Number(district) : undefined, faction: faction ?? undefined, on: on ?? undefined, kind: kind ?? undefined }).text;
+      ctx.ledger?.add(text); // a result is a fact the staff may now state
+      return text;
     },
     {
       name: "take_action",
@@ -79,6 +82,11 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
   const prof = profileOf(w, me.id);
   const team = describeTeam(w, me.id);
   const names = new Map(team.map((p) => [slug(p.name!), p.id]));
+  // Every figure the staff are shown: the case as they read it, the catalog, the order and the talk so far.
+  const ledger = (ctx.ledger = new Ledger().add(world(w), catalog(w), req.text, req.followOf, req.budget, ...req.history.map((l) => l.text)));
+  /** The figures in `text` nobody gave. The run's own totals count as given. */
+  const invented = (text: string, ...also: (number | null)[]) => ledger.add(ctx.spent, ctx.raised, ctx.left, ctx.committed, ...also).unknown(text);
+  let bounced = 0;
 
   const subagents: SubAgent[] = team.map((p) => ({
     name: slug(p.name!),
@@ -99,7 +107,11 @@ ${world(w)}`,
 
   const send = tool(
     async ({ reply, ask_amount, ask_reason, coaching }) => {
-      ctx.report(reply, ask_amount && ask_reason ? { amount: ask_amount, reason: ask_reason } : null, coaching);
+      // A figure nobody gave goes back once to be rewritten; after that the sentence carrying it is dropped.
+      const bad = invented(reply, ask_amount);
+      if (bad.length && bounced++ < 1) { console.log(`[staff] ${me.id} report sent back for figures: ${bad.join(", ")}`); return bounce(bad); }
+      if (bad.length) console.log(`[staff] ${me.id} report trimmed of figures: ${bad.join(", ")}`);
+      ctx.report(ledger.clean(reply) || "Done. The details are in the receipts.", ask_amount && ask_reason ? { amount: ask_amount, reason: ledger.clean(ask_reason) || "to finish the job" } : null, ledger.clean(coaching));
       return "Report delivered.";
     },
     {
@@ -116,7 +128,10 @@ ${world(w)}`,
   const doers = ["me", ...names.keys()] as [string, ...string[]];
   const propose = tool(
     async ({ reply, options }) => {
-      ctx.propose(reply, options.map((o) => ({ title: o.title, why: o.why, steps: o.steps.map((s) => ({ by: s.who === "me" ? me.id : names.get(s.who), action: s.action, district: s.district ? Number(s.district) : undefined, faction: s.faction ?? undefined, on: s.on ?? undefined, kind: s.kind ?? undefined })) })));
+      const bad = invented(reply);
+      if (bad.length && bounced++ < 1) { console.log(`[staff] ${me.id} answer sent back for figures: ${bad.join(", ")}`); return bounce(bad); }
+      if (bad.length) console.log(`[staff] ${me.id} answer trimmed of figures: ${bad.join(", ")}`);
+      ctx.propose(ledger.clean(reply) || "Here is what I would put on the table.", options.map((o) => ({ title: o.title, why: ledger.clean(o.why), steps: o.steps.map((s) => ({ by: s.who === "me" ? me.id : names.get(s.who), action: s.action, district: s.district ? Number(s.district) : undefined, faction: s.faction ?? undefined, on: s.on ?? undefined, kind: s.kind ?? undefined })) })));
       return "Options delivered. Stop here: the campaigner will pick one.";
     },
     {
@@ -224,7 +239,7 @@ ${world(w)}`,
         if (m.tool_call_id && pending.has(m.tool_call_id)) {
           const to = pending.get(m.tool_call_id)!;
           pending.delete(m.tool_call_id);
-          emit({ t: "job-done", to, summary: textOf(m.content).slice(0, 280) });
+          emit({ t: "job-done", to, summary: (ledger.clean(textOf(m.content)) || "Done.").slice(0, 280) });
         }
       }
     }

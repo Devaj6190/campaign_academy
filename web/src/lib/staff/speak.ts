@@ -119,7 +119,7 @@ async function say(t: Trigger, day: number) {
         campaign: `${w.c.candidates.find((x) => x.id === w.c.follow)?.name ?? w.c.follow}'s campaign in ${w.c.title[0].toLowerCase()}${w.c.title.slice(1)}`,
         voice: prof.voice,
         situation: t.situation,
-        context: `Today is ${useCase.getState().date}. ${shortMoney(w.w.budget)} left to spend under the cap. Citywide standing ${Math.round(w.w.poll[w.c.follow] ?? 0)}%.`,
+        context: `Today is ${useCase.getState().date}.${t.key === "money" ? ` ${shortMoney(w.w.budget)} left to spend under the cap.` : ""} Citywide standing ${Math.round(w.w.poll[w.c.follow] ?? 0)}%.`,
         fallback: said,
       }),
     });

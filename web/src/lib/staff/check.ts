@@ -1,4 +1,5 @@
 import { useCase } from "../cases/store";
+import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
 import { budgetIn, RunCtx, type Proposal, type RunEvent } from "./protocol";
 import { BASE_BUDGET, DAILY, runBookings, snapshot } from "./run";
@@ -8,6 +9,7 @@ import { BASE_BUDGET, DAILY, runBookings, snapshot } from "./run";
 // 2. With no key, a question to any director gets two or three options and spends nothing; an order does work.
 // 3. A scheduled event is a real appearance: it is booked on a date, paid for on the day and reserved from the order's
 //    budget until then, happens as the candidate's own work, and never puts more on one day than he can do.
+// 5. No invented numbers: a figure the staff were not given is caught, and one they were given (also rounded) passes.
 // 4. An option's price is the engine's: picking it carries out exactly its steps and costs exactly what the card said.
 
 const ORDERS = [
@@ -57,6 +59,31 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
   report.push(`wording: ${ORDERS.length} orders and ${QUESTIONS.length} questions checked`);
   for (const [t, want] of BUDGETS) if (budgetIn(t) !== want) problems.push(`budget read as ${budgetIn(t)}, should be ${want}: "${t}"`);
   report.push(`budgets: ${BUDGETS.length} orders read for their own limit`);
+
+  // What the staff were shown, then lines they might write: [line, the figures in it nobody gave].
+  const given = new Ledger().add(
+    "Left to spend under the cap: $4,312,000. Poll: Quinn 36, de Blasio 12. black (Black voters): 10.4% support; 29% of likely voters. 110 Harlem: support 11%.",
+    "Door canvass ~$18,000. Knocked 1,213 doors in Harlem. Support +3.6. Call time raised $114,250 from 23 donors.",
+    "Tax incomes above $500,000 to pay for pre-kindergarten. Today is 2013-01-28; 225 days to the primary.",
+  );
+  const LINES: [string, string[]][] = [
+    ["We're at 12% citywide and 10% with Black voters, who are 29% of the electorate.", []],
+    ["We have $4.3M under the cap and Harlem sits at 11%.", []],
+    ["1,213 doors in Harlem, support up 3.6. Call time brought in $114,250 from 23 donors.", []],
+    ["Book him on 125th St on the 9th, 2 events a day for 3 weeks.", []],
+    ["The $500,000 tax plan is our best story with 225 days to go.", []],
+    ["I'd put $1.5M into outer-borough radio.", ["$1.5M"]],
+    ["That canvass moved us 7% in Harlem.", ["7%"]],
+    ["We knocked 5,000 doors and signed up 340 volunteers.", ["5,000", "340"]],
+    ["A digital buy costs about $50,000 and Thompson is at 21%.", ["$50,000", "21%"]],
+  ];
+  for (const [line, want] of LINES) {
+    const got = given.unknown(line);
+    if (got.join("|") !== want.join("|")) problems.push(`numbers: in "${line}" caught [${got.join(", ")}], should catch [${want.join(", ")}]`);
+  }
+  const trimmed = given.clean("Harlem sits at 11%. I'd put $1.5M into radio there. Doors first.");
+  if (trimmed !== "Harlem sits at 11%. Doors first.") problems.push(`numbers: trimming left "${trimmed}"`);
+  report.push(`numbers: ${LINES.length} lines checked for figures the staff were not given`);
 
   useCase.getState().restart();
   useCase.setState({ at: 1, step: 1 });

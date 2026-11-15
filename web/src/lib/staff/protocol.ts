@@ -1,6 +1,7 @@
 import { ACTIONS, BOOKING, type ActionId, type BookingKind } from "../engine/catalog";
 import { clarity, describeTeam, fitScore, profileOf, resolve, type Effect } from "../engine/resolve";
 import { hash } from "../util";
+import type { Ledger } from "./numbers";
 import { PLACES, shortPlace, type Snapshot } from "./world";
 
 // The wire format between /api/staff/instruct and the browser: one JSON event per line.
@@ -78,6 +79,9 @@ export class RunCtx {
     this.quality = clarity(req.followOf ?? req.text);
   }
 
+  /** Set when live agents write this run's text: every figure they may state. Templated runs need none. */
+  ledger?: Ledger;
+
   /** Money promised to booked appearances: paid on their day, but it counts against this order's budget now. */
   committed = 0;
 
@@ -87,7 +91,9 @@ export class RunCtx {
 
   /** Say why, in a sentence or two. A long one is cut at a word; an empty one is dropped. */
   think(who: string, text: string) {
-    const t = text.replace(/\s+/g, " ").replace(/^\W*(thinking|why)\W*:\s*/i, "").trim();
+    const said = text.replace(/\s+/g, " ").replace(/^\W*(thinking|why)\W*:\s*/i, "").trim();
+    // A thought streams as it is written and cannot be sent back, so a sentence with a figure nobody gave is dropped.
+    const t = this.ledger ? this.ledger.clean(said) : said;
     if (!t) return;
     if (t.length <= THOUGHT_MAX) return this.emit({ t: "thought", who, text: t });
     const cut = t.lastIndexOf(" ", THOUGHT_MAX - 1);

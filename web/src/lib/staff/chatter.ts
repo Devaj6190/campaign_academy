@@ -1,5 +1,6 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
+import { Ledger } from "./numbers";
 import { genericPool, POOL, type Candidate } from "./roster";
 
 // Short single calls: a staffer speaking up unprompted, and a shortlist of people to hire.
@@ -15,15 +16,23 @@ export type SpeakRequest = { name: string; campaign: string; voice: string; situ
 export async function speak(r: SpeakRequest): Promise<{ text: string; suggest: string; mode: "live" | "offline" }> {
   if (!live()) return { ...r.fallback, mode: "offline" };
   try {
-    const res = await model().invoke([
+    const ledger = new Ledger().add(r.situation, r.context);
+    const messages: { role: string; content: string }[] = [
       { role: "system", content: `You are ${r.name} on ${r.campaign}. This is a nonpartisan teaching simulation built on the real race: speak as a professional in that post, never as an impersonation of a real person, and use only the figures you are given. Voice: ${r.voice}` },
-      { role: "user", content: `Something your boss should hear about, unprompted:\n${r.situation}\n\nCampaign state: ${r.context}\n\nWrite exactly two lines.\nLine 1: what you say to your boss, under 40 words, in your voice, no greeting. Have a view: say what you think it means and what you would do, and disagree with your boss if the facts say so.\nLine 2: SUGGEST: a short instruction (under 12 words) your boss could give you to act on it.` },
-    ]);
+      { role: "user", content: `Something your boss should hear about, unprompted:\n${r.situation}\n\nCampaign state: ${r.context}\n\nWrite exactly two lines.\nLine 1: what you say to your boss, under 40 words, in your voice, no greeting. Have a view: say what you think it means and what you would do, and disagree with your boss if the facts say so.\nUse a figure only when it is the point, and no dollar amounts of your own.\nLine 2: SUGGEST: a short instruction (under 12 words) your boss could give you to act on it.` },
+    ];
+    let res = await model().invoke(messages);
+    const bad = ledger.unknown(text(res.content));
+    if (bad.length) {
+      console.log(`[staff] remark sent back for figures: ${bad.join(", ")}`);
+      res = await model().invoke([...messages, { role: "assistant", content: text(res.content) }, { role: "user", content: `You stated figures you were not given: ${bad.join(", ")}. Write the two lines again using only figures from what I told you, or none.` }]);
+    }
     // The model sometimes copies the prompt's own labels ("Line 1:"); drop them.
     const lines = text(res.content).split("\n").map((l) => l.trim().replace(/^line\s*[12]\s*[:.-]\s*/i, "")).filter(Boolean);
     const suggest = lines.find((l) => /^suggest:/i.test(l))?.replace(/^suggest:\s*/i, "") ?? r.fallback.suggest;
     const said = lines.find((l) => !/^suggest:/i.test(l)) ?? r.fallback.text;
-    return { text: said.replace(/^["']|["']$/g, ""), suggest, mode: "live" };
+    // Still a figure nobody gave: that sentence goes, and if nothing is left the plain remark stands.
+    return { text: ledger.clean(said.replace(/^["']|["']$/g, "")) || r.fallback.text, suggest: ledger.clean(suggest) || r.fallback.suggest, mode: "live" };
   } catch (err) {
     console.error("[staff] speak failed:", err);
     return { ...r.fallback, mode: "offline" };
@@ -74,5 +83,6 @@ export async function wrapUp(r: { name: string; campaign: string; voice: string;
     { role: "system", content: `You are ${r.name} on ${r.campaign}. This is a nonpartisan teaching simulation built on the real race: speak as a professional in that post, never as an impersonation of a real person. Voice: ${r.voice}` },
     { role: "user", content: `Your boss picked your option "${r.option}" and it is done. What happened:\n${r.results.map((x) => `- ${x}`).join("\n")}\n\nReport back in under 40 words, in your voice, with your honest view: what it adds up to and what you would do next. Use only the facts above; state no figure that is not there. One paragraph, no greeting.` },
   ]);
-  return text(res.content).replace(/^["']|["']$/g, "");
+  // Only what the results say. A sentence with any other figure is dropped; nothing left means the plain line stands.
+  return new Ledger().add(r.option, ...r.results).clean(text(res.content).replace(/^["']|["']$/g, ""));
 }
