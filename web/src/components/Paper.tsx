@@ -90,9 +90,12 @@ function Page({ close }: { close: () => void }) {
       {/* key: a new edition prints its front page afresh, headline ink and all. */}
       <Lead key={e.id} c={c} e={e} latest={latest} close={close} />
 
-      <div className="ledger-rule mt-7 grid grid-cols-[1fr_1fr_1.1fr] gap-7 pt-5 max-[1000px]:grid-cols-2">
-        <Sim id="ledger-campaign" label="Your campaign" s={e.campaign} />
-        <Sim id="ledger-rivals" label="Your rivals" s={e.rivals} />
+      {/* Campaign and rivals stacked beside the poll box, so the row has no hole under a short story. */}
+      <div className="ledger-rule mt-7 grid grid-cols-[1.6fr_1fr] gap-7 pt-5 max-[900px]:grid-cols-1">
+        <div className="space-y-5 divide-y divide-line [&>*+*]:pt-5">
+          <Sim id="ledger-campaign" label="Your campaign" s={e.campaign} />
+          <Sim id="ledger-rivals" label="Your rivals" s={e.rivals} />
+        </div>
         <Poll e={e} />
       </div>
 
@@ -241,8 +244,9 @@ function Living({ c, text }: { c: Case; text: string }) {
     return () => clearInterval(t);
   }, [shots.length]);
   return (
-    <figure>
-      <div className="living aspect-[3/2]">
+    // The picture stretches to the height of the story beside it, so neither column leaves a gap.
+    <figure className="flex flex-col">
+      <div className="living min-h-[190px] max-h-[560px] flex-1">
         {shots.map((s, i) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={s.src} src={s.src} alt="" style={{ opacity: i === at ? 1 : 0, ["--lift" as string]: s.lift }} />
@@ -271,7 +275,7 @@ function Lead({ c, e, latest, close }: { c: Case; e: Edition; latest: boolean; c
       <Kicker real>{e.lead?.outlet ? `Lead story · ${e.lead.outlet}` : "Lead story"}</Kicker>
       <div className="mt-3"><Headline text={head} /></div>
 
-      <div className="mt-5 grid grid-cols-[1.05fr_1fr] gap-7 max-[900px]:grid-cols-1">
+      <div className="mt-5 grid grid-cols-[1fr_1.1fr] gap-7 max-[900px]:grid-cols-1">
         <Living c={c} text={e.lead?.text ?? ""} />
         <div>
           <p className="ledger-text ledger-drop">
@@ -382,7 +386,8 @@ function Sim({ id, label, s }: { id: string; label: string; s: { headline: strin
   return (
     <article id={id}>
       <Kicker>{label}</Kicker>
-      <h3 className="mt-2 font-masthead text-[22px] leading-[1.1] font-black">{s.headline}</h3>
+      {/* A simulated headline can run to a whole sentence; a long one steps down so it does not swamp its story. */}
+      <h3 className={cn("mt-2 font-masthead leading-[1.15] font-black", s.headline.length > 70 ? "text-[18px]" : "text-[22px]")}>{s.headline}</h3>
       <p className="ledger-text mt-2">{s.body}</p>
     </article>
   );
@@ -392,7 +397,7 @@ function Sim({ id, label, s }: { id: string; label: string; s: { headline: strin
 function Poll({ e }: { e: Edition }) {
   const still = useReducedMotion();
   return (
-    <aside id="ledger-poll" className="border-2 border-fg p-4 max-[1000px]:col-span-2">
+    <aside id="ledger-poll" className="border-2 border-fg p-4">
       <div className="text-center">
         <div className="ledger-kicker">Special report</div>
         <h3 className="font-headline text-[30px] leading-none uppercase">The poll</h3>

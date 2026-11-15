@@ -42,7 +42,7 @@
   /* The morning paper's faces (Paper.tsx), used nowhere else. */
   --font-headline: var(--font-anton);
   --font-masthead: var(--font-playfair);
-  --font-print: var(--font-oldstandard);
+  --font-print: var(--font-sourceserif);
 }
 
 html,
@@ -283,7 +283,7 @@ a {
 .ledger {
   --color-fg: #1c160e;
   --color-soft: #2b2318;
-  --color-muted: #574b39;
+  --color-muted: #4a3f30;
   --color-faint: #6c5f4a;
   --color-gold: #6e4510;
   --color-gold-bright: #3d2606;
@@ -296,7 +296,7 @@ a {
   --color-warm: #84460f;
   --color-cool: #2b4962;
   color: var(--color-fg);
-  font-family: var(--font-oldstandard), Georgia, serif;
+  font-family: var(--font-sourceserif), Georgia, serif;
 }
 .ledger-sheet {
   border: 0;
@@ -327,10 +327,13 @@ a {
   text-transform: uppercase;
 }
 .ledger-text {
-  font-size: 14.5px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   text-align: justify;
   hyphens: auto;
+  /* Justified columns open rivers between words; let the spacing give a little at the letter level instead. */
+  text-justify: inter-word;
+  word-spacing: -0.02em;
 }
 .ledger-cols {
   column-gap: 28px;
