@@ -43,6 +43,8 @@ type StaffState = {
   candidates: Record<string, { status: "loading" | "ready"; list: Candidate[]; mode?: "live" | "offline" }>;
   mode: "live" | "offline" | null;
   spoken: Record<string, number>; // trigger → day it last fired
+  /** What each post remembers of this campaign, oldest first (lib/staff/memory.ts). */
+  memory: Record<string, string[]>;
   /** A ready-made order waiting in someone's input box (e.g. "Send staff" from the map). */
   draft: Record<string, string>;
 };
@@ -60,6 +62,7 @@ export const useStaff = create<StaffState>(() => ({
   candidates: {},
   mode: null,
   spoken: {},
+  memory: {},
   draft: {},
 }));
 
@@ -69,3 +72,6 @@ export const nextId = () => uid++;
 export const pushChat = (id: string, item: ChatItem) => useStaff.setState((s) => ({ chat: { ...s.chat, [id]: [...(s.chat[id] ?? []), item] } }));
 
 export const bumpMorale = (id: string, d: number) => useStaff.setState((s) => ({ morale: { ...s.morale, [id]: Math.max(5, Math.min(100, (s.morale[id] ?? 70) + d)) } }));
+
+// Dev handle, like window.caseStore: window.staffStore.getState().memory
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") queueMicrotask(() => ((window as unknown as { staffStore: unknown }).staffStore = useStaff));

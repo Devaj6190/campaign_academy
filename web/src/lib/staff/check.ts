@@ -1,9 +1,10 @@
 import { skip } from "../cases/clock";
 import { useRivals } from "../cases/rivals";
 import { currentCase, useCase } from "../cases/store";
+import { KEEP, memoriesFor, remember } from "./memory";
 import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
-import { budgetIn, RunCtx, type Proposal, type RunEvent } from "./protocol";
+import { budgetIn, memoryFile, RunCtx, type Proposal, type RunEvent } from "./protocol";
 import { BASE_BUDGET, DAILY, pick, runBookings, snapshot } from "./run";
 import "./speak"; // its restart hook is part of what is checked
 import { useStaff } from "./store";
@@ -13,6 +14,8 @@ import { useStaff } from "./store";
 // 2. With no key, a question to any director gets two or three options and spends nothing; an order does work.
 // 3. A scheduled event is a real appearance: it is booked on a date, paid for on the day and reserved from the order's
 //    budget until then, happens as the candidate's own work, and never puts more on one day than he can do.
+// 6. Memory: a post keeps dated lines up to a cap, only posts with something to remember travel with an order, the
+//    agent's memory file lists them, and a restarted case clears everything.
 // 5. No invented numbers: a figure the staff were not given is caught, and one they were given (also rounded) passes.
 // 4. An option's price is the engine's: picking it carries out exactly its steps and costs exactly what the card said.
 
@@ -243,5 +246,20 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
     report.push(`scheduling near the end: nothing booked on the eve; two days out, ${ev.length} booked for the last day and the rest refused`);
   }
   report.push(`scheduling: 3 rallies asked for ${wanted} → booked on ${dates.join(", ")}; all happened, $${mine.reduce((a, x) => a + x.cost, 0).toLocaleString("en-US")} paid on the day (${texts[2].includes("full") ? "third moved: day was full" : "no day was full"})`);
+
+  // Memory.
+  useCase.getState().restart();
+  useCase.setState({ at: 1, step: 1, date: "2013-02-03" });
+  for (let i = 1; i <= KEEP + 3; i++) remember("fd", `Order ${i}: canvassed somewhere.`);
+  remember("ob", "The Field Director gave me Crown Heights. Knocked doors.");
+  const kept = useStaff.getState().memory.fd ?? [];
+  if (kept.length !== KEEP) problems.push(`memory: kept ${kept.length} lines, the cap is ${KEEP}`);
+  if (!kept[0]?.startsWith("2013-02-03: Order 4:") || !kept.at(-1)?.includes(`Order ${KEEP + 3}:`)) problems.push("memory: the oldest lines did not fall away first, or a line is not dated");
+  const sent = memoriesFor(["fd", "ob", "oq", "vc"]);
+  if (Object.keys(sent).sort().join() !== "fd,ob") problems.push(`memory: travelled for ${Object.keys(sent).join()}, should be fd and ob only`);
+  if (!memoryFile(sent.ob).includes("- 2013-02-03: The Field Director gave me Crown Heights.") || !memoryFile(undefined).includes("Nothing yet")) problems.push("memory: the memory file does not read as expected");
+  useCase.getState().restart();
+  if (Object.keys(useStaff.getState().memory).length) problems.push("memory: a restarted case kept the last campaign's memory");
+  report.push(`memory: capped at ${KEEP} dated lines per post, sent only where there is some, cleared on restart`);
   return { problems, report };
 }

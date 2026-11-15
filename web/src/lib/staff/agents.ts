@@ -5,7 +5,7 @@ import { z } from "zod";
 import { ACTION_IDS, ACTIONS, BOOKING_KINDS } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
 import { bounce, Ledger } from "./numbers";
-import { THOUGHT_MAX, type RunCtx } from "./protocol";
+import { memoryFile, THOUGHT_MAX, type RunCtx } from "./protocol";
 import { humanize, PLACES, short, type Snapshot } from "./world";
 
 // Real staff. Each director is a deep agent: it plans with write_todos and hands jobs to its people through the
@@ -51,6 +51,9 @@ Weakest five: ${weakest.slice(0, 5).map((p) => p.name).join(", ")}.`;
 
 export const catalog = (w: Snapshot) => ACTION_IDS.map((id) => `- ${id}: ${ACTIONS[id].about} ~$${(ACTIONS[id].cost * w.scale.money).toLocaleString("en-US")}${ACTIONS[id].needs.district ? " [needs district]" : ""}${ACTIONS[id].needs.faction ? " [needs voter group]" : ""}`).join("\n");
 
+/** Where a post's memory sits in its agent's files. */
+const MEMORY = "/memory/AGENTS.md";
+
 function actionTool(ctx: RunCtx, by: string) {
   return tool(
     async ({ why, action, district, faction, on, kind }) => {
@@ -83,7 +86,7 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
   const team = describeTeam(w, me.id);
   const names = new Map(team.map((p) => [slug(p.name!), p.id]));
   // Every figure the staff are shown: the case as they read it, the catalog, the order and the talk so far.
-  const ledger = (ctx.ledger = new Ledger().add(world(w), catalog(w), req.text, req.followOf, req.budget, ...req.history.map((l) => l.text)));
+  const ledger = (ctx.ledger = new Ledger().add(world(w), catalog(w), req.text, req.followOf, req.budget, ...req.history.map((l) => l.text), ...Object.values(req.memory ?? {}).flat()));
   /** The figures in `text` nobody gave. The run's own totals count as given. */
   const invented = (text: string, ...also: (number | null)[]) => ledger.add(ctx.spent, ctx.raised, ctx.left, ctx.committed, ...also).unknown(text);
   let bounced = 0;
@@ -97,7 +100,7 @@ export async function runLive(ctx: RunCtx, signal: AbortSignal) {
 Voice: ${p.profile.voice}
 Your boss, ${short(me)}, has handed you one job. Do it with take_action: usually one action, at most two. Pick the action, district and voter group that best fit the job and your skills. If take_action says something was not done, do not retry the same thing.
 Then reply in under 40 words, in your own voice, saying what happened. Use only the facts take_action gave you.
-
+${req.memory?.[p.id]?.length ? `\nWhat you remember of this campaign (use it when it bears on the job):\n${req.memory[p.id].map((l) => `- ${l}`).join("\n")}\n` : ""}
 Actions you can take:
 ${catalog(w)}
 
@@ -106,12 +109,12 @@ ${world(w)}`,
   }));
 
   const send = tool(
-    async ({ reply, ask_amount, ask_reason, coaching }) => {
+    async ({ reply, ask_amount, ask_reason, coaching, remember }) => {
       // A figure nobody gave goes back once to be rewritten; after that the sentence carrying it is dropped.
       const bad = invented(reply, ask_amount);
       if (bad.length && bounced++ < 1) { console.log(`[staff] ${me.id} report sent back for figures: ${bad.join(", ")}`); return bounce(bad); }
       if (bad.length) console.log(`[staff] ${me.id} report trimmed of figures: ${bad.join(", ")}`);
-      ctx.report(ledger.clean(reply) || "Done. The details are in the receipts.", ask_amount && ask_reason ? { amount: ask_amount, reason: ledger.clean(ask_reason) || "to finish the job" } : null, ledger.clean(coaching));
+      ctx.report(ledger.clean(reply) || "Done. The details are in the receipts.", ask_amount && ask_reason ? { amount: ask_amount, reason: ledger.clean(ask_reason) || "to finish the job" } : null, ledger.clean(coaching), remember ? ledger.clean(remember) : undefined);
       return "Report delivered.";
     },
     {
@@ -121,6 +124,7 @@ ${world(w)}`,
         reply: z.string().describe("Under 50 words, in your voice and with your honest view: what this adds up to and what you would do next. The campaigner already sees a receipt for every action with its cost and effect, so do not repeat those figures. Facts from tool results only."),
         ask_amount: z.number().nullable().describe("Dollars of extra budget you want approved, or null"),
         ask_reason: z.string().nullable().describe("What the extra money is for, as a short phrase starting with \"to\" or \"for\" (it follows the words \"wants $X more\"), or null"),
+        remember: z.string().nullable().describe("One line worth keeping in your memory for next time, or null: what you learned about this campaigner, a place or a group that the plain record of this order would not show. The record of what was ordered and what it did is kept for you; do not repeat it."),
         coaching: z.string().describe("One honest sentence of feedback on the campaigner's instruction: was it clear (what, where, who, by when) and did it go to the right person?"),
       }),
     },
@@ -171,9 +175,14 @@ ${world(w)}`,
     name: slug(me.name!),
     tools: team.length ? [send, propose] : [actionTool(ctx, me.id), send, propose],
     subagents,
+    // The post's memory of this campaign, as deepagents memory: seeded into the run's files below and loaded into
+    // the agent's instructions. Nothing else reads or writes files (the harness profile keeps the file tools off).
+    memory: [MEMORY],
     systemPrompt: `You are ${post(me)} ${frame(w)}. The player is a student learning to run a campaign, and they are your boss.
 Voice: ${prof.voice}
 Strengths: ${me.good ?? prof.skills.join(", ")}. Weaknesses: ${me.weak ?? "none noted"}. Let both show in your choices.
+
+You remember this campaign: your memory file is loaded with these instructions. Use it. When an order or a question touches something already tried, say how that went, and do not repeat what failed without saying so. Do not recite it otherwise.
 
 Who you are: a professional with views, not an order-taker. Everything the campaigner reads from you is in your voice. If an order is a poor use of money or time given the numbers below, say so plainly in one sentence, in your first thought and again in your report, then carry it out anyway: the campaigner decides. If it is a good call, you may say so in a few words. Never flatter.
 
@@ -203,7 +212,9 @@ ${world(w)}`,
   const ask = req.followOf ? `${req.text}\n(This continues my earlier order: "${req.followOf}". Use the extra budget on that, and do not ask for more this time.)` : req.text;
   const messages = [...past, { role: "user", content: ask }];
 
-  const stream = await agent.stream({ messages }, { streamMode: "updates", recursionLimit: 80, signal });
+  const now = new Date().toISOString();
+  const files = { [MEMORY]: { content: memoryFile(req.memory?.[me.id]), mimeType: "text/markdown", created_at: now, modified_at: now } };
+  const stream = await agent.stream({ messages, files } as never, { streamMode: "updates", recursionLimit: 80, signal });
   for await (const chunk of stream as AsyncIterable<Record<string, unknown>>) {
     for (const update of Object.values(chunk ?? {})) {
       const msgs = (update as { messages?: unknown[] } | null)?.messages;

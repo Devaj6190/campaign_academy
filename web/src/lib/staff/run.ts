@@ -9,6 +9,7 @@ import { resolve, type Effect } from "../engine/resolve";
 import { runOffline } from "./offline";
 import { budgetIn, RunCtx, type Line, type RunEvent, type RunRequest, type Step } from "./protocol";
 import { profileFor, ROLE_SKILLS, type Candidate } from "./roster";
+import { memoriesFor, remember } from "./memory";
 import { bumpMorale, nextId, pushChat, useStaff, type ChatItem, type FeedItem } from "./store";
 import { PLACES, short, shortPlace, type Snapshot } from "./world";
 
@@ -164,6 +165,10 @@ function patchThoughts(director: string, runId: number, fn: (t: Thoughts) => Tho
   useStaff.setState((s) => ({ chat: { ...s.chat, [director]: (s.chat[director] ?? []).map((c) => (c.k === "thoughts" && c.run === runId ? fn(c) : c)) } }));
 }
 
+/** What each run got done, for the memory line written when it reports. */
+const did = new Map<number, string[]>();
+const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+
 function handle(director: string, runId: number, e: RunEvent) {
   const patchRun = (fn: (r: NonNullable<ReturnType<typeof current>>) => void) =>
     useStaff.setState((s) => ({ runs: { ...s.runs, [director]: (s.runs[director] ?? []).map((r) => (r.id === runId ? (fn(r), { ...r }) : r)) } }));
@@ -195,6 +200,7 @@ function handle(director: string, runId: number, e: RunEvent) {
       break;
     }
     case "action": {
+      did.set(runId, [...(did.get(runId) ?? []), e.effect.summary.replace(/ \(Not their strength.*$/, "")]);
       apply(e.effect);
       if (e.effect.booking && e.effect.district) useCase.getState().book({ date: e.effect.booking.date, kind: e.effect.booking.kind, cd: e.effect.district, faction: e.effect.faction, by: e.effect.by });
       if (!e.effect.fit) {
@@ -216,13 +222,22 @@ function handle(director: string, runId: number, e: RunEvent) {
       useStaff.setState((s) => { const job = { ...s.job }; delete job[e.to]; return { job }; });
       patchRun((r) => { r.jobs = r.jobs.map((j) => (j.to === e.to && !j.done ? { ...j, done: true, summary: e.summary } : j)); });
       if (e.summary) pushChat(e.to, { k: "them", text: e.summary });
+      { const job = current()?.jobs.find((j) => j.to === e.to); if (job) remember(e.to, `${cap(first(director))} gave me "${job.job}". ${e.summary}`); }
       break;
     case "proposals":
       pushChat(director, { k: "proposals", text: e.text, options: e.options, run: runId });
+      remember(director, `The boss asked "${clip(current()?.text ?? "", 90)}". I offered: ${e.options.map((o) => o.title).join("; ")}.`);
       feed(director, `${cap(first(director))} answered with ${e.options.length} options.`);
       break;
     case "report":
       pushChat(director, { k: "report", text: e.text, ask: e.ask, state: e.ask ? "open" : "approved", spent: e.spent, raised: e.raised, run: runId });
+      {
+        // The plain record of the order, then the one thing the director chose to keep.
+        const run = current(), done = did.get(runId) ?? [];
+        did.delete(runId);
+        remember(director, `${run?.picked ? "Carried out the option the boss picked" : run?.follow ? "With the extra money approved" : `Order: "${clip(run?.text ?? "", 90)}"`}. ${done.length ? clip(done.join(" "), 150) : "Nothing was done."}${e.ask ? ` I asked for $${e.ask.amount.toLocaleString("en-US")} more ${e.ask.reason}.` : ""}`);
+        if (e.note) remember(director, `Note to self: ${e.note}`);
+      }
       if (current()?.follow || current()?.picked) break; // an approved ask or a picked option is not a new instruction to grade
       pushChat(director, { k: "coach", clarity: e.clarity, fit: e.fit, missing: e.missing, text: e.coaching, run: runId });
       // Clear orders to the right person lift morale; vague ones and misfits wear people down.
@@ -264,7 +279,7 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
   setBusy(id, "down");
   feed("you", `You → ${first(id)}: ${text}`);
 
-  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget, runId, followOf, steps };
+  const req: RunRequest = { director: id, text, snapshot: snapshot(), history, budget, runId, followOf, steps, memory: memoriesFor([id, ...useGame.getState().staff.filter((p) => p.boss === id).map((p) => p.id)]) };
   const on = (e: RunEvent) => handle(id, runId, e);
   try {
     const res = await fetch("/api/staff/instruct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) });
@@ -318,6 +333,7 @@ export function pick(id: string, index: number, option: number) {
   }
   useStaff.setState((s) => ({ chat: { ...s.chat, [id]: s.chat[id].map((c, i) => (i === index && c.k === "proposals" ? { ...c, picked: option } : c)) } }));
   const o = item.options[option];
+  remember(id, `The boss picked my option "${o.title}".`);
   void instruct(id, o.order, 0, undefined, o.cost, o.steps);
 }
 
@@ -327,6 +343,7 @@ export function answerAsk(id: string, index: number, yes: boolean) {
   const ask = item.ask;
   useStaff.setState((s) => ({ chat: { ...s.chat, [id]: s.chat[id].map((c, i) => (i === index && c.k === "report" ? { ...c, state: yes ? "approved" : "declined" } : c)) } }));
   const origin = useStaff.getState().runs[id]?.find((r) => r.status === "done")?.origin;
+  remember(id, `The boss ${yes ? "approved" : "turned down"} the $${ask.amount.toLocaleString("en-US")} more I asked for ${ask.reason}.`);
   if (yes) instruct(id, `Approved: another $${ask.amount.toLocaleString("en-US")} ${ask.reason}. Go ahead.`, ask.amount, origin);
   else {
     pushChat(id, { k: "them", text: "Understood. We'll make do." });
