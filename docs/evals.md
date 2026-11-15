@@ -112,6 +112,36 @@ What it showed:
 - **The chips matter a little:** without them, budget fell from 3/3 to 1/3.
 - **A leak found:** the budget card's dropped line still reached the staff memos, and the agent quoted it ("Thompson's $2.5 million in union money"). Fixed after this run.
 
+### Run 2: replay, N = 3, after the fixes (commit 9054c39, 15 November)
+
+Same agent as run 1. Changed: the memos no longer carry the dropped card lines, masking also hides identifying figures and details, and cut-short recall replies count.
+
+| Condition | On the real choice | Chance |
+|---|---|---|
+| card | 18/18 (100%) | 24% |
+| nochips | 18/18 (100%) | 24% |
+| masked | 15/18 (83%) | 24% |
+| recall (no card) | 15/18 (83%) | 24% |
+| changed: stuck to 2013 anyway | 9/18 (50%) | |
+
+Grounding: no masked card went unrecognised (0 of 18); changed facts were followed 9 of 18 times, the same three decisions as run 1.
+
+| Decision | card | nochips | masked | recall | changed (stuck) |
+|---|---|---|---|---|---|
+| positioning | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 |
+| weiner | 3/3 | 3/3 | 2/3 | 3/3 | 3/3 |
+| hospital | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 |
+| budget | 3/3 | 3/3 | 2/3 | 3/3 | 0/3 |
+| firstad | 3/3 | 3/3 | 3/3 | 3/3 | 0/3 |
+| base | 3/3 | 3/3 | 2/3 | 0/3 | 0/3 |
+
+Adviser fidelity: 8 of 9 on the card, 6 of 9 masked (Hyers on Weiner: 2/3, then 0/3 masked).
+
+What it showed:
+- **Stronger masking did not help.** The model named the race on all 27 masked cards. Its own explanation: the platform gives it away (a tax on high earners for pre-K, the paid sick leave fight with the Speaker, the divided-city theme, 200,000 affordable homes). Hiding names, places, dates and figures cannot hide a famous candidate's platform.
+- **At the last decision, memory is wrong and the card is right.** With no card, the model remembered the second ad as a repeat of the first, or as an attack on Quinn in Manhattan (0 of 3, and it said it was unsure). Given the card, it chose the stop-and-frisk ad every time, with and without the chips. That is the clearest case so far of the card, not memory, producing the real choice.
+- **The chips did not matter this time** (18/18 without them, against 16/18 in run 1). The budget decision is the one that moves between runs.
+
 ## 8. Decisions log
 
 | Date | Decision | Why |
@@ -123,6 +153,7 @@ What it showed:
 | 15 Nov | The campaigner sees what a student sees, memos and chips included, plus a no-chips condition | Devaj |
 | 15 Nov | After run 1: the target is grounding, not agreement. Report agreement on unrecognised masked cards and how often changed facts are followed | Memory alone gives 100% agreement |
 | 15 Nov | Memos skip the lines the card leaves out; masking also hides identifying figures and details; recall replies that are cut short still count | Found in run 1's transcripts |
+| 15 Nov | Tuning 1: the campaigner is told the facts it is given are this campaign's facts, even where they differ from what it remembers (`GROUNDED` in `decider.ts`). It names no option and no outcome | Run 1: at three changed-facts cards it argued from memory, not the card |
 
 ## 9. Limits
 
