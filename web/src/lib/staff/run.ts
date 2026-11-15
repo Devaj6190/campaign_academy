@@ -139,6 +139,8 @@ export function runBookings() {
   const set = (id: number, patch: Partial<{ date: string; done: string }>) => useCase.setState((k) => ({ bookings: k.bookings.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
   for (const b of s.bookings.filter((x) => !x.done && x.date <= s.date)) {
     const what = `${BOOKING[b.kind].label} in ${shortPlace(b.cd)}`;
+    // Nothing the campaign booked happens on election day or after it.
+    if (s.date >= c.electionDate) { set(b.id, { done: "Dropped: the election came first." }); continue; }
     if (appearancesToday() >= DAILY) {
       const next = new Date(Date.parse(s.date) + 86_400_000).toISOString().slice(0, 10);
       if (next >= c.electionDate) set(b.id, { done: "Dropped: no day left before the election." });

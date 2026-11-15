@@ -124,8 +124,10 @@ export class RunCtx {
     const w = this.req.snapshot;
     const kind: BookingKind = p.kind && p.kind in BOOKING ? p.kind : "rally";
     const day = (iso: string, n: number) => new Date(Date.parse(iso) + n * 86_400_000).toISOString().slice(0, 10);
-    const last = day(w.date, w.daysLeft - 1);
-    let date = p.on && /^\d{4}-\d{2}-\d{2}$/.test(p.on) && p.on > w.date && p.on <= last ? p.on : day(w.date, 1);
+    // The last day an event can happen is the day before the election; the first is tomorrow.
+    const last = day(w.date, w.daysLeft - 1), first = day(w.date, 1);
+    if (first > last) return { ok: false, text: "Not booked: there is no day left before the election." };
+    let date = p.on && /^\d{4}-\d{2}-\d{2}$/.test(p.on) && p.on >= first && p.on <= last ? p.on : first;
     const taken = (d: string) => w.booked.filter((b) => b.date === d).length + this.effects.filter((e) => e.booking?.date === d).length;
     while (taken(date) >= w.daily && date < last) date = day(date, 1);
     if (taken(date) >= w.daily) return { ok: false, text: "Not booked: the candidate's calendar is full until the election." };

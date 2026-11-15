@@ -1,4 +1,5 @@
-import { useCase } from "../cases/store";
+import { skip } from "../cases/clock";
+import { currentCase, useCase } from "../cases/store";
 import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
 import { budgetIn, RunCtx, type Proposal, type RunEvent } from "./protocol";
@@ -156,6 +157,39 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
   const mine = useCase.getState().work.filter((x) => x.by === "candidate");
   if (done !== 3 || mine.length !== 3) problems.push(`scheduling: ${done} of 3 bookings happened, ${mine.length} appearances on the case`);
   if (!mine.some((x) => x.cost > 0)) problems.push("scheduling: the appearances cost nothing on the day");
+  // Through the clock, as a student plays: bookings on three days, then Skip. Each must run on its own day, inside
+  // the daily limit, and none may be pushed to a later day as if its day were full (Devaj's review, item 1).
+  {
+    useCase.getState().restart();
+    const c = currentCase(useCase.getState().caseId);
+    useCase.setState({ at: 1, step: 1, picks: { [c.decisions[0].id]: { option: c.decisions[0].options[0].id } } });
+    const start = useCase.getState().date;
+    const d = (n: number) => new Date(Date.parse(start) + n * 86_400_000).toISOString().slice(0, 10);
+    for (const n of [2, 3, 4]) useCase.getState().book({ date: d(n), kind: "doors", cd: 308, by: "sch" });
+    for (let i = 0; i < 6 && useCase.getState().date < d(4); i++) skip();
+    const done = useCase.getState().bookings;
+    const ran = useCase.getState().work.filter((x) => x.by === "candidate").map((x) => x.date);
+    const want = [d(2), d(3), d(4)].join();
+    if (ran.join() !== want) problems.push(`scheduling: through Skip, bookings for ${want} ran on ${ran.join() || "no day"}`);
+    if (done.some((b) => b.done && /moves to tomorrow|Dropped/.test(b.done))) problems.push("scheduling: through Skip, a booking was pushed or dropped");
+    report.push(`scheduling through Skip: bookings for three days ran on ${ran.length === 3 ? "their own days" : ran.join()}`);
+  }
+  // Never on or after election day (Devaj's review, item 2): with one day left nothing can be booked.
+  {
+    const c = currentCase(useCase.getState().caseId);
+    const eve = new Date(Date.parse(c.electionDate) - 86_400_000).toISOString().slice(0, 10);
+    const two = new Date(Date.parse(c.electionDate) - 2 * 86_400_000).toISOString().slice(0, 10);
+    const at = (date: string) => { useCase.setState({ date }); return new RunCtx({ director: "cm", text: "Book", snapshot: snapshot(), history: [], budget: 500_000, runId: 11 }, () => {}); };
+    const onEve = at(eve).act("sch", "schedule_event", { district: 308, kind: "doors" });
+    if (onEve.ok) problems.push(`scheduling: on the eve of the election an event was booked (${onEve.text})`);
+    const ctx = at(two), ev: string[] = [];
+    const late = new RunCtx({ ...ctx.req }, (e) => { if (e.t === "action" && e.effect.booking) ev.push(e.effect.booking.date); });
+    late.act("sch", "schedule_event", { district: 308, kind: "doors", on: c.electionDate });
+    late.act("sch", "schedule_event", { district: 308, kind: "doors" });
+    late.act("sch", "schedule_event", { district: 308, kind: "doors" });
+    if (ev.some((x) => x >= c.electionDate)) problems.push(`scheduling: booked for ${ev.find((x) => x >= c.electionDate)}, on or after the election`);
+    report.push(`scheduling near the end: nothing booked on the eve; two days out, ${ev.length} booked for the last day and the rest refused`);
+  }
   report.push(`scheduling: 3 rallies asked for ${wanted} → booked on ${dates.join(", ")}; all happened, $${mine.reduce((a, x) => a + x.cost, 0).toLocaleString("en-US")} paid on the day (${texts[2].includes("full") ? "third moved: day was full" : "no day was full"})`);
   return { problems, report };
 }

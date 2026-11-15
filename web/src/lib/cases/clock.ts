@@ -1,4 +1,5 @@
 import { currentCase, useCase } from "./store";
+import { runBookings } from "../staff/run";
 import type { Case } from "./types";
 
 // The campaign clock. It runs on the case's real calendar, one day at a time, between decisions. It never runs past
@@ -43,11 +44,11 @@ export function tick(): "arrived" | "event" | undefined {
   // The stretch is under way, however it started (run or skip): the rivals plan for it, once per step.
   void import("./rivals").then((m) => m.planRivals());
   const date = nextDay(s.date);
-  // Whatever is on the candidate's calendar for the new day happens as it starts.
-  const bookings = () => void import("../staff/run").then((m) => m.runBookings());
-  if (date >= dateOf(c, s.at + 1)) { const r = arrive(); bookings(); return r; }
+  // Whatever is on the candidate's calendar for the new day happens as it starts, before the next day can begin, so
+  // Skip runs each day's bookings on their own day. Election day itself holds no campaign events.
+  if (date >= dateOf(c, s.at + 1)) { const r = arrive(); if (useCase.getState().date < c.electionDate) runBookings(); return r; }
   useCase.setState({ date });
-  bookings();
+  runBookings();
   return isEventDay(c, date) ? "event" : undefined;
 }
 
