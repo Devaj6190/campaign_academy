@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { DoorOpen, HandCoins, Megaphone, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -180,14 +181,23 @@ function NightPanel({ n, shown }: { n: ReturnType<typeof night>; shown: number }
                 <span className={r.id === c.follow ? "text-gold-bright" : "text-soft"}>{r.name}</span>
                 <span className="tnum font-mono text-[11.5px] text-muted">{r.votes.toLocaleString("en-US")} · {r.v.toFixed(1)}%</span>
               </div>
-              <Meter value={r.v * 2} color={r.id === c.follow ? "var(--color-warm)" : "rgb(255 255 255 / .5)"} className="mt-1" />
+              <div className="relative mt-1">
+                <Meter value={r.v * 2} color={r.id === c.follow ? "var(--color-warm)" : "rgb(255 255 255 / .5)"} />
+                {/* The share that wins outright. */}
+                <span className="pointer-events-none absolute -top-[3px] -bottom-[3px] w-px bg-gold/70" style={{ left: `${c.threshold * 2}%` }} aria-hidden />
+              </div>
             </div>
           ))}
         </div>
-        <p className="mt-3 text-[11px] text-faint">{t.total.toLocaleString("en-US")} ballots counted. Percentages are of all ballots, including candidates not listed.</p>
+        <p className="mt-3 text-[11px] text-faint"><span className="mr-1 inline-block h-2.5 w-px translate-y-[1px] bg-gold/70" aria-hidden /> {c.threshold} percent wins outright; below it, the top two go to a runoff. {t.total.toLocaleString("en-US")} ballots counted. Percentages are of all ballots, including candidates not listed.</p>
       </Section>
       <Section title={done ? "The result" : "How to read this"}>
-        {done ? <p className="text-[13.5px] leading-relaxed text-fg">{verdict}</p> : <p className="text-[12.5px] leading-relaxed text-muted">Where each candidate is strong comes from the certified 2013 result. How far each district moves from it comes from your campaign. No reporting order was published, so districts arrive in a fixed shuffle.</p>}
+        {done ? (
+          <motion.div initial={{ opacity: 0, y: 6, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }} className="rounded-lg border border-gold/60 bg-gold/[0.06] px-3.5 py-3">
+            <p className="font-display text-[11px] font-medium tracking-[0.12em] text-gold uppercase">{place === 1 && mine >= c.threshold ? "Outright win" : place <= 2 ? `Runoff against ${rows[place === 1 ? 1 : 0]?.name}` : "Out of the race"}</p>
+            <p className="mt-1 text-[13.5px] leading-relaxed text-fg">{verdict}</p>
+          </motion.div>
+        ) : <p className="text-[12.5px] leading-relaxed text-muted">Where each candidate is strong comes from the certified 2013 result. How far each district moves from it comes from your campaign. No reporting order was published, so districts arrive in a fixed shuffle.</p>}
         <div className="mt-3 flex flex-wrap gap-2">
           {!done && <Button onClick={() => useNight.setState({ shown: all })}>Skip to the full result</Button>}
           {done && <Button variant="primary" onClick={() => go("case")}>Read the debrief</Button>}
