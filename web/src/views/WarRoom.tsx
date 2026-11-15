@@ -19,48 +19,57 @@ import { useGame } from "@/lib/store";
 import { cn } from "@/lib/util";
 import { Cite } from "./CaseView";
 
-// Fixed logical canvas, seen from one camera: a stepped stone structure, centred, three levels rising to the back.
-// You stand on the top one, direct reports on the middle one, their people on the floor in front.
-const W = 900, H = 710;
-/**
- * One level: where feet stand (`feet`), how tall the camera sees people there (`h`), and its stone.
- * `back` to `edge` is the ledge people stand on; below `edge` is the wall, which carries their names down to `out`,
- * where the lines to their reports leave. `x0`..`x1` is the wall's width; `inset` narrows the ledge's back edge.
- * Names are 16px on this canvas because it is scaled down to fit: at a 1440×900 window that renders at about 13px.
- */
-const TIERS = [
-  { feet: 126, h: 110, back: 118, edge: 132, out: 184, bottom: 333, x0: 340, x1: 560, inset: 12, label: 150 },
-  { feet: 351, h: 125, back: 333, edge: 359, out: 429, bottom: 589, x0: 55, x1: 845, inset: 22, label: 126 },
-  { feet: 609, h: 140, back: 589, edge: 617, out: 0, bottom: H + 400, x0: -600, x1: 1500, inset: 60, label: 98 },
+// The room is real 3D: a stepped stone fan lying on a tilted floor, like a chamber seen from the gallery.
+// You stand on the round dais at the point of the fan, direct reports on the step below, their people on the floor.
+// Everything is placed in floor coordinates (x across, y toward the camera, z up) and the browser does the projection.
+const W = 900, H = 640;
+/** Where the point of the fan sits on the canvas, and how far the floor leans back. */
+const APEX = 214, TILT = 52;
+/** A level: the radius people stand at, how high its surface is, and how tall its people are drawn. */
+const LEVELS = [
+  { r: 0, z: 140, h: 108, label: 150 },
+  { r: 310, z: 70, h: 116, label: 112 },
+  { r: 450, z: 0, h: 124, label: 96 },
 ];
-type Pt = { x: number; t: number };
-const YOU: Pt = { x: 450, t: 0 };
+/** The stone: a dais, a step and the floor, each a slice of pie opening toward the camera. `half` is half its angle. */
+const DAIS = 86, STEP = { r: 400, half: 72 }, FLOOR = { r: 625, half: 76 };
+type Pt = { a: number; t: number };
+const YOU: Pt = { a: 0, t: 0 };
+/** A point on the floor plan: `r` out from the point of the fan, `a` degrees off the line toward the camera. */
+const at = (r: number, a: number) => ({ x: r * Math.sin((a * Math.PI) / 180), y: r * Math.cos((a * Math.PI) / 180) });
+const xy = (r: number, a: number) => { const q = at(r, a); return `${q.x.toFixed(1)} ${q.y.toFixed(1)}`; };
+/** A slice of pie with a round back, so the dais has stone under it. */
+const pie = (r: number, half: number) => `M0 0L${xy(r, -half)}A${r} ${r} 0 0 0 ${xy(r, half)}ZM${DAIS + 26} 0A${DAIS + 26} ${DAIS + 26} 0 1 0 ${-DAIS - 26} 0A${DAIS + 26} ${DAIS + 26} 0 1 0 ${DAIS + 26} 0Z`;
 
 function layout(staff: Staff[]) {
   const pos: Record<string, Pt> = { you: YOU };
   const dirs = staff.filter((p) => !p.boss);
-  dirs.forEach((p, i) => (pos[p.id] = { x: 125 + (i * 650) / (dirs.length - 1), t: 1 }));
+  dirs.forEach((p, i) => (pos[p.id] = { a: -60 + (i * 120) / (dirs.length - 1), t: 1 }));
   const subs = dirs.flatMap((d) => staff.filter((p) => p.boss === d.id));
-  subs.forEach((p, i) => (pos[p.id] = { x: 50 + (i * 800) / Math.max(1, subs.length - 1), t: 2 }));
+  subs.forEach((p, i) => (pos[p.id] = { a: -50 + (i * 100) / Math.max(1, subs.length - 1), t: 2 }));
   return pos;
 }
 
-// Bezier from under a boss's name on the wall to the top of a report's head. Reversed for reports travelling back up.
-function edge(a: Pt, b: Pt, up = false) {
-  const y1 = TIERS[a.t].out, y2 = TIERS[b.t].feet - TIERS[b.t].h - 6, ym = (y1 + y2) / 2;
-  return up ? `M${b.x} ${y2}C${b.x} ${ym},${a.x} ${ym},${a.x} ${y1}` : `M${a.x} ${y1}C${a.x} ${ym},${b.x} ${ym},${b.x} ${y2}`;
+// A wire on the stone from a boss to a report, drawn on the report's level: straight out from the dais for a direct
+// report, and from the foot of the step, under the boss, across the floor for their people. Reversed for the way back.
+function wire(a: Pt, b: Pt, up = false) {
+  const end = LEVELS[b.t].r - 20;
+  if (b.t === 1) return up ? `M${xy(end, b.a)}L${xy(DAIS, b.a)}` : `M${xy(DAIS, b.a)}L${xy(end, b.a)}`;
+  const pts = [xy(STEP.r, a.a), xy(STEP.r + 45, a.a), xy(end - 45, b.a), xy(end, b.a)];
+  if (up) pts.reverse();
+  return `M${pts[0]}C${pts[1]},${pts[2]},${pts[3]}`;
 }
 
-// Standing figures, one cut-out per post in /art/staff. Bodies are generated. Walzak and Singleton carry the head from a
-// news photo; no photo of Hyers was found, so that figure stands with his back to the camera.
+// Standing figures, one cut-out per post in /art/staff, all facing the front. Bodies are generated. Walzak and Singleton
+// carry the head from a news photo. No photo of Hyers was found, so that post is a figure left in shadow.
 const ART = "/art/staff/";
-const FIGURES = new Set(["cm", "fd", "fin", "com", "sch", "oq", "ob", "vc", "ct", "ev", "pr", "dg"]);
+const FIGURES = new Set(["fd", "fin", "com", "sch", "oq", "ob", "vc", "ct", "ev", "pr", "dg"]);
 const SPARES = 4;
 /** Whoever holds the post: its own figure for the first holder, one from the bench for someone hired later. */
 const figureFor = (p: Staff, hired: boolean) =>
-  !p.name ? undefined : hired || !FIGURES.has(p.id) ? `${ART}spare${1 + ([...p.name].reduce((a, c) => a + c.charCodeAt(0), 0) % SPARES)}.webp` : `${ART}${p.id}.webp`;
+  !p.name || (p.id === "cm" && !hired) ? undefined : hired || !FIGURES.has(p.id) ? `${ART}spare${1 + ([...p.name].reduce((a, c) => a + c.charCodeAt(0), 0) % SPARES)}.webp` : `${ART}${p.id}.webp`;
 const CREDIT: Record<string, string> = {
-  cm: "Figure: AI-generated and shown from behind. No photo was found.",
+  cm: "Figure: a stand-in left in shadow. No photo was found.",
   com: "Head: photo courtesy of the Mayor's Office, via amNY. Body: AI-generated.",
   dg: "Head: photo from Personal Democracy Forum. Body: AI-generated.",
 };
@@ -96,88 +105,112 @@ export function WarRoom() {
   // Reassigning opens a chooser in the side panel (a menu inside the dock would be clipped by its scroll area).
   const [moving, setMoving] = useState<string | null>(null);
   const hires = useStaff((s) => s.hires);
-  // The pointer moves the camera a little: the room tilts and slides as one piece, so the lines stay attached.
+  // The pointer moves the camera a little. The room is real 3D, so near things shift more than far ones.
   const still = useReducedMotion();
   const mx = useMotionValue(0), my = useMotionValue(0);
   const sx = useSpring(mx, { stiffness: 90, damping: 18 }), sy = useSpring(my, { stiffness: 90, damping: 18 });
-  const rotateY = useTransform(sx, [-1, 1], [-4, 4]), rotateX = useTransform(sy, [-1, 1], [3, -3]);
-  const x = useTransform(sx, [-1, 1], [10, -10]), y = useTransform(sy, [-1, 1], [6, -6]);
-  const backX = useTransform(sx, [-1, 1], [-16, 16]);
+  const rotateY = useTransform(sx, [-1, 1], [-2, 2]), rotateX = useTransform(sy, [-1, 1], [1.2, -1.2]);
   const look = (e: React.MouseEvent<HTMLDivElement>) => {
     if (still) return;
     const r = e.currentTarget.getBoundingClientRect();
     mx.set(((e.clientX - r.left) / r.width) * 2 - 1);
     my.set(((e.clientY - r.top) / r.height) * 2 - 1);
   };
+  // One sheet of stone at a given height. Stacked a few pixels apart, the sheets make the walls of the steps.
+  const sheet = (z: number, children: React.ReactNode, key?: string) => (
+    <svg key={key} viewBox="-700 -150 1400 850" className="pointer-events-none absolute overflow-visible" style={{ left: -700, top: -150, width: 1400, height: 850, transform: `translateZ(${z}px)` }} aria-hidden>
+      {children}
+    </svg>
+  );
+  const courses = (from: number, to: number, d: string, key: string) =>
+    Array.from({ length: Math.round((to - from) / 7) }, (_, i) => sheet(from + i * 7, <path d={d} fill={i % 2 ? "#120f0a" : "#0d0b08"} stroke="var(--color-gold-deep)" strokeOpacity={0.22} strokeWidth={0.8} />, key + i));
+  const circle = `M${DAIS} 0A${DAIS} ${DAIS} 0 1 0 ${-DAIS} 0A${DAIS} ${DAIS} 0 1 0 ${DAIS} 0Z`;
+  // The ring on the stone under each pair of feet carries the state.
+  const ringOf = (id: string) => (id === person ? "#fff" : misfit[id] ? "var(--color-neg)" : busy[id] || active[id] ? "var(--color-warm)" : "var(--color-gold)");
+  const rings = (t: number) =>
+    [...(t === 0 ? [{ id: "you" }] : []), ...staff.filter((p) => pos[p.id].t === t)].map((p) => {
+      const q = at(LEVELS[t].r, pos[p.id].a), c = ringOf(p.id), lit = c !== "var(--color-gold)";
+      return (
+        <g key={p.id} transform={`translate(${q.x} ${q.y})`}>
+          <circle r="26" fill="#000" opacity="0.6" />
+          <circle r="36" fill="none" stroke={c} strokeWidth={p.id === person ? 3.4 : lit ? 2.4 : 1.4} strokeOpacity={lit ? 1 : 0.4} className={cn(!!active[p.id] && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 6px ${c})` } : undefined} />
+        </g>
+      );
+    });
+  const wires = (t: number) =>
+    staff.filter((p) => pos[p.id].t === t).map((p) => {
+      const state = busy[p.id];
+      return (
+        <path
+          key={p.id}
+          d={wire(pos[p.boss ?? "you"], pos[p.id])}
+          fill="none"
+          strokeWidth={state || misfit[p.id] ? 2.6 : 1.8}
+          stroke={misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "var(--color-gold)"}
+          strokeOpacity={misfit[p.id] ? 1 : state === "work" ? 0.5 : state ? 1 : 0.38}
+          className={cn(state === "down" && "edge-flow", state === "up" && "edge-flow up")}
+        />
+      );
+    });
+  // Work in transit: a spark runs along the wire when a job is handed over, and back with the report.
+  const sparks = (t: number) =>
+    packets.map((k) => {
+      const child = staff.find((p) => p.id === k.to && p.boss === k.from) ?? staff.find((p) => p.id === k.from && p.boss === k.to);
+      if (!child || pos[child.id]?.t !== t) return null;
+      const up = child.id === k.from;
+      return <Spark key={k.id} d={wire(pos[child.boss ?? "you"], pos[child.id], up)} up={up} />;
+    });
+  // The wire from a director's feet to the foot of their step, where the wires to their people begin.
+  const drops = staff.filter((p) => staff.some((c) => c.boss === p.id)).map((p) => (
+    <path key={p.id} d={`M${xy(LEVELS[1].r + 22, pos[p.id].a)}L${xy(STEP.r, pos[p.id].a)}`} stroke="var(--color-gold)" strokeOpacity={0.38} strokeWidth={1.8} />
+  ));
+  const stone = (d: string) => (
+    <>
+      <path d={d} fill="url(#stone)" />
+      <path d={d} fill="url(#stone-shade)" stroke="var(--color-gold)" strokeOpacity={0.8} strokeWidth={2} />
+    </>
+  );
 
   return (
     <div className="flex h-full">
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader title="War room" sub="You direct. Your reports plan the work and hand it to their people." right={<ModeBadge />} />
         <div className="relative min-h-0 flex-1 px-6 pb-24" onClick={() => pick(null)} onMouseMove={look} onMouseLeave={() => { mx.set(0); my.set(0); }}>
-          <motion.div style={{ x: backX }} className="pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-screen [mask-image:radial-gradient(ellipse_65%_60%_at_50%_0%,black,transparent)]">
+          <motion.div className="pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-screen [mask-image:radial-gradient(ellipse_65%_60%_at_50%_0%,black,transparent)]">
             <ShaderBackground />
           </motion.div>
           <Fit w={W} h={H}>
-           <motion.div className="absolute inset-0" style={{ rotateX, rotateY, x, y, transformPerspective: 1400 }}>
             {/* The hall behind: back wall, columns and the light from above, fading out into the page. */}
-            <div className="pointer-events-none absolute [mask-image:radial-gradient(ellipse_40%_58%_at_50%_42%,black_40%,transparent)]" style={{ left: -110, top: -40, width: 1120, height: 506, backgroundImage: `url(${ART}room.jpg)`, backgroundSize: "100% 100%" }} />
-            <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 overflow-visible" aria-hidden>
-              <defs>
-                <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3" /></filter>
-                <pattern id="stone" patternUnits="userSpaceOnUse" width="440" height="200"><image href={`${ART}stone.jpg`} width="440" height="200" preserveAspectRatio="none" /></pattern>
-                {/* Light falls from above the top level; every wall darkens away from it and toward its foot. */}
-                <radialGradient id="wall-shade" gradientUnits="userSpaceOnUse" cx={YOU.x} cy="60" r="560"><stop offset="0" stopColor="#070605" stopOpacity="0" /><stop offset="0.6" stopColor="#070605" stopOpacity="0.42" /><stop offset="1" stopColor="#070605" stopOpacity="0.93" /></radialGradient>
-                <linearGradient id="wall-foot" x1="0" y1="0" x2="0" y2="1"><stop offset="0.5" stopColor="#070605" stopOpacity="0" /><stop offset="1" stopColor="#070605" stopOpacity="0.7" /></linearGradient>
-                <linearGradient id="ledge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#241e14" /><stop offset="1" stopColor="#6a5a3b" /></linearGradient>
-                <linearGradient id="lip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#000" stopOpacity="0.7" /><stop offset="1" stopColor="#000" stopOpacity="0" /></linearGradient>
-                <linearGradient id="gold-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="var(--color-gold-deep)" stopOpacity="0.2" /><stop offset="0.5" stopColor="var(--color-gold-bright)" /><stop offset="1" stopColor="var(--color-gold-deep)" stopOpacity="0.2" /></linearGradient>
-              </defs>
-              {TIERS.map((t, i) => {
-                const w = t.x1 - t.x0, wall = Math.min(t.bottom - t.edge, 300);
-                return (
-                  <g key={i}>
-                    <rect x={t.x0} y={t.edge} width={w} height={wall} fill="url(#stone)" />
-                    <rect x={t.x0} y={t.edge} width={w} height={wall} fill="url(#wall-shade)" />
-                    <rect x={t.x0} y={t.edge} width={w} height={wall} fill="url(#wall-foot)" />
-                    <polygon points={`${t.x0 + t.inset},${t.back} ${t.x1 - t.inset},${t.back} ${t.x1},${t.edge} ${t.x0},${t.edge}`} fill="url(#ledge)" />
-                    <polygon points={`${t.x0 + t.inset},${t.back} ${t.x1 - t.inset},${t.back} ${t.x1},${t.edge} ${t.x0},${t.edge}`} fill="url(#wall-shade)" />
-                    {/* The gold inlay along the front edge, and the shadow the ledge throws on its own wall. */}
-                    <rect x={Math.max(t.x0, -40)} y={t.edge - 1} width={Math.min(w, W + 80)} height={2.2} fill="url(#gold-edge)" />
-                    <rect x={t.x0} y={t.edge + 1.2} width={w} height={9} fill="url(#lip)" />
-                    {/* Where the wall behind meets this ledge. */}
-                    <rect x={t.x0 + t.inset} y={t.back} width={w - 2 * t.inset} height={7} fill="url(#lip)" />
-                  </g>
-                );
-              })}
-              {staff.map((p) => {
-                const state = busy[p.id];
-                return (
-                  <path
-                    key={p.id}
-                    d={edge(pos[p.boss ?? "you"], pos[p.id])}
-                    fill="none"
-                    strokeWidth={state || misfit[p.id] ? 1.4 : 1}
-                    stroke={misfit[p.id] ? "var(--color-neg)" : state ? "var(--color-warm)" : "rgb(255 255 255 / 0.1)"}
-                    strokeOpacity={state === "work" ? 0.45 : 1}
-                    className={cn(state === "down" && "edge-flow", state === "up" && "edge-flow up")}
-                  />
-                );
-              })}
-              {/* Work in transit: a spark runs down when a job is handed over, and back up with the report. */}
-              {packets.map((k) => {
-                const child = staff.find((p) => p.id === k.to && p.boss === k.from) ?? staff.find((p) => p.id === k.from && p.boss === k.to);
-                if (!child || !pos[child.id]) return null;
-                const up = child.id === k.from;
-                const d = edge(pos[child.boss ?? "you"], pos[child.id], up);
-                return <Spark key={k.id} d={d} up={up} />;
-              })}
-            </svg>
-            <Node at={YOU} name="You" role="The campaigner" you />
-            {staff.map((p) => (
-              <Node key={p.id} at={pos[p.id]} name={p.name} role={p.role} figure={figureFor(p, !!hires[p.id])} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} thinking={!!active[p.id]} selected={p.id === person} busy={!!busy[p.id]} unread={unread[p.id]} onClick={() => pick(p.id)} />
-            ))}
-           </motion.div>
+            <div className="pointer-events-none absolute [mask-image:radial-gradient(ellipse_40%_58%_at_50%_42%,black_40%,transparent)]" style={{ left: -110, top: -70, width: 1120, height: 506, backgroundImage: `url(${ART}room.jpg)`, backgroundSize: "100% 100%" }} />
+            <div className="absolute inset-0" style={{ perspective: 2400, perspectiveOrigin: "50% 36%" }}>
+              <motion.div className="absolute inset-0" style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}>
+                <div className="absolute" style={{ left: W / 2, top: APEX, transform: `rotateX(${TILT}deg)`, transformStyle: "preserve-3d" }}>
+                  {sheet(
+                    0,
+                    <>
+                      <defs>
+                        <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3" /></filter>
+                        <pattern id="stone" patternUnits="userSpaceOnUse" width="440" height="200"><image href={`${ART}stone.jpg`} width="440" height="200" preserveAspectRatio="none" /></pattern>
+                        {/* Light falls on the dais; the stone darkens away from it. */}
+                        <radialGradient id="stone-shade" gradientUnits="userSpaceOnUse" cx="0" cy="0" r={FLOOR.r}><stop offset="0" stopColor="#070605" stopOpacity="0" /><stop offset="0.6" stopColor="#070605" stopOpacity="0.5" /><stop offset="1" stopColor="#070605" stopOpacity="0.9" /></radialGradient>
+                      </defs>
+                      {stone(pie(FLOOR.r, FLOOR.half))}
+                      {wires(2)}
+                      {sparks(2)}
+                      {rings(2)}
+                    </>,
+                  )}
+                  {courses(7, LEVELS[1].z, pie(STEP.r, STEP.half), "s")}
+                  {sheet(LEVELS[1].z, <>{stone(pie(STEP.r, STEP.half))}{wires(1)}{drops}{sparks(1)}{rings(1)}</>)}
+                  {courses(LEVELS[1].z + 7, LEVELS[0].z, circle, "d")}
+                  {sheet(LEVELS[0].z, <>{stone(circle)}{rings(0)}</>)}
+                  <Node at={YOU} name="You" role="The campaigner" you />
+                  {staff.map((p) => (
+                    <Node key={p.id} at={pos[p.id]} name={p.name} role={p.role} figure={figureFor(p, !!hires[p.id])} shadow={p.id === "cm" && !hires[p.id]} job={job[p.id]} misfit={misfit[p.id]} morale={p.name ? morale[p.id] : undefined} selected={p.id === person} unread={unread[p.id]} onClick={() => pick(p.id)} />
+                  ))}
+                </div>
+              </motion.div>
+            </div>
           </Fit>
         </div>
         <Dock label={sel ? (sel.name ?? `${sel.role} · vacant`) : "Nobody selected"}>
@@ -228,52 +261,54 @@ function ModeBadge() {
   );
 }
 
-function Node({ at, name, role, figure, job, misfit, morale, thinking, you, selected, busy, unread, onClick }: { at: Pt; name?: string; role: string; figure?: string; job?: string; misfit?: boolean; morale?: number; thinking?: boolean; you?: boolean; selected?: boolean; busy?: boolean; unread?: boolean; onClick?: () => void }) {
-  const t = TIERS[at.t];
-  const k = t.h / 140;
-  // The ring on the floor carries the state, as the old halo round the badge did.
-  const ring = selected ? "#fff" : misfit ? "var(--color-neg)" : busy || thinking ? "var(--color-warm)" : "var(--color-gold)";
-  const lit = selected || misfit || busy || thinking;
+/** A person standing on the stone: placed on the floor plan, then stood upright to face the camera. */
+function Node({ at: where, name, role, figure, shadow, job, misfit, morale, you, selected, unread, onClick }: { at: Pt; name?: string; role: string; figure?: string; shadow?: boolean; job?: string; misfit?: boolean; morale?: number; you?: boolean; selected?: boolean; unread?: boolean; onClick?: () => void }) {
+  const lv = LEVELS[where.t], q = at(lv.r, where.a);
   // You are a gilded figure under the light; an empty post is the dark shape of whoever will fill it.
   const tone = you
     ? "grayscale(1) sepia(1) saturate(2.2) brightness(1.5) contrast(1.05) drop-shadow(0 0 6px rgb(214 178 110 / 0.5))"
     : !name
       ? "brightness(0) drop-shadow(0 0 1px rgb(214 178 110 / 0.75))"
-      : `drop-shadow(0 3px 3px rgb(0 0 0 / 0.7)) brightness(${selected ? 1.12 : 0.94})`;
+      : shadow
+        ? "brightness(0.3) drop-shadow(0 0 1px rgb(214 178 110 / 0.6))"
+        : `brightness(${selected ? 1.12 : 0.96})`;
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       disabled={you}
-      className="group absolute flex -translate-x-1/2 flex-col items-center text-center"
-      style={{ left: at.x, top: t.feet - t.h, width: t.label }}
+      className="group absolute text-center"
+      style={{ left: q.x, top: q.y, width: lv.h * 0.5, height: lv.h, transformOrigin: "50% 100%", transformStyle: "preserve-3d", transform: `translate(-50%, -100%) translateZ(${lv.z}px) rotateX(${-TILT}deg)` }}
     >
-      <span className="relative block" style={{ width: 64 * k, height: t.h }}>
-        <svg viewBox="-46 -13 92 26" className="absolute left-1/2 -translate-x-1/2 overflow-visible" style={{ width: 92 * k, height: 26 * k, bottom: -11 * k }} aria-hidden>
-          <ellipse rx="32" ry="8" fill="#000" opacity="0.7" />
-          <ellipse rx="42" ry="11" fill="none" stroke={ring} strokeWidth={selected ? 2.4 : lit ? 1.6 : 1} strokeOpacity={lit ? 1 : 0.35} className={cn("transition-[stroke] duration-300", thinking && "edge-flow")} style={lit ? { filter: `drop-shadow(0 0 5px ${ring})` } : undefined} />
-        </svg>
-        {/* eslint-disable-next-line @next/next/no-img-element -- a cut-out sized by the scene, not a content image */}
-        <img src={figure ?? `${ART}generic.webp`} alt="" draggable={false} className={cn("absolute bottom-0 left-1/2 h-full w-auto max-w-none -translate-x-1/2 transition-[filter,transform] duration-300 group-hover:-translate-y-0.5", !name && "opacity-80")} style={{ filter: tone }} />
-        {!name && <Plus className="absolute top-[30%] left-1/2 size-4 -translate-x-1/2 text-gold" />}
-        {unread && <i className="absolute top-0 size-2.5 rounded-full border-2 border-bg bg-warm" style={{ right: 12 * k }} />}
-        {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute top-0 size-2.5 rounded-full border-2 border-bg bg-neg" style={{ left: 12 * k }} />}
+      {/* eslint-disable-next-line @next/next/no-img-element -- a cut-out sized by the scene, not a content image */}
+      <img src={figure ?? `${ART}generic.webp`} alt="" draggable={false} className={cn("absolute bottom-0 left-1/2 h-full w-auto max-w-none -translate-x-1/2 transition-[filter,transform] duration-300 group-hover:-translate-y-0.5", !name && "opacity-80")} style={{ filter: tone }} />
+      {!name && <Plus className="absolute top-[30%] left-1/2 size-4 -translate-x-1/2 text-gold" />}
+      {unread && <i className="absolute top-0 right-1 size-2.5 rounded-full border-2 border-bg bg-warm" />}
+      {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute top-0 left-1 size-2.5 rounded-full border-2 border-bg bg-neg" />}
+      {/*
+        Where the name goes depends on where there is clear stone. On the floor it is written on the floor in front of the
+        feet: laid back down into the floor's plane and stretched, so it reads upright. On the step it floats over the
+        head, because the floor row stands in front. Yours is beside you.
+      */}
+      <span
+        className={cn("absolute flex flex-col items-center [text-shadow:0_1px_4px_#000,0_0_2px_#000,0_0_8px_#000]", where.t === 2 ? "top-full left-1/2 origin-top" : where.t === 1 ? "bottom-full left-1/2 mb-1.5" : "top-1/3 left-full ml-2 items-start text-left")}
+        style={{ width: lv.label, marginLeft: where.t === 0 ? undefined : -lv.label / 2, transform: where.t === 2 ? `rotateX(${TILT}deg) translateZ(2px) translateY(34px) scaleY(1.62)` : undefined }}
+      >
+        <span className={cn("text-[16px] leading-tight font-medium", !name && "text-faint")}>{name ?? "Vacant"}</span>
+        {/* A post shown by its title has no separate name to print. */}
+        {role !== name && <span className="text-[16px] leading-tight text-muted">{role}</span>}
+        <AnimatePresence>
+          {misfit && (
+            <motion.span key="misfit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("my-0.5 rounded bg-neg/30 px-1.5 text-[15px] leading-[20px] whitespace-nowrap text-neg", where.t === 1 && "order-first")}>
+              Wrong person
+            </motion.span>
+          )}
+          {job && (
+            <motion.span key="job" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("my-0.5 max-w-full truncate rounded bg-warm/25 px-1.5 text-[15px] leading-[20px] text-warm", where.t === 1 && "order-first")}>
+              {job}
+            </motion.span>
+          )}
+        </AnimatePresence>
       </span>
-      {/* The name is on the wall under the feet. */}
-      <span className={cn("text-[16px] leading-tight font-medium [text-shadow:0_1px_3px_#000]", !name && "text-faint")} style={{ marginTop: t.edge - t.feet + 6 }}>{name ?? "Vacant"}</span>
-      {/* A post shown by its title has no separate name to print. */}
-      {role !== name && <span className="text-[16px] leading-tight text-muted [text-shadow:0_1px_3px_#000]">{role}</span>}
-      <AnimatePresence>
-        {misfit && (
-          <motion.span key="misfit" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 rounded bg-neg/25 px-1.5 text-[15px] leading-[20px] whitespace-nowrap text-neg">
-            Wrong person
-          </motion.span>
-        )}
-        {job && (
-          <motion.span key="job" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 max-w-full truncate rounded bg-warm/20 px-1.5 text-[15px] leading-[20px] text-warm">
-            {job}
-          </motion.span>
-        )}
-      </AnimatePresence>
     </button>
   );
 }
