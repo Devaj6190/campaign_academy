@@ -44,7 +44,7 @@ ${sub ? `<text x="800" y="210" text-anchor="middle" font-family="${SERIF}" font-
 
 const T = (x, y, t, { size = 18, fill = C.muted, font = SANS, anchor = "middle", italic, spacing, weight } = {}) =>
   `<text x="${x}" y="${y}" text-anchor="${anchor}" font-family="${font}" font-size="${size}"${weight ? ` font-weight="${weight}"` : ""}${italic ? ' font-style="italic"' : ""}${spacing ? ` letter-spacing="${spacing}"` : ""} fill="${fill}">${esc(t)}</text>`;
-const cap = (x, y, t, fill = C.goldSoft, anchor = "middle") => T(x, y, t.toUpperCase(), { size: 15, spacing: 3, fill, anchor });
+const cap = (x, y, t, fill = C.goldSoft, anchor = "middle") => T(x, y, t.toUpperCase(), { size: 18, spacing: 4, fill, anchor });
 
 // A quiet card: hairline gold frame, serif title, one or two plain lines.
 function card(x, y, w, h, title, lines = [], { strong, label } = {}) {
@@ -95,93 +95,74 @@ function loop() {
   return svg(H, s);
 }
 
-// Left-aligned detail panel: numbered seal, serif title, plain lines. Lines starting with ` are code.
-function panel(x, y, w, h, n, title, lines, { strong, tag } = {}) {
-  let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${strong ? "#1d180f" : C.card}" stroke="${strong ? C.gold : C.goldDeep}" stroke-width="${strong ? 1.5 : 1}"/>`;
-  if (n) s += num(x + 34, y, n);
-  if (tag) s += cap(x + w - 24, y + 34, tag, C.muted, "end");
-  s += T(x + 28, y + 62, title, { anchor: "start", font: SERIF, size: 25, fill: strong ? C.gold : C.ivory });
-  lines.forEach((l, i) => {
-    const code = l.startsWith("`");
-    s += T(x + 28, y + 100 + i * 28, code ? l.slice(1) : l, { anchor: "start", size: 17, fill: code ? C.goldSoft : C.muted, font: code ? "Consolas, Menlo, monospace" : SANS });
-  });
-  return s;
+// A code chip under a card: gold monospace in a hairline frame.
+function chip(cx, y, t) {
+  const w = t.length * 12 + 36;
+  return `<rect x="${cx - w / 2}" y="${y}" width="${w}" height="40" fill="${C.bg}" stroke="${C.goldSoft}"/>` +
+    T(cx, y + 27, t, { size: 20, fill: C.gold, font: "Consolas, Menlo, monospace" });
 }
-const note = (x, y, t, anchor = "middle") => T(x, y, t, { font: SERIF, size: 16, italic: true, fill: C.muted, anchor });
+const note = (x, y, t) => T(x, y, t, { font: SERIF, size: 20, italic: true, fill: C.muted });
 
 function architecture() {
-  const H = 1140;
-  let s = head("Figure 2", "System architecture",
-    "Campaign state lives in the browser. Each request carries a snapshot; the server keeps no state between requests.");
-  s += cap(260, 262, "Browser"); s += cap(790, 262, "Next.js API routes"); s += cap(1320, 262, "Models and services");
-  s += panel(70, 290, 380, 170, "", "Screens", ["Case · Profile · War room", "Map · Factions · Morning paper", "Top bar: money, polls, weekly plan"]);
-  s += panel(70, 490, 380, 170, "", "Campaign state", ["Case store (zustand)", "Daily clock: stops at decisions", "Saved in the browser (localStorage)"]);
-  s += panel(70, 690, 380, 200, "", "Simulation engine", ["`simulate(case, picks, work)", "Pure and deterministic", "Prices and scores every action", "Fitted to the certified result"], { strong: true });
-  s += panel(70, 920, 380, 140, "", "Rules fallbacks", ["Used with no API key or on failure", "Emit the same events"]);
-  s += panel(530, 290, 520, 200, "", "Staff orders", ["`POST /api/staff/instruct", "One deep agent per order", "Director (Opus), team as subagents (Haiku)", "Streams NDJSON events to the War room"], { strong: true, tag: "deep agent" });
-  s += panel(530, 510, 520, 140, "", "Rival campaigns", ["One deep agent per rival, run in parallel", "Tool make_move, scored by the engine"], { strong: true, tag: "deep agent" });
-  s += panel(530, 670, 520, 140, "", "Election debrief", ["Read-only virtual filesystem of the campaign", "Seven subagents in parallel (Sonnet)"], { strong: true, tag: "deep agent" });
-  s += panel(530, 830, 520, 120, "", "Single model calls", ["Decision memos · planks · remarks · hiring"]);
-  s += panel(530, 970, 520, 90, "", "Morning paper", []);
-  s += T(780, 1032, "stories · letters · stances", { anchor: "start", size: 17 });
-  s += panel(1110, 290, 420, 110, "", "Claude Opus 5.5", ["directors · decision memos"]);
-  s += panel(1110, 420, 420, 110, "", "Claude Haiku 5.5", ["staff subagents · rivals"]);
-  s += panel(1110, 670, 420, 110, "", "Claude Sonnet 5.5", ["election debrief"]);
-  s += panel(1110, 800, 420, 110, "", "LangSmith", ["traces of LangChain runs"]);
-  s += panel(1110, 970, 420, 90, "", "Gemini 3.8 Flash", []);
-  s += T(1370, 1032, "Claude as fallback", { anchor: "start", size: 17 });
-  s += line([[450, 350], [530, 350]]); s += note(490, 338, "snapshot");
-  s += line([[530, 430], [450, 430]]); s += note(490, 452, "events");
-  s += line([[530, 470], [490, 470], [490, 760], [456, 760]], { dash: true }); s += note(490, 620, "resolve()");
-  s += line([[1050, 345], [1110, 345]]);
-  s += line([[1050, 400], [1080, 400], [1080, 470], [1110, 470]]);
-  s += line([[1050, 580], [1080, 580], [1080, 490], [1110, 490]]);
-  s += line([[1050, 740], [1110, 725]]);
-  s += line([[1050, 1015], [1110, 1015]]);
-  s += line([[1050, 455], [1095, 455], [1095, 855], [1110, 855]], { dash: true });
+  const H = 1080, w = 380, xs = [90, 610, 1130], bh = 120, step = 150;
+  let s = head("Figure 2", "System architecture");
+  ["Browser", "Server", "Models"].forEach((c, i) => { s += cap(xs[i] + w / 2, 250, c); });
+  const col = (x, items, top = 280) => items.forEach(([t, l, strong], i) => { s += card(x, top + i * step, w, bh, t, [l], { strong }); });
+  col(xs[0], [["Screens", "six views"], ["Campaign state", "saved in the browser"], ["Simulation engine", "simulate()", true], ["Rules fallback", "runs with no API key"]], 355);
+  col(xs[1], [["Staff agents", "director + team", true], ["Rival agents", "one per rival", true], ["Debrief agent", "after election night", true], ["Memos and planks", "single model calls"], ["Morning paper", "stories and stances"]]);
+  col(xs[2], [["Claude Opus", "directors · memos"], ["Claude Haiku", "staff · rivals"], ["Claude Sonnet", "debrief"], ["LangSmith", "traces"], ["Gemini", "the paper"]]);
+  const R = xs[0] + w, L = xs[1], R2 = xs[1] + w, L3 = xs[2];
+  s += line([[R, 395], [L, 325]]); s += note((R + L) / 2, 340, "snapshot");
+  s += line([[L, 370], [R, 435]]); s += note((R + L) / 2, 440, "events");
+  s += line([[L, 380], [L - 50, 380], [L - 50, 715], [R, 715]], { dash: true }); s += note(L - 70, 600, "resolve()");
+  s += line([[R2, 330], [L3, 330]]);
+  s += line([[R2, 360], [L3, 470]]);
+  s += line([[R2, 490], [L3, 490]]);
+  s += line([[R2, 640], [L3, 640]]);
+  s += line([[R2, 920], [L3, 920]]);
+  s += line([[R2, 395], [L3 - 70, 395], [L3 - 70, 790], [L3, 790]], { dash: true });
   return svg(H, s);
 }
 
 function order() {
-  const H = 1220;
-  let s = head("Figure 3", "Processing of one staff order",
-    "From the student's instruction to the report, as it runs in the War room.");
-  const xs = [60, 570, 1080], w = 460;
-  s += panel(xs[0], 270, w, 270, "1", "Instruction", ["The student writes an order to one director.", "Example: canvass our strongest districts,", "$25,000.", "Budget read from the text: $80,000 by", "default, at most $250,000."]);
-  s += panel(xs[1], 270, w, 270, "2", "Context", ["Campaign snapshot from the browser: date,", "cash, polls, calendar, platform, voter", "groups and support in every district.", "`/memory/AGENTS.md  (12 lines at most)", "Action catalog with engine prices."]);
-  s += panel(xs[2], 270, w, 270, "3", "Director", ["Plans the order and splits it into jobs.", "Assigns each job by role and strengths.", "`task  hand a job to a subagent", "`propose  2–3 priced options", "`send_report  close the order"], { strong: true, tag: "Opus · deep agent" });
-  s += panel(xs[2], 600, w, 270, "4", "Team", ["One subagent per job, run in parallel.", "Isolated context: sees only its brief.", "Own prompt, in its own voice.", "`take_action { why, action, target }", "The reason is written before the choice."], { strong: true, tag: "Haiku · subagents" });
-  s += panel(xs[1], 600, w, 270, "5", "Engine", ["`resolve(action)", "Refuses anything over the order budget.", "Prices the action from the catalog.", "Moves support in districts and groups.", "Returns the result and budget left."]);
-  s += panel(xs[0], 600, w, 270, "6", "Report and guards", ["The director drafts the report.", "Number ledger: a figure the agent was", "never shown is sent back once, then cut.", "Hindsight filter: lines past the date are cut.", "The memory file records the order."]);
-  s += line([[520, 405], [570, 405]]); s += line([[1030, 405], [1080, 405]]);
-  s += line([[1310, 540], [1310, 600]]); s += note(1322, 576, "task × N", "start");
-  s += line([[1080, 705], [1030, 705]]); s += note(1055, 690, "action");
-  s += line([[1030, 765], [1080, 765]]); s += note(1055, 792, "result");
-  s += line([[1310, 870], [1310, 905], [290, 905], [290, 874]], { dash: true }); s += note(800, 897, "jobs done → director → send_report");
-  s += panel(60, 950, 1480, 210, "7", "Live view in the War room", []);
-  ["thought", "delegate", "action", "job done", "report", "proposals"].forEach((e, i) => {
-    const x = 88 + i * 146;
-    s += `<rect x="${x}" y="1036" width="130" height="34" fill="none" stroke="${C.goldSoft}"/>` + T(x + 65, 1059, e, { size: 16, fill: C.gold });
-  });
-  s += T(88, 1112, "NDJSON events, streamed as each step happens", { anchor: "start", size: 16 });
-  ["Thinking: each agent's reasoning, line by line", "Hand-offs drawn between director and team", "Report: spent, effects, money asked for", "Delegation grade: clarity, right people"]
-    .forEach((v, i) => { s += T(1010, 1030 + i * 32, "·  " + v, { anchor: "start", size: 17, fill: C.ivory }); });
+  const H = 1140, w = 400, xs = [120, 600, 1080], bh = 170;
+  let s = head("Figure 3", "Processing of one staff order");
+  const step = (i, x, y, t, l, code, strong) => {
+    s += card(x, y, w, bh, t, [l], { strong });
+    s += num(x + w / 2, y, String(i));
+    if (code) s += chip(x + w / 2, y + bh - 20, code);
+  };
+  step(1, xs[0], 260, "Instruction", "an order and a budget");
+  step(2, xs[1], 260, "Context", "a snapshot of the campaign", "AGENTS.md");
+  step(3, xs[2], 260, "Director", "plans and assigns jobs", "task", true);
+  step(4, xs[2], 560, "Team", "subagents, in parallel", "take_action", true);
+  step(5, xs[1], 560, "Engine", "prices and scores", "resolve()");
+  step(6, xs[0], 560, "Report", "checked, then sent", "send_report");
+  s += line([[xs[0] + w, 345], [xs[1], 345]]); s += line([[xs[1] + w, 345], [xs[2], 345]]);
+  s += line([[xs[2] + w / 2, 470], [xs[2] + w / 2, 538]]);
+  s += line([[xs[2], 645], [xs[1] + w, 645]]); s += line([[xs[1], 645], [xs[0] + w, 645]]);
+  s += T(xs[2] + w / 2 + 120, 255 - 0, "Claude Opus", { font: SERIF, size: 20, italic: true, fill: C.goldSoft, anchor: "end" }).replace(`x="${xs[2] + w / 2 + 120}"`, `x="${xs[2] + w}"`);
+  s += T(xs[2] + w, 555, "Claude Haiku", { font: SERIF, size: 20, italic: true, fill: C.goldSoft, anchor: "end" });
+  // live view
+  s += `<rect x="120" y="860" width="1360" height="200" fill="#1d180f" stroke="${C.gold}" stroke-width="1.5"/>`;
+  s += num(800, 860, "7");
+  s += T(800, 925, "Live in the War room", { font: SERIF, size: 31, fill: C.gold });
+  const ev = ["thought", "delegate", "action", "job done", "report"];
+  ev.forEach((e, i) => { s += chip(800 + (i - 2) * 230, 965, e); });
+  s += line([[xs[0] + w / 2, 768], [xs[0] + w / 2, 838]], { dash: true });
+  s += line([[xs[2] + w / 2, 768], [xs[2] + w / 2, 838]], { dash: true });
+  s += note(800, 815, "every step is streamed as it happens");
   return svg(H, s);
 }
 
 function recordVsSim() {
-  const H = 860;
-  let s = head("Figure 4", "Record and simulation, kept separate",
-    "Every number on screen is labelled Real data or Simulated.");
-  s += card(150, 270, 520, 330, "The record", ["polls · money · events · results", "55 sources, every fact cited", "", "never changes"], { strong: true, label: "Real data" });
-  s += card(930, 270, 520, 330, "Your campaign", ["your choices · your staff's work", "rival moves · your weekly plan", "", "simulated by the engine"], { label: "Simulated" });
-  s += line([[670, 400], [930, 400]], { dash: true });
-  s += T(800, 384, "the engine is fitted to it", { font: SERIF, size: 20, italic: true });
-  s += T(800, 440, "play the real choices,", { size: 18 });
-  s += T(800, 462, "land on the real result", { size: 18 });
-  s += rule(660);
-  s += T(800, 716, "The agents never see how the race ended.", { font: SERIF, size: 30, fill: C.ivory });
-  s += T(800, 756, "What the campaign really chose, how it turned out and what was said afterwards are kept out of every prompt.", { size: 19 });
+  const H = 760;
+  let s = head("Figure 4", "Record and simulation, kept separate");
+  s += card(170, 270, 500, 220, "The record", ["real data, cited"], { strong: true });
+  s += card(930, 270, 500, 220, "The simulation", ["your campaign"]);
+  s += line([[930, 380], [670, 380]], { dash: true }); s += note(800, 362, "fitted to");
+  s += rule(570);
+  s += T(800, 650, "Agents never see how the race ended.", { font: SERIF, size: 34, fill: C.ivory });
   return svg(H, s);
 }
 

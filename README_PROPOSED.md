@@ -103,7 +103,7 @@ No model ever sets a poll figure, a cost or an effect.
 
 <p align="center"><img src="docs/readme/diagrams/evals.svg" alt="Evals: changed facts followed 78% vs reworded control 94%; held out, card 70% vs memory 67%." width="100%"></p>
 
-**Do the agents decide as the real people did?** We tested it with no student: an agent plays de Blasio, the live agents play everyone else, and each sees only facts dated before the decision. The catch is that the model already knows this race, so plain agreement mostly measures memory. What memory can't fake is whether the choices follow the facts on the card:
+**Do the agents decide as the real people did?** We tested it with no student: an agent plays de Blasio, the live agents play everyone else, and each sees only facts dated before the decision. However, the model already knows this race, so plain agreement mostly measures memory. What memory can't fake is whether the choices follow the facts on the card:
 
 - **They follow evidence, not wording.** Rewrite the facts to point away from the 2013 choice and the agent moves 78% of the time; reword the same facts and it holds 94% of the time.
 - **On 11 held-out decisions it was never tuned on, the card adds almost nothing to memory** (70% against 67%).
@@ -122,12 +122,13 @@ The honest summary: the agents are grounded in the evidence they are given, but 
 
 ### Education (main track)
 
-> **Draft, to edit.** Campaign Academy is built around how case-method teaching works, with the decision made by the student instead of read about:
-> - **Real material, cited.** Every fact links to its source, so a class can check it and argue with it.
-> - **Judgment before feedback.** Options preview only the direction of an effect, not its size. You choose, then see what moved, then what the real campaign did.
-> - **Four skills a course can assess:** delegating (orders are graded on clarity and on giving the job to the right people), budgeting, reading voter groups and weighing policy trade-offs.
-> - **No answer key.** The tool never says which option was best, and the real choice is not always the right one.
-> - **More cases are data, not code.** A new race is one researched case file.
+Campaign Academy is built around how case-method teaching works, with the decision made by the student instead of read about:
+
+- **Real material, cited.** Every fact links to its source, so a class can check it and argue with it.
+- **Judgment before feedback.** Options preview only the direction of an effect, not its size. The student chooses, then sees what moved, then what the real campaign did.
+- **Four skills a course can assess:** delegating (each order is graded on clarity and on giving the job to the right people), budgeting, reading voter groups and weighing policy trade-offs.
+- **No answer key.** The tool never says which option was best, and the real choice is not always the right one.
+- **More cases are data, not code.** A new race is one researched case file.
 
 ### LangChain: deep agents and LangSmith
 
@@ -153,7 +154,7 @@ The War room's **Thinking** panel streams the agents' reasoning and hand-offs as
 
 ### Gemini (MLH Best Use of Gemini API)
 
-> **TODO, later.** Gemini (`gemini-3.8-flash`) writes the morning paper's simulated stories, the letters and the three stances you can answer a story with. Every story passes the same number check as the agents, and the masthead names the writer. The lead story is always the real 2013 headline; the model never writes it. *We need a screenshot of a Gemini-written edition: the local key on this machine produced a Claude edition.*
+Gemini (`gemini-3.8-flash`, through `@google/genai`) writes the morning paper: the simulated stories about the student's campaign and the rivals, the letters to the editor, and the three stances the student can answer a story with. Every story passes the same number check as the agents, so a figure that isn't in the campaign's facts gets the story rejected. The masthead names the writer. The lead story is always the real headline of the day, cited, and the model never writes it. If Gemini fails, Claude writes the paper; with neither key, a template stands.
 
 ### Photon iMessage
 
