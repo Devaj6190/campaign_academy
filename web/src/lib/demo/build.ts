@@ -12,7 +12,7 @@ import { useStaff } from "../staff/store";
 // The demo start point (npm run demo:start): the campaign on May 22, 2013, the morning Weiner enters, played by the
 // game's own rules with no API key. The first decision is made (the real choice), the staff have done a stretch of
 // work, events are on the calendar, the rivals have moved, the paper has its archive, and the Weiner decision is
-// waiting with its two memos. Saved in lib/save.ts's format, so it loads through the same restore() as any save.
+// waiting. Its two advisers are written as the demo loads, live with a key. Saved in lib/save.ts's format, so it loads through the same restore() as any save.
 //
 // The game's network calls (/api/...) go straight to the route handlers here: with no key each one answers with its
 // rules, as the deployed game does without one.
@@ -91,6 +91,9 @@ export async function buildDemo(): Promise<{ save: Save; problems: string[]; rep
   if (!usePaper.getState().editions.length) problems.push("the paper has no editions");
   if ((useMemos.getState().byDecision[weiner.id]?.memos.length ?? 0) < 2) problems.push("the Weiner memos are not written");
   const save = snapshot();
+  // The waiting decision's advisers are left out: the game writes them as the demo loads (restore wakes the memo
+  // watcher), live when there is a key, so the presenter shows real advisers rather than the rules' stand-ins.
+  delete (save.stores.memos as { byDecision: Record<string, unknown> }).byDecision[weiner.id];
   const report = [
     `${s.date}, step ${s.at}: ${Object.keys(s.picks).length} decision made`,
     `work: ${staffWork.length} staff entries, ${rivalWork.length} rival moves`,

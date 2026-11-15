@@ -26,11 +26,7 @@ const put = (id: string, e: Entry) => useMemos.setState((s) => ({ byDecision: { 
 /** The two filled posts that write on a decision of this kind. */
 export function writers(d: Decision) {
   const staff = useGame.getState().staff;
-  // A post whose real holder is already named among this card's advisers (on record or predicted) has its say there:
-  // a simulated memo from the same post arguing otherwise would contradict the card (Devaj's review). The next post
-  // writes instead.
-  const onRecord = new Set(d.advice.filter((a) => a.name).map((a) => a.name));
-  const filled = (id: string) => staff.find((p) => p.id === id && p.name && !onRecord.has(p.name));
+  const filled = (id: string) => staff.find((p) => p.id === id && p.name);
   const order = [...WRITERS[d.skill], "cm", "com", "fd", "fin"];
   return [...new Set(order)].map(filled).filter((p): p is NonNullable<typeof p> => !!p).slice(0, 2);
 }
@@ -50,20 +46,21 @@ async function one(req: MemoRequest): Promise<Memo> {
   }
 }
 
-/** Write both memos for one decision, the second against the first. Once per decision per campaign. */
+/** Write both memos for one decision, each recommending a different option. Once per decision per campaign. */
 export async function writeMemos(index: number) {
   const c = currentCase(useCase.getState().caseId);
   const d = c.decisions[index];
   if (!d || useMemos.getState().byDecision[d.id]) return;
   put(d.id, { status: "writing", memos: [] });
   // Everything is read now, so both memos are written from the same moment of the campaign.
-  const w = snapshot();
+  // The campaign as it will stand on the decision's day: the stretch's news (the card's "Since your last decision")
+  // is in, so the memo quotes the figures the card shows, not the ones from before that news landed.
+  const w = snapshot({ at: index + 1, date: d.date });
   const campaign = describeWorld(w);
   const memory = { ...useStaff.getState().memory };
   const memos: Memo[] = [];
   for (const p of writers(d)) {
     const first = memos[0];
-    const firstBy = first && useGame.getState().staff.find((x) => x.id === first.director);
     const decision = memoDecision(d);
     const req: MemoRequest = {
       decision,
@@ -72,7 +69,6 @@ export async function writeMemos(index: number) {
       voice: profileOf(w, p.id).voice,
       campaign,
       memory: memory[p.id] ?? [],
-      against: first ? { option: first.option, who: firstBy?.onRecord || !firstBy?.name || firstBy.name === firstBy.role ? `the ${firstBy?.role ?? "other director"}` : firstBy.name } : undefined,
     };
     memos.push(await writer(req));
     // A restart or a loaded save while writing: these belong to a campaign that no longer exists.
