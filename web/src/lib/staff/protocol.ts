@@ -62,7 +62,8 @@ export class RunCtx {
   report(text: string, ask: Ask | null, coaching: string) {
     if (this.reported) return;
     this.reported = true;
-    const amount = ask ? Math.max(500, Math.min(25000, Math.round(ask.amount / 500) * 500)) : 0;
+    const m = this.req.snapshot.scale.money;
+    const amount = ask ? Math.max(500 * m, Math.min(25000 * m, Math.round(ask.amount / (500 * m)) * 500 * m)) : 0;
     this.emit({
       t: "report",
       text,

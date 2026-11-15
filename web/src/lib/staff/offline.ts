@@ -1,7 +1,7 @@
 import { ACTIONS, type ActionId } from "../engine/catalog";
 import { describeTeam, profileOf } from "../engine/resolve";
 import { jitter, RunCtx, sleep } from "./protocol";
-import { findBoros, findFactions, findPlaces, PLACES, shortPlace, type Snapshot } from "./world";
+import { findBoros, findFactions, findPlaces, PLACES, short, shortPlace, type Snapshot } from "./world";
 
 // The simulation used when no API key is set, or when the live agents fail. It emits exactly the same events
 // as the real agents, so the war room behaves the same either way. Responses are templated, not written.
@@ -35,6 +35,8 @@ const DEFAULTS: Record<string, ActionId[]> = {
   dat: ["voter_targeting"],
 };
 
+const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
+
 function pickActions(text: string, director: string) {
   const t = text.toLowerCase();
   const found = KEYWORDS.filter(([re]) => re.test(t)).flatMap(([, a]) => a);
@@ -54,9 +56,9 @@ function pickDistricts(w: Snapshot, text: string, boro?: number) {
 function pickFaction(w: Snapshot, text: string, action: ActionId) {
   const named = findFactions(text);
   if (named.length) return named[0];
-  if (action === "mail_piece") return "seniors";
-  // The biggest group that could still go either way.
-  return [...w.factions].filter((f) => f.feel > 35 && f.feel < 62).sort((a, b) => b.size - a.size)[0]?.id ?? w.factions[0].id;
+  void action;
+  // The sizeable group where the campaign is weakest.
+  return [...w.factions].filter((f) => f.size >= 20).sort((a, b) => a.feel - b.feel)[0]?.id ?? w.factions[0].id;
 }
 
 export async function runOffline(ctx: RunCtx, pace = 1) {
@@ -64,7 +66,7 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
   const w = req.snapshot;
   const me = w.staff.find((s) => s.id === req.director);
   if (!me?.name) return emit({ t: "done" }); // the post is vacant now
-  const first = me.name.split(" ")[0];
+  const first = short(me);
   const team = describeTeam(w, req.director);
   const basis = req.followOf ?? req.text;
   const actions = pickActions(basis, req.director);
@@ -81,12 +83,12 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
       return (sk.some((s) => p.profile.skills.includes(s)) ? 2 : 0) + (p.profile.skills.includes(sk[0]) ? 0.5 : 0) + ((p.profile.special?.[a] ?? 1) > 1 ? 0.5 : 0) + (district && p.profile.turf?.includes(Math.floor(district / 100)) ? 1 : 0);
     }
     const who = ranked[0] && score(ranked[0]) >= 2 ? ranked[0] : null;
-    return { a, district, faction, who: who?.id ?? req.director, whoName: who?.name ?? me.name! };
+    return { a, district, faction, who: who?.id ?? req.director, whoShort: short(who ?? me) };
   });
 
   emit({ t: "start", mode: "offline" });
   await wait(700);
-  emit({ t: "say", text: team.length ? `On it. ${jobs.map((j) => j.whoName.split(" ")[0]).filter((n, i, a) => a.indexOf(n) === i).join(" and ")} will take this.` : me.boss ? "On it." : `On it. I'll handle this myself; nobody reports to me yet.` });
+  emit({ t: "say", text: team.length ? `On it. ${cap(jobs.map((j) => j.whoShort).filter((n, i, a) => a.indexOf(n) === i).join(" and "))} will take this.` : me.boss ? "On it." : `On it. I'll handle this myself; nobody reports to me yet.` });
   const items = jobs.map((j) => ({ title: `${ACTIONS[j.a].label}${j.district ? ` in ${shortPlace(j.district)}` : j.faction ? ` for ${w.factions.find((f) => f.id === j.faction)?.name}` : ""}`, status: "pending" as const }));
   emit({ t: "plan", items });
   await wait(900);
@@ -107,13 +109,13 @@ export async function runOffline(ctx: RunCtx, pace = 1) {
   const prof = profileOf(w, req.director);
   const overspender = prof.cost > 1.1;
   const blocked = notes.some((n) => n.startsWith("Not done: it costs"));
-  const ask = !req.followOf && (blocked || overspender) ? { amount: overspender ? 3000 : 5000, reason: blocked ? "to finish the job" : "to run another round while we have momentum" } : null;
+  const ask = !req.followOf && (blocked || overspender) ? { amount: (overspender ? 3000 : 5000) * w.scale.money, reason: blocked ? "to finish the job" : "to run another round while we have momentum" } : null;
   const head = ctx.effects.length ? `Done. Spent $${ctx.spent.toLocaleString("en-US")}${ctx.raised ? `, raised $${ctx.raised.toLocaleString("en-US")}` : ""}.` : "Couldn't get it done.";
   const best = ctx.effects.find((e) => Object.keys(e.sent).length || Object.keys(e.factions).length);
   const coaching = req.followOf
     ? ""
     : ctx.quality.missing.length
-    ? `Clearer next time: say ${ctx.quality.missing.join(", ")}. ${first} had to guess, and guesses cost money.`
+    ? `Clearer next time: say ${ctx.quality.missing.join(", ")}. ${cap(first)} had to guess, and guesses cost money.`
     : ctx.effects.some((e) => !e.fit)
       ? `Clear instruction, but part of it went to someone without the skills. Check who is best placed before you ask.`
       : `Clear, specific, and given to the right person. That's how delegation should look.`;

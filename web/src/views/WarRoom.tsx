@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownRight, ArrowUp, Check, CircleDollarSign, FlaskConical, Loader2, MapPin, MessageSquare, Plus, Shuffle, Sparkles, UserMinus, UserPlus, Users, X } from "lucide-react";
+import { ArrowDownRight, ArrowUp, Check, CircleDollarSign, Loader2, MapPin, MessageSquare, Plus, Shuffle, Sparkles, UserMinus, UserPlus, Users, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Fit } from "@/components/Fit";
@@ -12,9 +12,11 @@ import type { Effect } from "@/lib/engine/resolve";
 import { profileFor } from "@/lib/staff/roster";
 import { answerAsk, hire, letGo, loadCandidates, reassign } from "@/lib/staff/run";
 import { useStaff, type ChatItem, type Run } from "@/lib/staff/store";
-import { shortPlace } from "@/lib/staff/world";
+import { FACTIONS_2013 } from "@/lib/cases/mayor2013-factions";
+import { shortDate, shortMoney, staffMoney, useCase } from "@/lib/cases/store";
+import { short, shortPlace } from "@/lib/staff/world";
 import { useGame } from "@/lib/store";
-import { clock, cn } from "@/lib/util";
+import { cn } from "@/lib/util";
 
 // Fixed logical canvas: you on top, direct reports below, their people below them.
 const W = 900, H = 520;
@@ -36,14 +38,14 @@ function edge(a: Pt, b: Pt, sub: boolean, up = false) {
   return up ? `M${b.x} ${y2}C${b.x} ${ym},${a.x} ${ym},${a.x} ${y1}` : `M${a.x} ${y1}C${a.x} ${ym},${b.x} ${ym},${b.x} ${y2}`;
 }
 
-// Things a player might plausibly say to each person, to get them started.
+// Things a student might plausibly say to each post, to get them started. Places and voter groups are the case's own.
 const IDEAS: Record<string, string[]> = {
-  cm: ["Get us in the room with the union locals before day 3", "Plan this week around the debate on day 7"],
-  fd: ["Win back Jackson Heights before Friday: canvass renters", "Recruit and train volunteers in the Bronx this weekend"],
-  fin: ["Raise $40k this week with call time and a donor dinner", "Send a small-dollar email to transit riders tonight"],
-  com: ["Hit back on Hale's crime ad with seniors today", "Pitch the housing story to reporters for renters"],
-  pol: ["Draft a transit plan that bus riders will love", "Write a brief that answers homeowners' worries about density"],
-  dat: ["Build target lists for the open Bronx districts", "Find where seniors are winnable in southeast Queens"],
+  cm: ["Sit down with union leaders this week and tell me where we stand", "Put a week of events for Black voters in Brooklyn on the calendar"],
+  fd: ["Canvass Latino voters in Jackson Heights this week", "Train volunteers in the Bronx this weekend"],
+  fin: ["Raise money this week with call time and a donor dinner", "Send a small-dollar email to liberal supporters tonight"],
+  com: ["Pitch reporters a story for women voters today", "Run digital ads for voters under 45 this week"],
+  pol: ["Write a brief on the tax plan for union households this week", "Draft a brief that answers moderates' doubts before Friday"],
+  dat: ["Build target lists for the Bronx districts this week", "Find where older voters are winnable in southeast Queens"],
 };
 const ideasFor = (p: Staff) => IDEAS[p.id] ?? [`${p.role.split(",")[0]}: what should we do this week?`, "Pick the district where you can do the most good tomorrow"];
 
@@ -52,7 +54,6 @@ export function WarRoom() {
   const person = useGame((s) => s.person);
   const busy = useGame((s) => s.busy);
   const unread = useGame((s) => s.unread);
-  const open = useGame((s) => s.open);
   const packets = useStaff((s) => s.packets);
   const job = useStaff((s) => s.job);
   const misfit = useStaff((s) => s.misfit);
@@ -125,7 +126,6 @@ export function WarRoom() {
             />
           )}
           <DockButton icon={<UserPlus />} label="Hire" sub={`${vacancies.length} open`} onClick={() => vacancies[0] && pick(vacancies[0].id)} />
-          <DockButton icon={<FlaskConical />} label="Tactics" onClick={() => open("tactic")} />
         </Dock>
       </section>
       <aside className="flex w-[320px] shrink-0 flex-col border-l border-line bg-surface xl:w-[380px]">
@@ -181,7 +181,8 @@ function Node({ at, name, role, job, misfit, morale, thinking, you, selected, bu
         {morale !== undefined && morale < 40 && <i title="Low morale" className="absolute bottom-0.5 left-0.5 size-2.5 rounded-full border-2 border-bg bg-neg" />}
       </span>
       <span className={cn("mt-1.5 text-[12.5px] leading-tight font-medium", !name && "text-faint")}>{name ?? "Vacant"}</span>
-      <span className="text-[10.5px] leading-tight text-muted">{role}</span>
+      {/* A post shown by its title has no separate name to print. */}
+      {role !== name && <span className="text-[10.5px] leading-tight text-muted">{role}</span>}
       <AnimatePresence>
         {misfit && (
           <motion.span initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-0.5 rounded bg-neg/15 px-1.5 text-[10px] leading-[16px] text-neg">
@@ -200,17 +201,16 @@ function Node({ at, name, role, job, misfit, morale, thinking, you, selected, bu
 
 function Overview({ pick }: { pick: (id: string) => void }) {
   const staff = useGame((s) => s.staff);
-  const losses = useGame((s) => s.losses);
+  const spent = staffMoney(useCase((s) => s.work)).spent;
   const busy = useGame((s) => s.busy);
   const feedItems = useStaff((s) => s.feed);
   const job = useStaff((s) => s.job);
   const filled = staff.filter((p) => p.name).length;
-  const payroll = losses[0]?.v ?? 0;
   return (
     <div className="overflow-y-auto">
       <Section title="Your campaign">
         <div className="grid grid-cols-3 gap-2">
-          {([["Staff", String(filled)], ["Vacancies", String(staff.length - filled)], ["Payroll/day", `$${(payroll / 1000).toFixed(1)}k`]] as const).map(([k, v]) => (
+          {([["Staff", String(filled)], ["Vacancies", String(staff.length - filled)], ["Spent on jobs", shortMoney(spent)]] as const).map(([k, v]) => (
             <div key={k} className="rounded-lg border border-line bg-raised px-3 py-2.5">
               <div className="tnum font-mono text-[18px] font-medium">{v}</div>
               <div className="text-[11px] text-muted">{k}</div>
@@ -233,12 +233,12 @@ function Overview({ pick }: { pick: (id: string) => void }) {
         </div>
       </Section>
       <Section title="Activity" right={<span className="text-[10.5px] text-faint">{feedItems.length ? "Newest first" : ""}</span>}>
-        {!feedItems.length && <p className="text-[12.5px] leading-relaxed text-muted">Select someone and tell them what you want in plain language. Directors plan, hand jobs to their people, and report back. Every result moves your money, your map and tomorrow&apos;s paper.</p>}
+        {!feedItems.length && <p className="text-[12.5px] leading-relaxed text-muted">Select someone and tell them what you want in plain language. Directors plan, hand jobs to their people, and report back. Every result moves your money, your map and your standing with the voter groups.</p>}
         <ol className="space-y-2">
           <AnimatePresence initial={false}>
             {feedItems.slice(0, 24).map((f) => (
               <motion.li key={f.id} layout initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} className="flex gap-2.5 text-[12px] leading-snug">
-                <span className="tnum w-[52px] shrink-0 pt-px font-mono text-[10.5px] text-faint">D{f.day} {clock(f.min)}</span>
+                <span className="tnum w-[44px] shrink-0 pt-px font-mono text-[10.5px] text-faint">{shortDate(f.date)}</span>
                 <span className={cn("min-w-0", f.tone === "pos" ? "text-pos" : f.tone === "neg" ? "text-neg" : f.tone === "warm" ? "text-warm" : "text-soft")}>{f.text}</span>
               </motion.li>
             ))}
@@ -282,7 +282,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
   const [text, setText] = useState(() => useStaff.getState().draft[p.id] ?? "");
   useEffect(() => { useStaff.setState((s) => ({ draft: Object.fromEntries(Object.entries(s.draft).filter(([k]) => k !== p.id)) })); }, [p.id]);
   const end = useRef<HTMLDivElement>(null);
-  const first = p.name!.split(" ")[0];
+  const first = short(p), First = first[0].toUpperCase() + first.slice(1);
   const prof = hired ?? profileFor(p.id, p.role);
   const plan = useMemo(() => toPlan(runs, staff), [runs, staff]);
   const lastSuggest = [...(chat ?? [])].reverse().find((c): c is Extract<ChatItem, { k: "them" }> => c.k === "them" && !!c.suggest)?.suggest;
@@ -297,14 +297,15 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
         <Avatar name={p.name} size={46} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-medium tracking-tight">{p.name}</div>
-          <div className="truncate text-[12px] text-muted">{p.role}{boss ? ` · reports to ${boss.name?.split(" ")[0] ?? "a vacant post"}` : " · direct report"}</div>
+          <div className="truncate text-[12px] text-muted">{p.role}{boss ? ` · reports to ${boss.name ? short(boss) : "a vacant post"}` : " · direct report"}</div>
         </div>
         <Status on={busy || thinking} label={thinking ? "On it" : undefined} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <Section title="Profile" right={<span className="tnum font-mono text-[11px] text-faint">${prof.salary.toLocaleString("en-US")}/day</span>}>
+        <Section title="Profile">
+          {p.onRecord && <p className="mb-2 text-[12px] leading-relaxed text-muted">The record names {p.name} in this post. What this post says and does here is simulated.</p>}
           <dl className="space-y-2 text-[13px]">
-            {[["Good at", p.good], ["Weak at", p.weak], ["Working on", job ?? p.doing]].map(([k, v]) => (
+            {[["Good at", p.good], ["Weak at", p.weak], ["Working on", job ?? p.doing ?? "Nothing yet"]].filter(([, v]) => v).map(([k, v]) => (
               <div key={k} className="flex gap-3"><dt className="w-[76px] shrink-0 text-muted">{k}</dt><dd className="text-soft">{v}</dd></div>
             ))}
             <div className="flex items-center gap-3">
@@ -342,7 +343,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
             {thinking && (
               <div className="flex items-center gap-2 py-1 text-[12px] text-muted">
                 <Loader2 className="size-3.5 animate-spin text-warm" />
-                {first} is {runs?.[0]?.jobs.length ? "waiting on the team" : runs?.[0]?.items.length ? "working the plan" : "thinking it through"}…
+                {First} is {runs?.[0]?.jobs.length ? "waiting on the team" : runs?.[0]?.items.length ? "working the plan" : "thinking it through"}…
               </div>
             )}
           </div>
@@ -366,7 +367,7 @@ function Person({ p, moving, done }: { p: Staff; moving: boolean; done: () => vo
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder={thinking ? `${first} is on it…` : `Tell ${first} what you need…`}
+            placeholder={thinking ? `${First} is on it…` : `Tell ${first} what you need…`}
             className="flex-1 resize-none bg-transparent px-1.5 py-1 text-[13px] outline-none placeholder:text-faint"
           />
           <button onClick={() => send()} disabled={!text.trim() || thinking} aria-label="Send" className="grid size-7 shrink-0 place-items-center rounded-lg bg-gold text-bg transition-opacity disabled:opacity-25">
@@ -398,13 +399,13 @@ function ChatRow({ c, index, id, onSuggest }: { c: ChatItem; index: number; id: 
 
 function Receipt({ e }: { e: Effect }) {
   const staff = useGame((s) => s.staff);
-  const factions = useGame((s) => s.factions);
-  const who = staff.find((p) => p.id === e.by)?.name?.split(" ")[0] ?? "Staff";
+  const by = staff.find((p) => p.id === e.by);
+  const who = by ? short(by).replace(/^the /, "") : "Staff";
   const chips: [string, "pos" | "neg" | "soft"][] = [];
   if (e.cost) chips.push([`−$${e.cost.toLocaleString("en-US")}`, "neg"]);
   if (e.raised) chips.push([`+$${e.raised.toLocaleString("en-US")}`, "pos"]);
   for (const [cd, d] of Object.entries(e.sent)) chips.push([`${shortPlace(+cd)} ${d >= 0 ? "+" : ""}${d}`, d >= 0 ? "pos" : "neg"]);
-  for (const [f, d] of Object.entries(e.factions)) chips.push([`${factions.find((x) => x.id === f)?.name ?? f} ${d >= 0 ? "+" : ""}${d}`, d >= 0 ? "pos" : "neg"]);
+  for (const [f, d] of Object.entries(e.factions)) chips.push([`${FACTIONS_2013.find((x) => x.id === f)?.name ?? f} ${d >= 0 ? "+" : ""}${d}`, d >= 0 ? "pos" : "neg"]);
   return (
     <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="rounded-lg border border-dashed border-line-strong bg-white/[0.015] px-3 py-2">
       <div className="flex items-center gap-1.5 text-[11px] text-muted">
@@ -493,10 +494,9 @@ function Vacancy({ p }: { p: Staff }) {
           {box?.list.map((o, i) => (
             <motion.div key={o.name} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0, transition: { delay: i * 0.06 } }} className="rounded-lg border border-line bg-raised p-3">
               <div className="flex items-center gap-3">
-                <Avatar name={o.name} size={34} />
+                <Avatar name={`Applicant ${i + 1}`} size={34} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-medium">{o.name}</div>
-                  <div className="tnum font-mono text-[11px] text-muted">${o.salary.toLocaleString("en-US")}/day</div>
+                  <div className="text-[13px] font-medium">Applicant {i + 1}</div>
                 </div>
                 <Button size="sm" onClick={() => hire(p.id, o)}>Hire</Button>
               </div>

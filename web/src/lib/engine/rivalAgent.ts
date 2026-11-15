@@ -2,7 +2,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { tool } from "@langchain/core/tools";
 import { createDeepAgent } from "deepagents";
 import { z } from "zod";
-import { CATALOG, STAFF_MODEL, world } from "../staff/agents"; // also registers the harness profile (no file tools)
+import { catalog, STAFF_MODEL, world } from "../staff/agents"; // also registers the harness profile (no file tools)
 import { PLACES, type Snapshot } from "../staff/world";
 import { ACTION_IDS, ACTIONS } from "./catalog";
 import type { Effect } from "./resolve";
@@ -66,7 +66,7 @@ Tonight you have $${budget.toLocaleString("en-US")} and up to ${cap} moves${req.
 Make your moves with make_move. Then reply with one sentence (under 25 words) on your strategy tonight, as a campaign memo.
 
 Actions available:
-${CATALOG}
+${catalog(w)}
 
 The city right now (support figures are for Cole):
 ${world(w)}`,

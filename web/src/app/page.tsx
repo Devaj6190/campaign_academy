@@ -2,7 +2,6 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { DecisionCard, useTicker } from "@/components/Clock";
-import { Overlays } from "@/components/Overlays";
 import { Paper } from "@/components/Paper";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
@@ -37,7 +36,6 @@ export default function Home() {
       </div>
       <Paper />
       <DecisionCard />
-      <Overlays />
     </div>
   );
 }
