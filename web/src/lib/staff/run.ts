@@ -299,7 +299,6 @@ export function hire(post: string, c: Candidate) {
   });
   pushChat(post, { k: "them", text: `Glad to be here. Tell me where you want me first.` });
   feed(post, `You filled the ${p.role} post.`, "pos");
-  useGame.setState((g) => ({ tasks: g.tasks.map((t) => (t.text.toLowerCase().includes(p.role.toLowerCase().split(",")[0].toLowerCase()) ? { ...t, done: true } : t)) }));
 }
 
 export function letGo(id: string) {

@@ -5,10 +5,9 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import adResult from "@/lib/cases/mayor2013-ad.json";
 import type { NightRow } from "@/lib/cases/night";
-import { mapValue, useCase } from "@/lib/cases/store";
-import { groupsHere } from "@/lib/demographics";
+import { censusShare, cityShare, mapValue, supportIn, useCase, worldNow } from "@/lib/cases/store";
 import { DISTRICTS } from "@/lib/geo";
-import { sentimentOf, useGame } from "@/lib/store";
+import { useGame } from "@/lib/store";
 
 // A real street map of New York (OpenFreeMap, no key) with the 59 community districts on top, coloured by
 // how strong the campaign is in each one. Buildings rise in 3D when you zoom in on a district.
@@ -79,9 +78,7 @@ export function MapCanvas({ onHover, onSelect, layer = "campaign", night }: { on
   const cbs = useRef({ onHover, onSelect, layer });
   useEffect(() => { cbs.current = { onHover, onSelect, layer }; });
 
-  const sent = useGame((s) => s.sent);
   const filter = useGame((s) => s.filter);
-  const factions = useGame((s) => s.factions);
   const district = useGame((s) => s.district);
 
   // Election night: mark each Assembly District that has reported, with the student's share there.
@@ -94,16 +91,17 @@ export function MapCanvas({ onHover, onSelect, layer = "campaign", night }: { on
     for (const r of n.rows) m.setFeatureState({ source: "real", id: r.ad }, { in: reported.has(r.ad), s: r.share });
   };
 
-  // Paint support (and, under a group filter, how many of that group live there) into feature state.
+  // Paint each district: the campaign's support there, or, under a group filter, how many of that group live there
+  // against the group's citywide share (census).
   const paint = () => {
     const m = map.current;
     if (!m || !ready.current) return;
-    const world = useGame.getState();
+    const g = worldNow().c.groups.find((x) => x.id === useGame.getState().filter && x.census);
+    const avg = g ? cityShare(g.census!) : 0;
     for (const d of DISTRICTS) {
       if (d.park) continue;
-      const g = world.filter === "all" ? null : groupsHere(d.cd).find((x) => x.id === world.filter);
-      const op = g ? 0.25 + 0.5 * Math.min(1, g.rel / 1.6) : 0.6;
-      m.setFeatureState({ source: "districts", id: d.cd }, { v: world.filter === "all" ? mapValue(sentimentOf(world, d.cd)) : sentimentOf(world, d.cd), op });
+      const v = g ? 47.5 + (censusShare(d.cd, g.census!) - avg) * 0.9 : mapValue(supportIn(d.cd) ?? 0);
+      m.setFeatureState({ source: "districts", id: d.cd }, { v, op: 0.6 });
     }
   };
 
@@ -173,10 +171,10 @@ export function MapCanvas({ onHover, onSelect, layer = "campaign", night }: { on
     return () => { dead = true; ready.current = false; map.current?.remove(); map.current = null; };
   }, []);
 
-  // Recolour whenever support, the group filter or group feelings change.
+  // Recolour whenever the group filter changes.
   // The case moves while the map is open: a decision is made, the campaign reaches the next one, a staff job lands.
   const picks = useCase((s) => s.picks), at = useCase((s) => s.at), work = useCase((s) => s.work);
-  useEffect(paint, [sent, filter, factions, picks, at, work]);
+  useEffect(paint, [filter, picks, at, work]);
 
   // Swap between the student's campaign, their election night and the real result.
   useEffect(() => { if (map.current && ready.current) show(map.current, layer); }, [layer]);

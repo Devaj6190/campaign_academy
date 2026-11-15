@@ -100,7 +100,7 @@ ${world(w)}`,
       schema: z.object({
         reply: z.string().describe("Under 60 words, in your voice: what got done, what it cost, what changed. Facts from tool results only."),
         ask_amount: z.number().nullable().describe("Dollars of extra budget you want approved, or null"),
-        ask_reason: z.string().nullable().describe("What the extra money is for, or null"),
+        ask_reason: z.string().nullable().describe("What the extra money is for, as a short phrase starting with \"to\" or \"for\" (it follows the words \"wants $X more\"), or null"),
         coaching: z.string().describe("One honest sentence of feedback on the campaigner's instruction: was it clear (what, where, who, by when) and did it go to the right person?"),
       }),
     },
@@ -120,7 +120,7 @@ How you work:
 2. ${team.length ? `Hand each job to the right person on your team with the task tool. Open each brief with a one-line title of at most eight plain words that uses place and group names, not ids (for example "Canvass union households in Jackson Heights"). Then brief them precisely: what, where (district number), who (voter group id), and why. Run independent jobs in parallel. Your team: ${team.map((p) => `${slug(p.name!)} (${p.role})`).join(", ")}.` : "Nobody reports to you, so do the jobs yourself with take_action."}
 3. Budget for this instruction: $${req.budget.toLocaleString("en-US")}. Never plan past it. If the job needs more, ask in your report.
 4. If the instruction is vague, make a sensible call and say what you assumed. If it is the wrong job for your department, do your best and say who should have had it.
-5. Finish with send_report exactly once. Report only what tool results told you; never invent numbers.
+5. Finish with send_report exactly once. Report only what tool results told you; never invent numbers. In the report, name places and voter groups in words; never print a district number or a group id.
 
 Actions available to the campaign:
 ${catalog(w)}

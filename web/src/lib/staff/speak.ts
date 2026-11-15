@@ -1,65 +1,110 @@
 "use client";
 
-import { QUIPS } from "../data";
-import { netPerDay, useGame } from "../store";
+import { finished, waiting } from "../cases/clock";
+import { FACTIONS_2013, factionNow } from "../cases/mayor2013-factions";
+import { factionWork, shortMoney, supportIn, useCase, worldNow } from "../cases/store";
+import { useGame } from "../store";
 import { profileFor } from "./roster";
 import { feed } from "./run";
 import { pushChat, useStaff } from "./store";
-import { PLACES } from "./world";
+import { BOROS, PLACES, short, shortPlace } from "./world";
 
-// Staff speak up unprompted when something in the world deserves it. Each kind of worry fires at most once
-// every few days, and only when nobody is mid-conversation with that person.
+// Staff speak up unprompted when something in the campaign deserves it. Every worry is read from the live case:
+// the money left under the cap, the voter groups and districts where the campaign trails, what the rivals just did,
+// empty posts, idle staff, morale. The clock calls speakUp() as the days pass; it lets one remark through every GAP
+// days at most, and the same worry returns only after REPEAT days. With an API key the post says it in its own voice.
+
+const GAP = 8;
+const REPEAT = 30;
 
 type Trigger = { key: string; who: string; situation: string; text: string; suggest: string };
 
-function triggers(): Trigger[] {
+const dayNow = () => { const s = useCase.getState(), c = worldNow().c; return Math.round((Date.parse(s.date) - Date.parse(c.briefingDate)) / 86_400_000) + 1; };
+
+function triggers(day: number): Trigger[] {
   const g = useGame.getState();
   const s = useStaff.getState();
+  const k = useCase.getState();
+  const { c, w } = worldNow();
   const has = (id: string) => g.staff.some((p) => p.id === id && p.name);
+  const vacant = (id: string) => g.staff.find((p) => p.id === id && !p.name);
+  const mine = w.poll[c.follow] ?? 0;
+  const pct = (n: number) => `${Math.round(n)}%`;
   const out: Trigger[] = [];
-  const net = netPerDay(g);
-  const left = 30 - g.day;
-  if (net < 0 && has("fin")) {
-    const runway = Math.floor(g.cash / -net);
-    if (runway < left + 4) out.push({ key: "runway", who: "fin", situation: `At the current burn of $${(-net).toLocaleString("en-US")}/day the campaign runs out of money in ${runway} days, before election day.`, text: `At this burn we're broke by day ${g.day + runway}. I need call time and a dinner on the books.`, suggest: "Raise $40k this week with call time and a donor dinner" });
+
+  // The rivals just moved against the campaign.
+  const rivals = k.work.filter((x) => x.by !== c.follow && c.candidates.some((r) => r.id === x.by) && Date.parse(k.date) - Date.parse(x.date) <= 10 * 86_400_000);
+  if (rivals.length && has("com")) {
+    const last = rivals[rivals.length - 1].note ?? "";
+    out.push({ key: `rivals-${k.at}`, who: "com", situation: `Rival campaigns have made ${rivals.length} moves in the last ten days. The latest: ${last}`, text: `The other campaigns have been busy: ${last} We should not let that sit.`, suggest: "Answer the rivals' latest moves with a press pitch today" });
   }
-  if (!g.staff.find((p) => p.id === "ox")?.name && has("fd")) out.push({ key: "bronx", who: "fd", situation: "There is still no organizer in the Bronx, the biggest open area on the map.", text: "Still nobody in the Bronx. Every day without an organizer there is a day Hale gets for free.", suggest: "Canvass the open Bronx districts this weekend" });
-  if (!g.staff.find((p) => p.id === "pol")?.name && has("cm") && g.day >= 2) out.push({ key: "policy", who: "cm", situation: "The Policy Director post is still empty and the manifesto needs work.", text: "We need a Policy Director. The manifesto won't write itself, and the debate is on day 7.", suggest: "Plan the week around the debate on day 7" });
-  const cold = [...g.factions].sort((a, b) => a.feel - b.feel)[0];
-  if (cold.feel < 30 && has("com")) out.push({ key: `cold-${cold.id}`, who: "com", situation: `${cold.name} are cold toward Cole (${Math.round(cold.feel)}/100).`, text: `${cold.name} have gone cold on us. I have an idea for how to reach them.`, suggest: `Reach ${cold.name.toLowerCase()} with a press pitch this week` });
-  const slipping = PLACES.filter((p) => (g.sent[p.cd] ?? 50) < 40 && Math.floor(p.cd / 100) === 4).sort((a, b) => g.sent[a.cd] - g.sent[b.cd])[0];
-  if (slipping && has("oq")) out.push({ key: `slip-${slipping.cd}`, who: "oq", situation: `${slipping.name} in Queens is slipping (support ${Math.round(g.sent[slipping.cd])}). Top complaint there: ${slipping.issue}.`, text: `${slipping.name.split("-")[0]} is slipping. People there are angry about ${slipping.issue.toLowerCase()}.`, suggest: `Canvass ${slipping.name.split("-")[0]} on ${slipping.issue.toLowerCase()} tomorrow` });
-  const morale = Object.entries(s.morale).filter(([id]) => has(id)).sort((a, b) => a[1] - b[1])[0];
-  if (morale && morale[1] < 40) out.push({ key: `morale-${morale[0]}`, who: "cm", situation: `${g.staff.find((p) => p.id === morale[0])?.name} has low morale (${morale[1]}/100) and might walk.`, text: `${g.staff.find((p) => p.id === morale[0])?.name?.split(" ")[0]} is close to quitting. Clearer orders would help.`, suggest: "Give the team a clear plan for the next three days" });
-  return out.filter((t) => has(t.who) && !s.active[t.who] && (s.spoken[t.key] === undefined || g.day - s.spoken[t.key] >= 3));
+
+  // Money: the closing weeks need a reserve.
+  const close = -(c.close.shift.budget ?? 0);
+  if (close > 0 && w.budget < close && has("fin")) out.push({ key: "money", who: "fin", situation: `The campaign has ${shortMoney(w.budget)} left to spend under the cap. A full push in the closing weeks costs about ${shortMoney(close)}.`, text: `We have ${shortMoney(w.budget)} left under the cap, and the closing weeks need about ${shortMoney(close)}. Everything we fund now comes out of the finish.`, suggest: "Raise money this week with call time and a donor dinner" });
+
+  // The large voter group where the campaign trails its own citywide figure by the most.
+  const boost = factionWork();
+  const weak = FACTIONS_2013.filter((f) => f.share >= 20).map((f) => ({ f, v: factionNow(f, w.groups, mine, c.start.poll[c.follow] ?? 0, boost) })).sort((a, b) => a.v - b.v)[0];
+  if (weak && mine - weak.v >= 2 && has("com")) out.push({ key: `group-${weak.f.id}`, who: "com", situation: `Support among ${weak.f.name} is ${pct(weak.v)}, against ${pct(mine)} citywide. They are ${weak.f.share}% of likely voters.`, text: `We are at ${pct(weak.v)} with ${weak.f.name}, against ${pct(mine)} citywide. They are ${weak.f.share}% of the electorate.`, suggest: `Pitch reporters a story for ${weak.f.name} this week` });
+
+  // The weakest district on each organizer's turf.
+  for (const [id, boro] of [["oq", 4], ["ob", 3]] as const) {
+    if (!has(id)) continue;
+    const low = PLACES.filter((p) => Math.floor(p.cd / 100) === boro).map((p) => ({ p, v: supportIn(p.cd) ?? mine })).sort((a, b) => a.v - b.v)[0];
+    if (low && mine - low.v >= 3) out.push({ key: `district-${low.p.cd}`, who: id, situation: `${low.p.name} is the campaign's weakest district in ${BOROS[boro]}: ${pct(low.v)} support, against ${pct(mine)} citywide.`, text: `${shortPlace(low.p.cd)} is our weakest spot in ${BOROS[boro]}: ${pct(low.v)}, against ${pct(mine)} citywide.`, suggest: `Canvass ${shortPlace(low.p.cd)} this week` });
+  }
+
+  // Empty posts.
+  if (vacant("ox") && has("fd")) out.push({ key: "vacant-ox", who: "fd", situation: "The Organizer, Bronx post is still empty, so nobody is running field work in the Bronx.", text: "Nobody is organising the Bronx for us. That post is still empty.", suggest: "Train volunteers in the Bronx this weekend" });
+  if (vacant("pol") && has("cm")) out.push({ key: "vacant-pol", who: "cm", situation: "The Policy Director post is still empty, so platform planks are drafted by whoever is free.", text: "The Policy Director post is still empty. Whoever is free is drafting our planks, and it shows.", suggest: "" });
+
+  // Nobody has been given work since the last decision.
+  const since = c.decisions[k.at - 1]?.date ?? c.briefingDate;
+  const quiet = !k.work.some((x) => x.date >= since && g.staff.some((p) => p.id === x.by));
+  if (k.at >= 1 && quiet && has("cm") && Date.parse(k.date) - Date.parse(since) >= 10 * 86_400_000) out.push({ key: `idle-${k.at}`, who: "cm", situation: "No one on the staff has been given a job since the last decision.", text: "The staff have had no orders since your last decision. Tell a director what you want done.", suggest: "Sit down with union leaders this week and tell me where we stand" });
+
+  // Morale.
+  const low = Object.entries(s.morale).filter(([id]) => has(id)).sort((a, b) => a[1] - b[1])[0];
+  const who = low && g.staff.find((p) => p.id === low[0]);
+  if (low && who && low[1] < 40 && has("cm")) out.push({ key: `morale-${low[0]}`, who: "cm", situation: `Morale in the ${who.role} post is low (${Math.round(low[1])} of 100). Clearer orders to the right person would help.`, text: `Morale is low with ${short(who)}. Clearer orders, to the right person, would help.`, suggest: "" });
+
+  return out.filter((t) => has(t.who) && !s.active[t.who] && (s.spoken[t.key] === undefined || day - s.spoken[t.key] >= REPEAT));
 }
 
 export async function speakUp() {
+  if (waiting() || finished()) return;
+  const day = dayNow();
+  const last = useStaff.getState().spoken._last;
+  if (last !== undefined && day - last < GAP) return;
+  const t = triggers(day)[0];
+  if (!t) return;
   const g = useGame.getState();
-  const pick = triggers()[0];
-  const t: Trigger = pick ?? (() => {
-    // Canned lines only when they are still true.
-    const quips = QUIPS.filter(([who, text]) => g.staff.some((p) => p.id === who && p.name) && !(/Bronx/.test(text) && g.staff.find((p) => p.id === "ox")?.name));
-    const [who, text] = quips[Math.floor(Math.random() * quips.length)] ?? QUIPS[3];
-    return { key: `quip-${who}`, who, situation: text, text, suggest: "" };
-  })();
   const p = g.staff.find((x) => x.id === t.who);
   if (!p?.name) return;
-  useStaff.setState((s) => ({ spoken: { ...s.spoken, [t.key]: g.day } }));
+  useStaff.setState((s) => ({ spoken: { ...s.spoken, [t.key]: day, _last: day } }));
 
   let said = { text: t.text, suggest: t.suggest };
-  if (pick) {
-    try {
-      const prof = useStaff.getState().hires[p.id] ?? profileFor(p.id, p.role);
-      const res = await fetch("/api/staff/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: p.name, role: p.role, voice: prof.voice, situation: t.situation, context: `Day ${g.day}/30, cash $${g.cash.toLocaleString("en-US")}, poll Cole ${g.poll.cole} vs Hale ${g.poll.hale}.`, fallback: said }),
-      });
-      if (res.ok) said = await res.json();
-    } catch {}
-  }
+  try {
+    const w = worldNow();
+    const prof = useStaff.getState().hires[p.id] ?? profileFor(p.id, p.role);
+    const res = await fetch("/api/staff/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // A post held by a real person in the record speaks as the post, never as that person.
+        name: `the ${p.role}`,
+        campaign: `${w.c.candidates.find((x) => x.id === w.c.follow)?.name ?? w.c.follow}'s campaign in ${w.c.title[0].toLowerCase()}${w.c.title.slice(1)}`,
+        voice: prof.voice,
+        situation: t.situation,
+        context: `Today is ${useCase.getState().date}. ${shortMoney(w.w.budget)} left to spend under the cap. Citywide standing ${Math.round(w.w.poll[w.c.follow] ?? 0)}%.`,
+        fallback: said,
+      }),
+    });
+    if (res.ok) said = await res.json();
+  } catch {}
   useGame.setState((s) => ({ toasts: [...s.toasts.slice(-2), { id: Date.now(), staff: p.id, text: said.text }], unread: { ...s.unread, [p.id]: true } }));
   pushChat(p.id, { k: "them", text: said.text, suggest: said.suggest || undefined });
-  feed(p.id, `${p.name.split(" ")[0]}: "${said.text}"`, "warm");
+  const who = short(p);
+  feed(p.id, `${who[0].toUpperCase()}${who.slice(1)}: "${said.text}"`, "warm");
 }
