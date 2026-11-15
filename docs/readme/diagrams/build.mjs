@@ -66,11 +66,11 @@ const rule = y => `<line x1="140" y1="${y}" x2="1460" y2="${y}" stroke="${C.fain
 
 function loop() {
   const H = 1000, cx = 800, cy = 590, r = 280;
-  let s = head("How a student plays", "Six times, the clock stops on *a real decision*",
-    "The 2013 calendar runs day by day. Where the real campaign had to choose, you choose.");
+  let s = head("How a student plays", "The campaign runs. *You make the calls.*",
+    "A real race on its real calendar. Where the real campaign had to choose, the clock stops and you choose.");
   s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${C.faint}"/>`;
   const nodes = [
-    [-90, "A real decision", ["on its real date"]],
+    [-90, "A decision point", ["the clock stops"]],
     [0, "You choose", ["your staff argue the options"]],
     [90, "History revealed", ["what the real campaign did"]],
     [180, "The campaign runs", ["direct staff · rivals move"]],
@@ -81,15 +81,15 @@ function loop() {
     s += `<path d="M${x1},${y1} A${r},${r} 0 0 1 ${x2},${y2}" fill="none" stroke="${C.goldSoft}" stroke-width="1.3" marker-end="url(#h)"/>`;
   }
   s += `<circle cx="${cx}" cy="${cy}" r="96" fill="#1d180f" stroke="${C.gold}"/>`;
-  s += T(cx, cy - 4, "× 6", { font: SERIF, size: 52, fill: C.gold });
-  s += cap(cx, cy + 34, "real decisions", C.goldSoft);
+  s += T(cx, cy - 2, "The record", { font: SERIF, size: 30, fill: C.gold });
+  s += cap(cx, cy + 32, "every fact cited", C.goldSoft);
   for (const [a, t, l] of nodes) { const [x, y] = at(a); s += card(x - 160, y - 56, 320, 112, t, l); }
   s += T(250, 300, "Begin", { font: SERIF, size: 20, italic: true, fill: C.goldSoft });
-  s += T(250, 336, "27 January 2013", { font: SERIF, size: 26, fill: C.ivory });
-  s += T(250, 364, "you start fourth", { size: 20 });
+  s += T(250, 336, "The briefing", { font: SERIF, size: 26, fill: C.ivory });
+  s += T(250, 364, "the race as it really stood", { size: 20 });
   s += line([[355, 330], [cx - 175, at(-90)[1]]]);
   s += T(1350, 840, "End", { font: SERIF, size: 20, italic: true, fill: C.goldSoft });
-  s += T(1350, 876, "10 September 2013", { font: SERIF, size: 26, fill: C.ivory });
+  s += T(1350, 876, "Election night", { font: SERIF, size: 26, fill: C.ivory });
   s += T(1350, 904, "your result beside the real one", { size: 20 });
   s += line([[at(90)[0] + 165, at(90)[1] + 20], [1220, 868]]);
   return svg(H, s);
@@ -101,7 +101,7 @@ function architecture() {
     "Every live part has a rules fallback, so the app runs even with no API key.");
   const cols = [
     [110, "In the browser", [["The game", "case file · clock · saves itself"], ["The rules engine", "prices and scores every action"]]],
-    [600, "On our server", [["Staff agents", "a director and their team"], ["Rival agents", "Quinn · Thompson · Liu · Weiner"], ["Debrief agent", "reviews your whole campaign"]]],
+    [600, "On our server", [["Staff agents", "a director and their team"], ["Rival agents", "the other campaigns in the race"], ["Debrief agent", "reviews your whole campaign"]]],
     [1090, "The models", [["Claude", "Opus · Sonnet · Haiku"], ["Gemini", "writes the morning paper"], ["LangSmith", "traces every agent run"]]],
   ];
   for (const [x, label, items] of cols) {
@@ -141,10 +141,10 @@ function order() {
   const sub = ["", "Claude Opus deep agent", "Claude Haiku subagents", "same rules as the game", "two guards"];
   sub.forEach((t, i) => { if (t) s += cap(x0 + i * (w + gap) + w / 2, 524, t, C.muted); });
   s += rule(580);
-  s += cap(800, 630, "An example from a live run");
-  s += T(800, 680, "“Canvass Black voters in Crown Heights and Flatbush this week, $25,000.”", { font: SERIF, size: 24, italic: true, fill: C.ivory });
-  s += T(800, 724, "The Field Director sends one organizer to knock doors and another to run phone calls.", { size: 21 });
-  s += T(800, 754, "Spent $24,300 · Crown Heights +4.1 · Flatbush +1.2", { font: SERIF, size: 22, fill: C.gold });
+  s += cap(800, 630, "For example");
+  s += T(800, 680, "“Canvass our strongest neighbourhoods this week, $25,000.”", { font: SERIF, size: 26, italic: true, fill: C.ivory });
+  s += T(800, 724, "The field director gives the doors to one organizer and the phone calls to another.", { size: 21 });
+  s += T(800, 756, "The report says what was spent and which districts moved.", { font: SERIF, size: 22, fill: C.gold });
   s += T(800, 800, "The guards: a number the agent was never shown is sent back; anything from after the game's date is cut.", { size: 19 });
   return svg(H, s);
 }
@@ -160,7 +160,7 @@ function recordVsSim() {
   s += T(800, 440, "play the real choices,", { size: 18 });
   s += T(800, 462, "land on the real result", { size: 18 });
   s += rule(660);
-  s += T(800, 716, "The agents never see how 2013 ended.", { font: SERIF, size: 30, fill: C.ivory });
+  s += T(800, 716, "The agents never see how the race ended.", { font: SERIF, size: 30, fill: C.ivory });
   s += T(800, 756, "What the campaign really chose, how it turned out and what was said afterwards are kept out of every prompt.", { size: 19 });
   return svg(H, s);
 }

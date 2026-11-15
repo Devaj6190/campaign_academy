@@ -3,48 +3,51 @@
 
 <h1 align="center">Campaign Academy</h1>
 
-<p align="center"><b>Run a real political campaign with a staff of live AI agents, then see how your choices compare with history.</b></p>
+<p align="center"><b>A learning tool for political science students to simulate real campaigns.</b></p>
+
+<p align="center">Students run a real race from the inside, with live LangChain deep agents that play the people in it, grounded in the historical record.</p>
 
 <p align="center">
 LangChain deep agents · Claude Opus, Sonnet and Haiku · Gemini · LangSmith · Photon iMessage · Next.js · MapLibre
 </p>
 
-<p align="center"><img src="docs/readme/screens/war-room-live-order.jpg" alt="The War room: the Field Director, a live deep agent, splits a $25,000 canvass order between two organizers and reports back with what moved." width="100%"></p>
-<p align="center"><sub>A live run. You type one order; the Field Director plans it, hands the jobs to two people on his team, spends $24,300 through the game's engine and reports what moved.</sub></p>
+<p align="center"><img src="docs/readme/diagrams/architecture.svg" alt="Architecture: the game and the rules engine in the browser; staff, rival and debrief agents on the server; Claude, Gemini and LangSmith behind them." width="100%"></p>
 
 ---
 
 ## The problem
 
-Political science students learn campaigns from the outside: readings, polls, case write-ups, all written after the result is known. They never have to make the calls themselves: how to spend a limited budget, which voters to go after, what to tell a team, what to do when a famous rival enters with $4.8 million. And once you know how a race ended, every choice in it looks obvious.
+Political science students learn campaigns from the outside: readings, polls, case write-ups, all written after the result is known. They never have to make the calls themselves: how to spend a limited budget, which voters to go after, what to tell a team, how to answer a rival's move. And once you know how a race ended, every choice in it looks obvious.
 
 ## The idea
 
-A flight simulator for campaigns. Put the student inside a **real** race, on its **real** calendar, without telling them how it ends. Give them a staff to direct, rivals who fight back and a press that reports it all. At the end, show them their result beside the real one, so they learn from the gap.
+Put the student inside a **real** race, on its **real** calendar, without telling them how it ends. Give them a staff to direct, rivals who fight back and a press that reports it all. At the end, show them their result beside the real one, so they learn from the gap.
 
 ## The solution
 
-The first case is the **2013 Democratic primary for Mayor of New York**. You run Bill de Blasio's campaign, which started in fourth place.
+Campaign Academy turns a real race into a **case**: a sourced record of the candidates, polls, money, events and voters, plus the moments where the real campaign had to decide.
 
-- **The race is real.** Polls, money, events and voters come from 55 sources, and every fact on screen is cited. The simulation is fitted to the record: play the real choices and you land on the certified result.
-- **The staff are live agents.** Each director is a LangChain deep agent with their own team as subagents. They plan, delegate, spend simulated money through the game's engine and report back.
+- **The race is real.** Every fact on screen is cited. The simulation is fitted to the record, so playing the real choices lands on the real result.
+- **The people are live agents.** Your staff and your rivals are LangChain deep agents. Directors plan, hand jobs to their own teams, spend simulated money through the game's engine and report back. Rivals plan their own moves.
 - **No hindsight.** The agents know only what was known on the game's date, and a filter drops anything that leaks the future.
-- **You learn from the gap.** After every decision you see what the real campaign did. How it turned out for them is held back to the end.
+- **You learn from the gap.** After each decision you see what the real campaign did. How it turned out for them is held back to the end.
+
+**A new race is new data, not new code.** The first case is the 2013 Democratic primary for Mayor of New York, played from inside Bill de Blasio's campaign, which started fourth. We built one case in the time we had; the shortlist already names the next four.
 
 ---
 
 ## How it works
 
-<p align="center"><img src="docs/readme/diagrams/loop.svg" alt="The student's loop: a real decision, you decide, what the real campaign did, the calendar runs, the morning paper, back to the next decision; the 2013 record feeds every step." width="100%"></p>
+<p align="center"><img src="docs/readme/diagrams/loop.svg" alt="The student's loop: a decision point, you choose, history revealed, the campaign runs; the record at the centre." width="100%"></p>
 
-1. **Briefing, 27 January 2013.** The race on the day de Blasio launched. You are fourth, and 40% wins outright.
-2. **A real decision.** On its real date the clock stops. Two of your directors each write a memo for a different option; each option shows its price and which way it moves things.
-3. **You decide.** Then you see what changed, and what the real campaign did.
-4. **The calendar runs.** You give your staff orders in plain English, send the candidate out on the map and set a weekly spending plan. Rivals make their own moves, and a morning paper reports it all.
-5. **Election night, 10 September 2013.** 65 Assembly Districts count in, then the certified result appears beside yours.
+1. **The briefing.** The race as it really stood when the campaign began.
+2. **A decision point.** On a real date, the clock stops. Two of your own staff each argue for a different option; each option shows its price and which way it moves things.
+3. **History revealed.** After you choose, you see what changed and what the real campaign did.
+4. **The campaign runs.** Between decisions you direct your staff in plain English, send the candidate out on the map and set a weekly spending plan. Rivals make their own moves, and a morning paper reports it all.
+5. **Election night.** The count comes in district by district, then the real result appears beside yours.
 
 <p align="center"><img src="docs/readme/screens/decision-card.jpg" alt="Decision 2: a famous rival enters" width="100%"></p>
-<p align="center"><sub><b>A real decision.</b> 22 May 2013: Anthony Weiner enters with $4.8 million. Every line is cited.</sub></p>
+<p align="center"><sub><b>A decision point, from the first case.</b> Every line is cited to its source.</sub></p>
 
 ## Inside the app
 
@@ -64,7 +67,8 @@ The first case is the **2013 Democratic primary for Mayor of New York**. You run
 
 ## How it is built
 
-<p align="center"><img src="docs/readme/diagrams/architecture.svg" alt="Architecture: the browser holds the game and the rules engine; Next.js API routes run the deep agents; Claude, Gemini, LangSmith and Photon behind them." width="100%"></p>
+<p align="center"><img src="docs/readme/screens/war-room-live-order.jpg" alt="The War room: a director, a live deep agent, splits an order between two people on the team and reports back." width="100%"></p>
+<p align="center"><sub><b>The War room, live.</b> One order in plain English; the director plans it, hands the jobs to two people on the team, spends through the game's engine and reports what moved.</sub></p>
 
 The game lives in the browser: the case file, the clock and a pure rules engine (`simulate()`: picks in, world out). Every live part runs on the server and has a rules fallback, so the app always runs, even with no API key.
 
@@ -85,7 +89,7 @@ No model ever sets a poll figure, a cost or an effect. The agents choose actions
 
 <p align="center"><img src="docs/readme/diagrams/accuracy.svg" alt="Simulated vs certified vote share for each candidate, all within 0.2 points." width="100%"></p>
 
-**The simulation is fitted.** The real campaign's six choices, with the rivals acting and a typical weekly plan, land every candidate within 0.2 points of the certified result. Play the weakest choices with no staff work and you finish third.
+**The simulation is fitted (first case).** The real campaign's six choices, with the rivals acting and a typical weekly plan, land every candidate within 0.2 points of the certified result. Play the weakest choices with no staff work and you finish third.
 
 <p align="center"><img src="docs/readme/diagrams/evals.svg" alt="Evals: changed facts followed 78% vs reworded control 94%; held out, card 70% vs memory 67%." width="100%"></p>
 
