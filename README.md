@@ -62,7 +62,7 @@ The simulation is grounded in the record and is not a replay of it. The six deci
 - **The real campaign's choice is shown only after you decide.** Once you have chosen, you see what they did at that point. How it turned out for them is held to the end, so later events are not spoiled.
 - **Decisions are never on a timer.** The clock stops at a decision and stays stopped until you choose.
 - **The real choice is not always the right one.** Luck and rivals' mistakes are part of the record and are shown as such.
-- **No invented person sits in a real campaign.** A real name appears only where the record names that person in that post. Every other post is shown by its title.
+- **A real name is always sourced.** A real person appears in a post only where the record names them in it, and the War room cites that source. The rest of the staff are invented people, so the student has a full team to direct.
 - **Poll numbers and inferences are kept apart.** How large a voter group is and how it polled are real figures. What a group is likely to value is inferred, and is stored and labelled separately.
 - **Cases are chosen for the lesson.** Not for who won or what they believed. Party primaries are preferred because the contest is inside one party.
 
