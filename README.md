@@ -1,6 +1,4 @@
-# Ballot to Bill
-
-> Working title. "Capitol Classroom" is the other candidate name.
+# Campaign Academy
 
 A campaign simulation for students, built on real races. You take over a real New York City campaign at a real moment, with the real candidates, money, polls and voters of that year. At the points where that campaign had to decide something, you decide instead. Your choices change your campaign, the race plays on from there, and at the end you see how your version finished and what really happened.
 
