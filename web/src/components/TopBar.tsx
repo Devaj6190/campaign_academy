@@ -45,7 +45,7 @@ function Nav() {
           <path d="M16 6.5 25.5 16 16 25.5 6.5 16Z" fill="currentColor" fillOpacity=".14" stroke="currentColor" />
           <path d="M12.4 16.2l2.5 2.5 4.8-5.2" fill="none" stroke="var(--color-gold-bright)" strokeWidth="1.6" strokeLinecap="square" />
         </svg>
-        <span className="gilt hidden font-display text-[15px] leading-none font-semibold tracking-[0.12em] whitespace-nowrap uppercase min-[1560px]:block">Campaign Academy</span>
+        <span className="gilt hidden font-display text-[15px] leading-none font-semibold tracking-[0.12em] whitespace-nowrap uppercase min-[1640px]:block">Campaign Academy</span>
       </div>
       <nav aria-label="Sections" className="flex items-stretch self-stretch">
         {VIEWS.map(([k, name]) => (
