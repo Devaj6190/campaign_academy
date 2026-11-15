@@ -16,6 +16,7 @@
     "demo:start": "node scripts/demo-start.mjs"
   },
   "dependencies": {
+    "@google/genai": "2.32.0",
     "@langchain/anthropic": "^1.6.5",
     "deepagents": "^1.16.5",
     "lucide-react": "^1.73.0",

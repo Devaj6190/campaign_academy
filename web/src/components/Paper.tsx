@@ -82,6 +82,7 @@ function Page({ close }: { close: () => void }) {
         <Archive editions={editions} current={e} />
       </div>
       <h1 className="mt-4 border-y border-line-strong py-3 text-center font-serif text-[42px] leading-none tracking-tight">The Five Borough Ledger</h1>
+      {e.by && <p className="mt-2 text-center text-[11px] tracking-wide text-faint uppercase">Simulated stories written by {e.by === "gemini" ? "Gemini" : "Claude"}</p>}
       {!latest && <p className="mt-3 text-center text-[12px] text-muted">An earlier edition. <button className="text-gold hover:underline" onClick={() => usePaper.getState().show(null)}>Back to this morning</button></p>}
 
       <Lead c={c} e={e} latest={latest} close={close} />
