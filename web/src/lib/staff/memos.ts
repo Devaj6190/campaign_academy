@@ -10,9 +10,13 @@ import { snapshot } from "./run";
 import { useStaff } from "./store";
 import { describeWorld } from "./world";
 
-// Writes the staff memos for a case decision in the background, as the stretch before it begins, so a decision never
-// waits on an agent: when the decision card opens they are usually there; if not, the card says they are coming.
-// A restarted case starts them over.
+// Writes the staff memos for a case decision in the background, from the campaign as it stands a few days before the
+// decision date (LEAD_DAYS), or on arrival if the clock gets there first. Close enough to the date that the memo
+// knows this campaign as it is; early enough that the decision never waits on an agent: the card says if they are
+// still coming. A restarted case starts them over.
+
+/** How many campaign days before a decision its memos are written. */
+export const LEAD_DAYS = 3;
 
 type Entry = { status: "writing" | "ready"; memos: Memo[] };
 export const useMemos = create<{ byDecision: Record<string, Entry> }>(() => ({ byDecision: {} }));
@@ -26,6 +30,10 @@ function writers(d: Decision) {
   const order = [...WRITERS[d.skill], "cm", "com", "fd", "fin"];
   return [...new Set(order)].map(filled).filter((p): p is NonNullable<typeof p> => !!p).slice(0, 2);
 }
+
+/** Who writes a memo: the live route, with the rules if it fails. A check can put its own in (setMemoWriter). */
+let writer: (req: MemoRequest) => Promise<Memo> = one;
+export const setMemoWriter = (w: ((req: MemoRequest) => Promise<Memo>) | null) => { writer = w ?? one; };
 
 async function one(req: MemoRequest): Promise<Memo> {
   try {
@@ -44,8 +52,10 @@ export async function writeMemos(index: number) {
   const d = c.decisions[index];
   if (!d || useMemos.getState().byDecision[d.id]) return;
   put(d.id, { status: "writing", memos: [] });
+  // Everything is read now, so both memos are written from the same moment of the campaign.
   const w = snapshot();
   const campaign = describeWorld(w);
+  const memory = { ...useStaff.getState().memory };
   const memos: Memo[] = [];
   for (const p of writers(d)) {
     const first = memos[0];
@@ -57,10 +67,10 @@ export async function writeMemos(index: number) {
       director: { id: p.id, role: p.role, name: p.name, onRecord: p.onRecord, good: p.good, weak: p.weak },
       voice: profileOf(w, p.id).voice,
       campaign,
-      memory: useStaff.getState().memory[p.id] ?? [],
+      memory: memory[p.id] ?? [],
       against: first ? { option: first.option, who: firstBy?.onRecord || !firstBy?.name || firstBy.name === firstBy.role ? `the ${firstBy?.role ?? "other director"}` : firstBy.name } : undefined,
     };
-    memos.push(await one(req));
+    memos.push(await writer(req));
     // A restart while writing: these belong to a campaign that no longer exists.
     if (!useMemos.getState().byDecision[d.id]) return;
     put(d.id, { status: memos.length < 2 ? "writing" : "ready", memos: [...memos] });
@@ -68,19 +78,25 @@ export async function writeMemos(index: number) {
   put(d.id, { status: "ready", memos });
 }
 
+/** The first day a decision's memos may be written: LEAD_DAYS before it. */
+export const memoDay = (date: string) => new Date(Date.parse(date) - LEAD_DAYS * 86_400_000).toISOString().slice(0, 10);
+
 /**
- * Start each decision's memos when the stretch before it begins: the moment the previous decision is made, or for
- * the first one when the campaign reaches it. Mount once.
+ * Start each decision's memos once the campaign is within LEAD_DAYS of its date (or has reached it), and never before
+ * the previous decision is made. The clock moves a day at a time, Skip included, so this fires on the right day.
+ * Mount once.
  */
 export function watchMemos() {
   const kick = () => {
     const s = useCase.getState(), c = currentCase(s.caseId);
     const next = c.decisions.findIndex((d) => !s.picks[d.id]);
-    if (next >= 0 && s.at >= 1 && (next === 0 || s.picks[c.decisions[next - 1].id])) void writeMemos(next);
+    if (next < 0 || s.at < 1 || (next > 0 && !s.picks[c.decisions[next - 1].id])) return;
+    const d = c.decisions[next];
+    if (s.date >= memoDay(d.date) || s.at >= next + 1) void writeMemos(next);
   };
   kick();
   return useCase.subscribe((s, p) => {
     if (s.at < p.at || s.date < p.date) useMemos.setState({ byDecision: {} });
-    if (s.picks !== p.picks || s.at !== p.at) kick();
+    if (s.picks !== p.picks || s.at !== p.at || s.date !== p.date) kick();
   });
 }
