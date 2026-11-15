@@ -3,7 +3,7 @@
 import { effectOf as caseEffect, type Decision, type Shift } from "../cases/types";
 import { districtBy } from "../geo";
 import { effectOf } from "../engine/resolve";
-import { pollOf, supportPerPoint } from "../engine/poll";
+import { pollOf, STANDING, supportPerPoint } from "../engine/poll";
 import { useGame } from "../store";
 import { useStaff } from "../staff/store";
 import { ACTIVE, ME, RIVAL_IDS } from "./index";
@@ -36,13 +36,21 @@ const picks = () => Object.fromEntries(Object.entries(useGame.getState().moments
  * - a rival's poll points scale that rival's strength everywhere;
  * - money is scaled to the game (1:10) and comes out of cash.
  */
+/** Where the real race had a rival by this game day: the case's opening poll plus every real shift so far. */
+function caseLevel(id: string, day: number) {
+  let v = CASE.start.poll[id] ?? 0;
+  for (const d of MOMENTS) if (d.day <= day) v += d.since?.shift.poll?.[id] ?? 0;
+  if (day >= 29) v += CASE.close.shift.poll?.[id] ?? 0;
+  return Math.max(1, v);
+}
+
 export function applyShift(s: Shift, label: string, summary: string, source: "event" | "moment", sources?: string[]) {
   const g = useGame.getState();
   const k = supportPerPoint(g.day, g.sent);
   // The case's poll points say how far the student moves citywide; its group points only say where. Group
   // support is the case's second lens on the same voters, so it is never added on top of the poll.
   const sent: Record<number, number> = {};
-  const mine = s.poll?.[ME.id] ?? 0;
+  const mine = (s.poll?.[ME.id] ?? 0) * (source === "moment" ? (ACTIVE.momentWeight ?? 1) : 1);
   const cds = Object.keys(g.sent).map(Number).filter((cd) => districtBy(cd)?.demo);
   const tilt = (cd: number) => {
     const race = districtBy(cd)!.demo!.race;
@@ -53,7 +61,7 @@ export function applyShift(s: Shift, label: string, summary: string, source: "ev
   const spread = Math.max(1e-6, cds.reduce((a, cd) => a + Math.abs(t[cd] - mean), 0) / Math.max(1, cds.length));
   for (const cd of cds) {
     // Where the favoured groups live gets more of the move (weight 0.4..1.6 around the city average).
-    const w = s.groups ? Math.max(0.4, Math.min(1.6, 1 + (0.6 * (t[cd] - mean)) / spread)) : 1;
+    const w = s.groups ? Math.max(0.75, Math.min(1.25, 1 + (0.18 * (t[cd] - mean)) / spread)) : 1;
     // With no citywide move, the groups still shift support between areas (net zero), at a small scale.
     const d = mine ? mine * w : (s.groups ? 0.5 * (t[cd] - mean) : 0);
     if (d) sent[cd] = Math.round(d * k * 10) / 10;
@@ -70,13 +78,13 @@ export function applyShift(s: Shift, label: string, summary: string, source: "ev
     const delta = s.poll?.[id];
     if (!delta) continue;
     const cur = Math.max(1, truth[id] ?? 0);
-    // A rival who entered today: the case's number is their level on entry, not a change.
-    const def = ACTIVE.rivals.find((r) => r.id === id);
-    const target = def?.joins === g.day ? Math.max(1, delta) : cur + delta;
+    // A real event brings the rival back to where the real race had them at this point; the student's own choices
+    // (a contrast ad, say) move them relative to where they are now.
+    const target = source === "event" ? caseLevel(id, g.day) : cur + delta;
     const factor = Math.max(0.15, Math.min(4, target / cur));
-    const strength: Record<number, number> = {};
-    for (const cd of Object.keys(g.sent).map(Number)) strength[cd] = Math.max(-90, (1 + (rivals[id].strength[cd] ?? 0) / 100) * factor * 100 - 100);
-    rivals[id] = { ...rivals[id], strength };
+    // Real events move a rival's citywide standing, which (unlike their campaigning) does not fade.
+    const standing = Math.max(-95, (1 + (rivals[id].strength[STANDING] ?? 0) / 100) * factor * 100 - 100);
+    rivals[id] = { ...rivals[id], strength: { ...rivals[id].strength, [STANDING]: Math.round(standing * 10) / 10 } };
   }
   const now = useGame.getState();
   useGame.setState({ rivals, truth: pollOf({ sent: now.sent, day: now.day, rivals }) });

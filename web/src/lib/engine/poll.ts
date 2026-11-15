@@ -6,7 +6,10 @@ import { ACTIVE, activeRivals, ME, RIVAL_LIST, undecidedShare, type Shares } fro
 // and the city is the sum weighted by how many people really voted there in 2025.
 
 export type Rival = string;
+/** Per rival, per district: extra pull in percent from their campaigning. Key STANDING (0) is their citywide
+ *  standing from real events (a rival entering, a scandal); it does not fade. */
 export type Strength = Record<string, Record<number, number>>;
+export const STANDING = 0;
 export type { Shares };
 
 export { undecidedShare };
@@ -28,7 +31,7 @@ export function splitOf(cd: number, support: number, day: number, strength: Stre
   const mine = committed * Math.pow(Math.max(0, Math.min(1, support / 100)), GAMMA);
   const rest = committed - mine;
   const ids = activeRivals(day);
-  const pull = Object.fromEntries(ids.map((id) => [id, W[id] * Math.max(0.0001, RIVAL_LIST.find((r) => r.id === id)!.lean(cd)) * (1 + (strength[id]?.[cd] ?? 0) / 100)]));
+  const pull = Object.fromEntries(ids.map((id) => [id, W[id] * Math.max(0.0001, RIVAL_LIST.find((r) => r.id === id)!.lean(cd)) * Math.max(0.05, 1 + (strength[id]?.[cd] ?? 0) / 100) * Math.max(0.05, 1 + (strength[id]?.[STANDING] ?? 0) / 100)]));
   const sum = Object.values(pull).reduce((a, b) => a + b, 0) || 1;
   const out: Shares = { [ME.id]: mine, undecided };
   for (const r of RIVAL_LIST) out[r.id] = ids.includes(r.id) ? (rest * pull[r.id]) / sum : 0;

@@ -145,7 +145,7 @@ function RivalCard({ id, name, tag, note }: { id: string; name: string; tag: str
   const poll = useGame((s) => s.poll[id]);
   const ledger = useGame((s) => s.ledger);
   const moves = ledger.filter((l) => l.source === "rival" && l.effect.by === id).slice(-3).reverse();
-  const strong = Object.entries(r.strength).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([cd]) => districtBy(+cd)?.name.split("-")[0]).filter(Boolean);
+  const strong = Object.entries(r.strength).filter(([cd]) => +cd !== 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([cd]) => districtBy(+cd)?.name.split("-")[0]).filter(Boolean);
   return (
     <div className="rounded-lg border border-line bg-raised p-3">
       <div className="flex items-baseline justify-between gap-2">

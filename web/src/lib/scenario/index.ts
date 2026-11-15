@@ -72,6 +72,9 @@ export type Scenario = {
   /** Share needed to win outright; below it the top two go to a runoff (0: plurality wins). */
   threshold: number;
   startCash: number;
+  /** Fitted: how strongly the student's choices at real moments land in this engine (rivals campaign every night here,
+   *  which the case's own fit did not have). Chosen so the real campaign's choices finish near the real result. */
+  momentWeight?: number;
   /** Optional real date for each game day. */
   dateOf?: (day: number) => Date;
   finance: Finance;

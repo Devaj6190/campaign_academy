@@ -6,7 +6,7 @@ import { shares } from "./demographics";
 import { hash } from "./util";
 import type { Effect } from "./engine/resolve";
 import { knockOns } from "./relations";
-import { calibrate, pollOf, type Rival } from "./engine/poll";
+import { calibrate, pollOf, STANDING, type Rival } from "./engine/poll";
 import { publish, type PollRecord } from "./engine/polls";
 import { ACTIVE, ME, RIVAL_LIST } from "./scenario";
 import { tacticOutcome, type Deliverer } from "./engine/tactic";
@@ -188,6 +188,8 @@ if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") queu
 
 // A game day is one real minute at 1x: 06:00 to 22:00 in 240 ticks of 250 ms.
 const MIN_PER_TICK = 4;
+/** Share of a rival's built-up strength that survives each night. */
+const RIVAL_DECAY = 0.93;
 const NOON = 720;
 // Tune the poll so day 1 reads as the README describes (Hale 38, Cole 31, Brandt 14, undecided 17).
 calibrate(sent);
@@ -308,12 +310,15 @@ export const useGame = create<State>((set, get) => ({
       return;
     }
     // Day rolls over: money settles, the rivals' overnight moves land, debates are judged, and the paper arrives.
+    const decayed = Object.fromEntries(Object.entries(s.rivals).map(([k, r]) => [k, { ...r, strength: Object.fromEntries(Object.entries(r.strength).map(([cd, v]) => [cd, +cd === STANDING ? v : Math.round(v * RIVAL_DECAY * 10) / 10])) }]));
     const books = settle({ day: s.day, cash: s.cash, payroll: s.losses[0]?.v ?? 0, money: s.money, polls: s.polls, ledger: s.ledger }, s.day);
     set({
       day: s.day + 1,
       min: DAY_START,
+      // A rival's push fades unless they keep it up: strength from their moves decays a little each night.
+      rivals: decayed,
       // A new day can change the field (a rival enters), so the true opinion is recomputed.
-      truth: pollOf({ sent: s.sent, day: s.day + 1, rivals: s.rivals }),
+      truth: pollOf({ sent: s.sent, day: s.day + 1, rivals: decayed }),
       cash: books.cash,
       money: books.money,
       tasks: s.tasks.filter((t) => !t.done),

@@ -54,8 +54,8 @@ export const NYC2013: Scenario = {
       short: "Quinn",
       color: "#a3a3ad",
       cash: 530_000, // $5.3M on hand in January 2013 (dna-0114), at the game's 1:10 scale
-      perDay: 24_000,
-      income: 15_000,
+      perDay: 18_000,
+      income: 13_000,
       participant: true,
       smallShare: 0.25,
       runsOn: "40,000 middle-class apartments, a technology agenda for jobs, and her record running the City Council",
@@ -125,6 +125,7 @@ export const NYC2013: Scenario = {
   threshold: C.threshold,
   // The case's money left to spend under the cap ($4.3M), at the game's 1:10 scale.
   startCash: Math.round(C.start.budget * 0.1),
+  momentWeight: 1.15,
   dateOf: (d) => {
     const a = Date.parse(C.briefingDate), b = Date.parse(C.electionDate);
     return new Date(a + ((b - a) * (d - 1)) / 29);
@@ -144,7 +145,7 @@ export const NYC2013: Scenario = {
     // The case's $4.3M to spend is the room under the cap after staff, rent and fixed costs (about $2.1M).
     fixedAllowance: 6_426_000 - 4_300_000,
     // Small daily budgets: most of the real campaign's money went to television, which comes from its decisions.
-    envelopes: { ads: 1500, field: 1800, events: 700 },
+    envelopes: { ads: 800, field: 2600, events: 700 },
   },
   story: {
     initials: "BdB",
@@ -162,8 +163,10 @@ export const NYC2013: Scenario = {
       from("Quinn has $5.3 million on hand.", "dna-0114"),
     ],
     // Simulated starting support: brownstone Brooklyn, his home base, warm; Staten Island and the Upper East Side cold.
-    strong: [306, 302, 307, 308],
-    weak: [501, 502, 503, 108, 106],
+    // Only his home base starts strong (an estimate); the real result shows him winning every borough, so no
+    // district is marked weak by hand.
+    strong: [306],
+    weak: [],
     // Planks on his record at the briefing date (see lib/cases: platform).
     manifesto: [
       "Raise the city income tax on incomes above $500,000 to fund full-day pre-K and after-school programmes.",
@@ -172,7 +175,7 @@ export const NYC2013: Scenario = {
     tasks: ["Take the platform to five planks", "Hire a Policy Director", "Two hours of call time", "Decide on public matching funds"],
     calendar: { 1: ["Campaign launch, Park Slope"], [day("2013-05-22")]: ["Weiner expected to enter"], 7: ["First debate"], 21: ["Second debate"], 30: ["Primary day"] },
     // Estimates: low name recognition early in 2013, warmer with renters and activists, cool with donors.
-    feel: { renters: 50, homeowners: 38, immigrants: 46, transit: 48, seniors: 40, unions: 47, smallbiz: 42, activists: 52, donors: 28, students: 46 },
+    feel: { renters: 50, homeowners: 45, immigrants: 47, transit: 48, seniors: 46, unions: 48, smallbiz: 46, activists: 52, donors: 34, students: 47 },
     staff: { cm: { name: "Bill Hyers", source: C.sources.find((s) => s.id === "spb-hyers")!.url } },
     tactic: { target: "quinn", title: "A contrast ad against the front-runner", note: "It names a real rival. The ad itself, and how voters take it, is simulated." },
   },

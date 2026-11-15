@@ -33,11 +33,11 @@ export function rivalEffect(w: Snapshot, who: Rival, m: Move, seed: number): Eff
   // Rivals keep their own books (store.ts), so Cole's donor fatigue and budgets don't apply to them.
   const world = { ...w, money: undefined, hires: { ...w.hires, [who]: r.profile }, morale: { ...w.morale, [who]: 75 } };
   const base = resolve(world, who, m.action, { district: m.district, faction: m.faction }, { quality: 1, seed, load: 0 });
-  const sent = Object.fromEntries(Object.entries(base.sent).map(([cd, d]) => [cd, r1(-0.6 * d)]));
-  const factions = Object.fromEntries(Object.entries(base.factions).filter(([, d]) => d > 0).map(([f, d]) => [f, r1(-0.4 * d)]));
+  const sent = Object.fromEntries(Object.entries(base.sent).map(([cd, d]) => [cd, r1(-0.25 * d)]));
+  const factions = Object.fromEntries(Object.entries(base.factions).filter(([, d]) => d > 0).map(([f, d]) => [f, r1(-0.25 * d)]));
   // Where the move lands: its district, or (for citywide ads) the districts where the courted group lives.
   const where = base.district ? [base.district] : base.faction ? whereTheyLive(base.faction, 4).map((x) => x.cd) : [];
-  const strength = Object.fromEntries(where.map((cd) => [cd, r1(4 * Math.max(1, Math.abs(ACTIONS[m.action].local ?? ACTIONS[m.action].group ?? 1)))]));
+  const strength = Object.fromEntries(where.map((cd) => [cd, r1(2.5 * Math.max(1, Math.abs(ACTIONS[m.action].local ?? ACTIONS[m.action].group ?? 1)))]));
   const fname = w.factions.find((f) => f.id === base.faction)?.name.toLowerCase();
   const place = base.district ? ` in ${shortPlace(base.district)}` : "";
   const aim = fname && m.action !== "canvass" ? ` aimed at ${fname}` : "";
