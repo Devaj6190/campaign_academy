@@ -11,7 +11,8 @@
 LangChain deep agents · Claude Opus, Sonnet and Haiku · Gemini · LangSmith · Photon iMessage · Next.js · MapLibre
 </p>
 
-<p align="center"><img src="docs/readme/diagrams/architecture.svg" alt="Architecture: the game and the rules engine in the browser; staff, rival and debrief agents on the server; Claude, Gemini and LangSmith behind them." width="100%"></p>
+<p align="center"><img src="docs/readme/screens/war-room-live-order.jpg" alt="The War room: a director, a live deep agent, splits an order between two people on the team; their reasoning streams on the right." width="100%"></p>
+<p align="center"><sub><b>The War room, during a live order.</b> The field director has split the order between two organizers; each agent's reasoning streams on the right as it happens.</sub></p>
 
 ---
 
@@ -28,11 +29,11 @@ Put the student inside a **real** race, on its **real** calendar, without tellin
 Campaign Academy turns a real race into a **case**: a sourced record of the candidates, polls, money, events and voters, plus the moments where the real campaign had to decide.
 
 - **The race is real.** Every fact on screen is cited. The simulation is fitted to the record, so playing the real choices lands on the real result.
-- **The people are live agents.** Your staff and your rivals are LangChain deep agents. Directors plan, hand jobs to their own teams, spend simulated money through the game's engine and report back. Rivals plan their own moves.
-- **No hindsight.** The agents know only what was known on the game's date, and a filter drops anything that leaks the future.
+- **The people are live agents.** Your staff and your rivals are LangChain deep agents. Directors plan, hand jobs to their own teams, spend simulated money through the simulation engine and report back. Rivals plan their own moves.
+- **No hindsight.** The agents know only what was known on the campaign's date, and a filter drops anything that leaks the future.
 - **You learn from the gap.** After each decision you see what the real campaign did. How it turned out for them is held back to the end.
 
-**A new race is new data, not new code.** The first case is the 2013 Democratic primary for Mayor of New York, played from inside Bill de Blasio's campaign, which started fourth. We built one case in the time we had; the shortlist already names the next four.
+**A new race is new data, not new code.** We built one case: the 2013 Democratic primary for Mayor of New York, run from inside Bill de Blasio's campaign.
 
 ---
 
@@ -67,14 +68,23 @@ Campaign Academy turns a real race into a **case**: a sourced record of the cand
 
 ## How it is built
 
-<p align="center"><img src="docs/readme/screens/war-room-live-order.jpg" alt="The War room: a director, a live deep agent, splits an order between two people on the team and reports back." width="100%"></p>
-<p align="center"><sub><b>The War room, live.</b> One order in plain English; the director plans it, hands the jobs to two people on the team, spends through the game's engine and reports what moved.</sub></p>
+<p align="center"><img src="docs/readme/diagrams/architecture.svg" alt="Figure 2: system architecture. Browser: screens, campaign state, simulation engine, rules fallbacks. Next.js API routes: staff orders, rival campaigns and election debrief as deep agents, single model calls, morning paper. Models and services: Claude Opus, Haiku and Sonnet, LangSmith, Gemini." width="100%"></p>
 
-The game lives in the browser: the case file, the clock and a pure rules engine (`simulate()`: picks in, world out). Every live part runs on the server and has a rules fallback, so the app always runs, even with no API key.
+The campaign lives in the browser: the case file, the daily clock and a pure simulation engine (`simulate()`: decisions and work in, campaign state out). The agents run on the server behind Next.js API routes. Each request carries a snapshot of the campaign, and the server keeps nothing between requests. Every live part has a rules fallback that emits the same events, so the tool runs even with no API key.
 
-<p align="center"><img src="docs/readme/diagrams/one-order.svg" alt="Sequence of one order: student, War room, director deep agent, subagents, engine, guards." width="100%"></p>
+<p align="center"><img src="docs/readme/diagrams/one-order.svg" alt="Figure 3: processing of one staff order, in seven steps from the instruction to the live view in the War room." width="100%"></p>
 
-No model ever sets a poll figure, a cost or an effect. The agents choose actions; the engine prices and scores them. Before a report reaches you, two guards check it: a figure the agent was never shown is sent back once and then dropped, and anything that reaches past the game's date is removed.
+One order, step by step:
+
+1. **Instruction.** The student writes to one director in plain language. The order's budget is read from the text ($80,000 by default, at most $250,000, never more than the campaign has).
+2. **Context.** The browser sends the director a snapshot of the campaign: the date, cash, polls, calendar, platform, voter groups and support in every district. The director's memory file (`/memory/AGENTS.md`, up to 12 lines from earlier orders) and the action catalog with prices are added.
+3. **Director.** A deep agent on Claude Opus plans the order, splits it into jobs and gives each one, through the `task` tool, to the person on its team whose strengths fit.
+4. **Team.** Each team member is a subagent on Claude Haiku with its own prompt and voice. It sees only its brief and acts through one tool, `take_action`, writing its reason before its choice. Independent jobs run in parallel.
+5. **Engine.** Every action goes through the same engine as the rest of the simulation, which prices it, refuses it if the order's budget is spent, and moves support in districts and voter groups.
+6. **Report and guards.** The director closes the order with `send_report`. A figure the agent was never shown is sent back once, then cut; any sentence that reaches past the campaign's date is removed. The memory file records the order.
+7. **Live view.** Every step is streamed to the War room as it happens: the student watches each agent's reasoning, sees the hand-offs drawn between director and team, and gets the report with a grade for how well the order was delegated.
+
+No model ever sets a poll figure, a cost or an effect.
 
 ## Honest by design
 
@@ -117,7 +127,7 @@ The honest summary: the agents are grounded in the evidence they are given, but 
 > - **Judgment before feedback.** Options preview only the direction of an effect, not its size. You choose, then see what moved, then what the real campaign did.
 > - **Four skills a course can assess:** delegating (orders are graded on clarity and on giving the job to the right people), budgeting, reading voter groups and weighing policy trade-offs.
 > - **No answer key.** The tool never says which option was best, and the real choice is not always the right one.
-> - **More cases are data, not code.** A new race is one researched case file. The shortlist already names the next four.
+> - **More cases are data, not code.** A new race is one researched case file.
 
 ### LangChain: deep agents and LangSmith
 

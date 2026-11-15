@@ -66,14 +66,14 @@ const rule = y => `<line x1="140" y1="${y}" x2="1460" y2="${y}" stroke="${C.fain
 
 function loop() {
   const H = 1000, cx = 800, cy = 590, r = 280;
-  let s = head("How a student plays", "The campaign runs. *You make the calls.*",
-    "A real race on its real calendar. Where the real campaign had to choose, the clock stops and you choose.");
+  let s = head("Figure 1", "The learning cycle",
+    "A real race on its real calendar. At each point where the real campaign decided, the clock stops and the student decides.");
   s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${C.faint}"/>`;
   const nodes = [
     [-90, "A decision point", ["the clock stops"]],
-    [0, "You choose", ["your staff argue the options"]],
-    [90, "History revealed", ["what the real campaign did"]],
-    [180, "The campaign runs", ["direct staff · rivals move"]],
+    [0, "The student decides", ["two staff memos argue options"]],
+    [90, "The record is shown", ["what the real campaign did"]],
+    [180, "The campaign runs", ["staff work · rival moves · press"]],
   ];
   const at = a => [cx + r * Math.cos(a * Math.PI / 180), cy + r * Math.sin(a * Math.PI / 180)];
   for (let i = 0; i < 4; i++) {
@@ -95,63 +95,83 @@ function loop() {
   return svg(H, s);
 }
 
+// Left-aligned detail panel: numbered seal, serif title, plain lines. Lines starting with ` are code.
+function panel(x, y, w, h, n, title, lines, { strong, tag } = {}) {
+  let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${strong ? "#1d180f" : C.card}" stroke="${strong ? C.gold : C.goldDeep}" stroke-width="${strong ? 1.5 : 1}"/>`;
+  if (n) s += num(x + 34, y, n);
+  if (tag) s += cap(x + w - 24, y + 34, tag, C.muted, "end");
+  s += T(x + 28, y + 62, title, { anchor: "start", font: SERIF, size: 25, fill: strong ? C.gold : C.ivory });
+  lines.forEach((l, i) => {
+    const code = l.startsWith("`");
+    s += T(x + 28, y + 100 + i * 28, code ? l.slice(1) : l, { anchor: "start", size: 17, fill: code ? C.goldSoft : C.muted, font: code ? "Consolas, Menlo, monospace" : SANS });
+  });
+  return s;
+}
+const note = (x, y, t, anchor = "middle") => T(x, y, t, { font: SERIF, size: 16, italic: true, fill: C.muted, anchor });
+
 function architecture() {
-  const H = 900;
-  let s = head("How it is built", "The game in the browser, *live agents* on the server",
-    "Every live part has a rules fallback, so the app runs even with no API key.");
-  const cols = [
-    [110, "In the browser", [["The game", "case file · clock · saves itself"], ["The rules engine", "prices and scores every action"]]],
-    [600, "On our server", [["Staff agents", "a director and their team"], ["Rival agents", "the other campaigns in the race"], ["Debrief agent", "reviews your whole campaign"]]],
-    [1090, "The models", [["Claude", "Opus · Sonnet · Haiku"], ["Gemini", "writes the morning paper"], ["LangSmith", "traces every agent run"]]],
-  ];
-  for (const [x, label, items] of cols) {
-    s += cap(x + 200, 290, label);
-    s += `<line x1="${x + 120}" y1="306" x2="${x + 280}" y2="306" stroke="${C.goldDeep}"/>`;
-    const n = items.length, gap = 26, h = 128, top = 340 + (3 - n) * (h + gap) / 2;
-    items.forEach(([t, l], i) => { s += card(x, top + i * (h + gap), 400, h, t, [l], { strong: x === 600 }); });
-  }
-  s += line([[516, 470], [594, 470]]);
-  s += line([[594, 560], [516, 560]]);
-  s += T(555, 456, "state", { size: 15, italic: true, font: SERIF });
-  s += T(555, 586, "actions", { size: 15, italic: true, font: SERIF });
-  for (const y of [404, 558, 712]) s += line([[1006, y], [1084, y]]);
-  s += rule(820);
-  s += T(800, 856, "No model ever sets a poll number, a cost or an effect. The engine does.", { font: SERIF, size: 23, italic: true, fill: C.ivory });
+  const H = 1140;
+  let s = head("Figure 2", "System architecture",
+    "Campaign state lives in the browser. Each request carries a snapshot; the server keeps no state between requests.");
+  s += cap(260, 262, "Browser"); s += cap(790, 262, "Next.js API routes"); s += cap(1320, 262, "Models and services");
+  s += panel(70, 290, 380, 170, "", "Screens", ["Case · Profile · War room", "Map · Factions · Morning paper", "Top bar: money, polls, weekly plan"]);
+  s += panel(70, 490, 380, 170, "", "Campaign state", ["Case store (zustand)", "Daily clock: stops at decisions", "Saved in the browser (localStorage)"]);
+  s += panel(70, 690, 380, 200, "", "Simulation engine", ["`simulate(case, picks, work)", "Pure and deterministic", "Prices and scores every action", "Fitted to the certified result"], { strong: true });
+  s += panel(70, 920, 380, 140, "", "Rules fallbacks", ["Used with no API key or on failure", "Emit the same events"]);
+  s += panel(530, 290, 520, 200, "", "Staff orders", ["`POST /api/staff/instruct", "One deep agent per order", "Director (Opus), team as subagents (Haiku)", "Streams NDJSON events to the War room"], { strong: true, tag: "deep agent" });
+  s += panel(530, 510, 520, 140, "", "Rival campaigns", ["One deep agent per rival, run in parallel", "Tool make_move, scored by the engine"], { strong: true, tag: "deep agent" });
+  s += panel(530, 670, 520, 140, "", "Election debrief", ["Read-only virtual filesystem of the campaign", "Seven subagents in parallel (Sonnet)"], { strong: true, tag: "deep agent" });
+  s += panel(530, 830, 520, 120, "", "Single model calls", ["Decision memos · planks · remarks · hiring"]);
+  s += panel(530, 970, 520, 90, "", "Morning paper", []);
+  s += T(780, 1032, "stories · letters · stances", { anchor: "start", size: 17 });
+  s += panel(1110, 290, 420, 110, "", "Claude Opus 5.5", ["directors · decision memos"]);
+  s += panel(1110, 420, 420, 110, "", "Claude Haiku 5.5", ["staff subagents · rivals"]);
+  s += panel(1110, 670, 420, 110, "", "Claude Sonnet 5.5", ["election debrief"]);
+  s += panel(1110, 800, 420, 110, "", "LangSmith", ["traces of LangChain runs"]);
+  s += panel(1110, 970, 420, 90, "", "Gemini 3.8 Flash", []);
+  s += T(1370, 1032, "Claude as fallback", { anchor: "start", size: 17 });
+  s += line([[450, 350], [530, 350]]); s += note(490, 338, "snapshot");
+  s += line([[530, 430], [450, 430]]); s += note(490, 452, "events");
+  s += line([[530, 470], [490, 470], [490, 760], [456, 760]], { dash: true }); s += note(490, 620, "resolve()");
+  s += line([[1050, 345], [1110, 345]]);
+  s += line([[1050, 400], [1080, 400], [1080, 470], [1110, 470]]);
+  s += line([[1050, 580], [1080, 580], [1080, 490], [1110, 490]]);
+  s += line([[1050, 740], [1110, 725]]);
+  s += line([[1050, 1015], [1110, 1015]]);
+  s += line([[1050, 455], [1095, 455], [1095, 855], [1110, 855]], { dash: true });
   return svg(H, s);
 }
 
 function order() {
-  const H = 860;
-  let s = head("One order, end to end", "You give an order. *A team* does the work.",
-    "A live run in the War room takes about 10 to 24 seconds.");
-  const steps = [
-    ["You", ["type an order", "in plain English"]],
-    ["The director", ["plans it and splits", "it into jobs"]],
-    ["The team", ["each takes a job,", "all at once"]],
-    ["The engine", ["prices and scores", "every action"]],
-    ["The report", ["checked, then", "streamed back"]],
-  ];
-  const w = 250, gap = 34, x0 = (W - (steps.length * w + (steps.length - 1) * gap)) / 2;
-  steps.forEach(([t, l], i) => {
-    const x = x0 + i * (w + gap);
-    s += card(x, 300, w, 190, t, l, { strong: i === 1 || i === 2 });
-    s += num(x + w / 2, 300, String(i + 1));
-    if (i < steps.length - 1) s += line([[x + w + 6, 395], [x + w + gap - 6, 395]]);
+  const H = 1220;
+  let s = head("Figure 3", "Processing of one staff order",
+    "From the student's instruction to the report, as it runs in the War room.");
+  const xs = [60, 570, 1080], w = 460;
+  s += panel(xs[0], 270, w, 270, "1", "Instruction", ["The student writes an order to one director.", "Example: canvass our strongest districts,", "$25,000.", "Budget read from the text: $80,000 by", "default, at most $250,000."]);
+  s += panel(xs[1], 270, w, 270, "2", "Context", ["Campaign snapshot from the browser: date,", "cash, polls, calendar, platform, voter", "groups and support in every district.", "`/memory/AGENTS.md  (12 lines at most)", "Action catalog with engine prices."]);
+  s += panel(xs[2], 270, w, 270, "3", "Director", ["Plans the order and splits it into jobs.", "Assigns each job by role and strengths.", "`task  hand a job to a subagent", "`propose  2–3 priced options", "`send_report  close the order"], { strong: true, tag: "Opus · deep agent" });
+  s += panel(xs[2], 600, w, 270, "4", "Team", ["One subagent per job, run in parallel.", "Isolated context: sees only its brief.", "Own prompt, in its own voice.", "`take_action { why, action, target }", "The reason is written before the choice."], { strong: true, tag: "Haiku · subagents" });
+  s += panel(xs[1], 600, w, 270, "5", "Engine", ["`resolve(action)", "Refuses anything over the order budget.", "Prices the action from the catalog.", "Moves support in districts and groups.", "Returns the result and budget left."]);
+  s += panel(xs[0], 600, w, 270, "6", "Report and guards", ["The director drafts the report.", "Number ledger: a figure the agent was", "never shown is sent back once, then cut.", "Hindsight filter: lines past the date are cut.", "The memory file records the order."]);
+  s += line([[520, 405], [570, 405]]); s += line([[1030, 405], [1080, 405]]);
+  s += line([[1310, 540], [1310, 600]]); s += note(1322, 576, "task × N", "start");
+  s += line([[1080, 705], [1030, 705]]); s += note(1055, 690, "action");
+  s += line([[1030, 765], [1080, 765]]); s += note(1055, 792, "result");
+  s += line([[1310, 870], [1310, 905], [290, 905], [290, 874]], { dash: true }); s += note(800, 897, "jobs done → director → send_report");
+  s += panel(60, 950, 1480, 210, "7", "Live view in the War room", []);
+  ["thought", "delegate", "action", "job done", "report", "proposals"].forEach((e, i) => {
+    const x = 88 + i * 146;
+    s += `<rect x="${x}" y="1036" width="130" height="34" fill="none" stroke="${C.goldSoft}"/>` + T(x + 65, 1059, e, { size: 16, fill: C.gold });
   });
-  const sub = ["", "Claude Opus deep agent", "Claude Haiku subagents", "same rules as the game", "two guards"];
-  sub.forEach((t, i) => { if (t) s += cap(x0 + i * (w + gap) + w / 2, 524, t, C.muted); });
-  s += rule(580);
-  s += cap(800, 630, "For example");
-  s += T(800, 680, "“Canvass our strongest neighbourhoods this week, $25,000.”", { font: SERIF, size: 26, italic: true, fill: C.ivory });
-  s += T(800, 724, "The field director gives the doors to one organizer and the phone calls to another.", { size: 21 });
-  s += T(800, 756, "The report says what was spent and which districts moved.", { font: SERIF, size: 22, fill: C.gold });
-  s += T(800, 800, "The guards: a number the agent was never shown is sent back; anything from after the game's date is cut.", { size: 19 });
+  s += T(88, 1112, "NDJSON events, streamed as each step happens", { anchor: "start", size: 16 });
+  ["Thinking: each agent's reasoning, line by line", "Hand-offs drawn between director and team", "Report: spent, effects, money asked for", "Delegation grade: clarity, right people"]
+    .forEach((v, i) => { s += T(1010, 1030 + i * 32, "·  " + v, { anchor: "start", size: 17, fill: C.ivory }); });
   return svg(H, s);
 }
 
 function recordVsSim() {
   const H = 860;
-  let s = head("Honest by design", "What *happened*, kept apart from what *you* did",
+  let s = head("Figure 4", "Record and simulation, kept separate",
     "Every number on screen is labelled Real data or Simulated.");
   s += card(150, 270, 520, 330, "The record", ["polls · money · events · results", "55 sources, every fact cited", "", "never changes"], { strong: true, label: "Real data" });
   s += card(930, 270, 520, 330, "Your campaign", ["your choices · your staff's work", "rival moves · your weekly plan", "", "simulated by the engine"], { label: "Simulated" });
@@ -167,7 +187,7 @@ function recordVsSim() {
 
 function evals() {
   const H = 900;
-  let s = head("Evals", "The agents *follow the facts* on the card",
+  let s = head("Figure 6", "Evals: agent decisions against the record",
     "No student: an agent plays de Blasio, and each agent sees only what was known on the day.");
   const panel = (x, label, rows, note) => {
     let p = cap(x + 300, 290, label);
@@ -181,7 +201,7 @@ function evals() {
     p += T(x + 300, 680, note, { font: SERIF, size: 22, italic: true, fill: C.muted });
     return p;
   };
-  s += panel(150, "Grounding · tuned set", [["Facts rewritten to point elsewhere: it moved", 78, "28 of 36", C.gold], ["Same facts, new words: it held", 94, "17 of 18", C.goldSoft]], "It reacts to evidence, not wording.");
+  s += panel(150, "Grounding · tuned set", [["Facts rewritten to point elsewhere: it moved", 78, "28 of 36", C.gold], ["Same facts, new words: it held", 94, "17 of 18", C.goldSoft]], "Choices change with the evidence, not the wording.");
   s += `<line x1="800" y1="280" x2="800" y2="700" stroke="${C.faint}"/>`;
   s += panel(850, "11 held-out decisions · run once", [["With the card: chose what really happened", 70, "23 of 33", C.ivory], ["Memory alone, no card", 67, "22 of 33", C.muted]], "On new decisions, the card adds little to memory.");
   s += rule(740);
@@ -192,8 +212,8 @@ function evals() {
 
 function accuracy() {
   const H = 820;
-  let s = head("The simulation", "Play the real choices, land on *the real result*",
-    "Every candidate within 0.2 points of the certified count. A test fails if it drifts.");
+  let s = head("Figure 5", "Simulated and certified vote share",
+    "The real choices, replayed with rivals active and the default weekly plan. A test fails if any candidate drifts.");
   const rows = [["Bill de Blasio", 40.9, 40.81], ["Bill Thompson", 26.3, 26.14], ["Christine Quinn", 15.7, 15.74], ["John Liu", 6.7, 6.84], ["Anthony Weiner", 4.9, 4.94]];
   const x0 = 470, sc = 19;
   s += `<rect x="1180" y="262" width="14" height="14" fill="${C.gold}"/>` + T(1202, 276, "Certified", { anchor: "start", size: 19 });
@@ -207,7 +227,7 @@ function accuracy() {
   const lx = x0 + 40 * sc;
   s += `<line x1="${lx}" y1="306" x2="${lx}" y2="712" stroke="${C.goldSoft}" stroke-dasharray="3 6"/>`;
   s += T(lx, 736, "40% wins outright", { font: SERIF, italic: true, size: 20, fill: C.goldSoft });
-  s += T(800, 780, "And you can lose: the weakest choices with no staff work finish third, at 8.3%.", { size: 20 });
+  s += T(800, 780, "The weakest choice at every decision, with no staff work, finishes third at 8.3%.", { size: 20 });
   return svg(H, s);
 }
 
