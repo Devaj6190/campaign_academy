@@ -5,7 +5,7 @@
 The first case is the 2013 Democratic primary for Mayor of New York. You run it from inside Bill de Blasio's campaign, which started in fourth place. The calendar runs. At the six moments where the real campaign had to decide something, the clock stops and you decide instead. Between decisions you direct a staff of live AI agents, the rival campaigns move against you, and a morning paper reports it all. On election night you see your result beside the certified one.
 
 > **About this README (15 Nov 2026).** This is the big rough draft. Everything is in; it gets made beautiful next, and the Devpost is written from it. It is not the final README (that is issue #56).
-> - It describes `main` at `6f4bcfc`, plus two unmerged pieces: the evals (`feat/evals`, through run 7, §9) and the end-of-election debrief agent (`feat/debrief`, PR #73, in the deep agents section).
+> - It describes `main` at `6f4bcfc`, plus three unmerged PRs: the evals with held-out results (PR #75, §9), the end-of-election debrief agent (PR #73, §5b) and the appearances notice (PR #74).
 > - It folds in every doc in the repo.
 > - Where a doc and the code disagree, the code on `main` wins.
 >
@@ -18,6 +18,7 @@ The first case is the 2013 Democratic primary for Mayor of New York. You run it 
 3. [A tour of the app, screen by screen](#3-a-tour-of-the-app-screen-by-screen)
 4. [The two-minute demo](#4-the-two-minute-demo)
 5. [The AI: live agents, Gemini, iMessage](#5-the-ai-live-agents-gemini-imessage)
+   - 5b. [How the agents work: LangChain deep agents in depth](#5b-how-the-agents-work-langchain-deep-agents-in-depth)
 6. [Real and simulated, kept apart](#6-real-and-simulated-kept-apart)
 7. [The case: the 2013 race](#7-the-case-the-2013-race)
 8. [How accurate the simulation is](#8-how-accurate-the-simulation-is)
@@ -207,6 +208,7 @@ The full click-by-click script, rehearsed on `main` with #64 and #65, is in [`do
 Every live part has a rules fallback, so the app always runs. With no key the War room says "Simulated staff · no API key".
 
 ### Staff: LangChain `deepagents` (LangChain track)
+*The technical version, with every deep agent, its features, guards and limits, is §5b.*
 - **Each director is a `createDeepAgent`** (`web/src/lib/staff/agents.ts`) with its own team as subagents.
   - It plans with `write_todos` and hands work down with the `task` tool. The **Thinking** panel shows this live.
   - It keeps a memory file of what worked in this campaign (`/memory/AGENTS.md`), capped at 12 dated lines per post and cleared on restart.
@@ -269,6 +271,80 @@ Every live part has a rules fallback, so the app always runs. With no key the Wa
   - Each call-time session uses one of the candidate's two appearances that day.
 - **Warnings:** a runway warning, and the Finance Director speaks up if the plan will run the money out.
 - A new campaign starts on the default plan (one Brooklyn canvass, one call-time session and one press pitch a week), which is the routine the engine is fitted with.
+
+---
+
+## 5b. How the agents work: LangChain deep agents in depth
+
+Campaign Academy runs on LangChain's `deepagents` harness (`deepagents` 1.16.5, the latest release; `langchain` 1.6.6, `@langchain/langgraph` 1.7.4, `@langchain/anthropic` 1.6.5). A deep agent is a model in a tool-calling loop (LangChain's `createAgent`, compiled to a LangGraph graph) with a stack of middleware around it: planning, a virtual filesystem, subagents through a `task` tool, memory files, summarization and prompt caching. Since deepagents v0.7 the harness is a kit you configure; planning, for one, is opt-in. Below is every place the app builds a deep agent, what each one uses, and where it stops.
+
+### Where deep agents run
+
+| Agent | File | Model | deepagents features used |
+|---|---|---|---|
+| Staff director (one per post) | `web/src/lib/staff/agents.ts` | `claude-opus-5-5`, effort low | `createDeepAgent`, subagents via `task` (in parallel), `memory` (`/memory/AGENTS.md`), a harness profile, custom tools |
+| Staff under a director | same | `claude-haiku-5-5`, effort low | `SubAgent` specs in isolated mode, each with its own model, prompt and one tool |
+| Rival campaigns (Quinn, Thompson, Liu, Weiner) | `web/src/lib/engine/rivalAgent.ts` | `claude-haiku-5-5`, effort low | `createDeepAgent` with one custom tool |
+| End-of-election debrief (PR #73) | `web/src/lib/debrief/` | `claude-sonnet-5-5`, effort low | `createDeepAgent`, `write_todos` (`todoListMiddleware`), virtual filesystem, filesystem permissions, subagents via `task` in parallel, custom tools |
+| Evals campaigner (#28, `feat/evals`) | `web/src/lib/eval/decider.ts`, `free.ts` | `claude-opus-5-5`, effort medium (decisions) or low (weekly orders) | `createDeepAgent` with read tools and one decision tool, LangSmith tracing |
+
+Everything else that talks to a model is a single LangChain `ChatAnthropic` call, not a deep agent: the decision memos, plank shaping, unprompted remarks, wrap-up lines, hiring shortlists, and the Claude fallback for the paper and the stances. The morning paper itself is written by Gemini.
+
+### Staff: a director and the people under them
+- **One deep agent per order.** Each order builds the director fresh from a snapshot the browser sends (`/api/staff/instruct`). The game state lives in the browser, so the server keeps nothing between orders.
+- **Delegation through `task`.** The director's team members are `SubAgent` specs: name, description (role, strengths, weaknesses), their own model, their own prompt in their own voice, and one tool. The director hands each job to the right person with `task`, and independent jobs run in parallel. Each subagent sees only its brief, so its context stays isolated from the director's.
+- **Acting through the engine only.** Staff act with one custom tool, `take_action`. It calls the same rules engine as the rest of the game (`lib/engine/resolve.ts`), which prices and scores the action. The `why` field comes first in the schema, so the reason is written before the choice; it streams to the War room as the staffer's thought.
+- **The director's own tools:**
+  - `send_report` ends an order;
+  - `propose` answers a question with two or three options, each priced by the engine, not the model;
+  - `take_action` only when nobody reports to the director.
+- **Memory as a deepagents memory file.** Each post's memory is written into the run's files as `/memory/AGENTS.md` and loaded into the prompt by deepagents' `MemoryMiddleware`. It holds two kinds of line, capped at 12 per post: the exact record of each order, written by code from the run's results, and one lesson per order that the director chooses to keep.
+- **A harness profile per model.** `registerHarnessProfile` hides the deepagents file tools and turns off the general-purpose subagent for both staff models. Staff delegate only to real colleagues and act only through the catalog.
+- **Proactive staff.** Directors come back three campaign days after their team's work, with what changed and what the rivals did there since. Staff also speak up unprompted (money, weak groups, rival moves, a new front page), at most once every three days and the same worry at most every fourteen.
+- **Streaming.** The route streams the agent with `streamMode: "updates"` and turns each step into an NDJSON event: thought, delegate, action, job-done, report or proposals. The War room animates the hand-offs from these events.
+
+### Rival campaigns
+- After each of the student's decisions, every rival still in the race plans its next stretch as a deep agent, all four in parallel. Each is told its real standing and its platform on record, what the student's campaign did since, and its own last four moves.
+- It acts through one tool, `make_move`: at most two moves on $150,000, scored by the same engine as the student's staff. The rival gains the points its move is worth, and the student loses half of them where it landed.
+- It shares the staff's harness profile (no file tools) and runs with `invoke`, not streaming.
+
+### The end-of-election debrief (PR #73)
+- **When:** once, after election day, as a section on the debrief screen beside the existing comparison of decisions.
+- **A virtual filesystem as context.** The student's whole campaign (orders, staff thinking and reports, coaching, money asks, options picked, memos, rival moves, planks) and the case's sourced 2013 record are laid out as files: `/campaign/...` for what the student did, which is simulated, and `/record/...` for what really happened, with source ids on every line. The record is built on the server from the case file, so the browser cannot change it. The agent reads only what it needs, instead of getting one huge prompt.
+- **Planning and parallel subagents.** It plans with `write_todos`, then sends six `decision_analyst` subagents (one per decision) and a `campaign_reviewer` in one turn, so they run in parallel. Each records its part through a tool; the main agent finishes with `submit_debrief`.
+- **Read-only by construction.** deepagents filesystem permissions deny every write, edit and delete for the agent and every subagent. Its record tools only fill this run's result, and nothing it returns reaches the campaign.
+- **Its own model on purpose.** Harness profiles are global to the server and keyed by model. The staff's profile hides the file tools for Opus and Haiku, so the debrief runs on Sonnet 5.5 to keep its file tools without touching the staff.
+- **Checked output.** Every citation must be one of the case's sources, and every figure must appear in the files; anything else is dropped.
+
+### The evals harness (#28, branch `feat/evals`)
+- A campaigner deep agent plays de Blasio, and other agents play the real advisers and rivals. Each sees only facts dated on or before the decision. It can read the map, the voter groups and the paper through read tools before it decides through one `decide` tool, which asks it to name the facts its choice rests on.
+- In the free run it holds a weekly meeting through an `order` tool, and the game's own live staff and rivals carry the orders out.
+- Every run is traced in LangSmith (project `campaign-academy-evals`), with tags and metadata per decision and condition. Section 9 has the method and results.
+
+### Guards around every live agent
+- **No invented numbers** (`staff/numbers.ts`). A `Ledger` holds every figure an agent was shown: the case, the order, and its own tool results. A report or answer with any other figure is sent back once; after that the sentence carrying it is dropped. Memos, remarks, wrap-ups and the debrief use the same check.
+- **No hindsight** (`staff/memo.ts`). Every staff prompt gives the date and says nothing after it is known. `withoutHindsight` drops any sentence that reaches past the date ("won the primary", "Mayor de Blasio", "in the real race", a year after 2013) from reports, thoughts, remarks and memos.
+- **Memos never choose.** Left to choose, the model picked 2013's real option at all six decisions, because it recognises the race. So a fixed rotation assigns each memo writer an option, and the model only writes the case for it.
+- **Budgets.** Each order has one budget for the whole team, read from the order text ($80,000 by default, at most $250,000, never more than the campaign has). Every tool reply says what is left of this order's budget, and the prompt says that is not the campaign's cash. The engine refuses anything over budget.
+- **The engine moves the numbers.** No model ever sets a poll figure, a cost or an effect. Planks and stances name the groups they serve and offend; code sizes the effect.
+
+### What is live, and what falls back to rules
+- **With an Anthropic key,** the staff, rivals, memos, remarks, hiring shortlists, planks and debrief are live.
+- **Without a key,** each one has a rules fallback that emits the same events or the same shape of result, so the screens behave the same:
+  - staff: a keyword planner (`staff/offline.ts`);
+  - rivals: two moves against the student's strongest group and district (`rulePlan`);
+  - memos: a fixed reason per post (`rulesMemo`);
+  - planks: a keyword shaper (`manifesto/rules.ts`);
+  - the debrief: the plain decision-by-decision comparison.
+- **Partial failure.** A live staff run that fails before spending anything reruns in the rules simulation. One that fails after spending closes with a partial report. The War room labels which mode is running.
+
+### Limits we found
+- **The director has never had `write_todos`.** Since deepagents v0.7 the to-do tool is opt-in through `todoListMiddleware`. The director's prompt still asks for it, and the War room still listens for it, but the staff agents don't add the middleware. So the plan checklist fills in only in the rules simulation. Building the director offline shows it is given `send_report`, `delete` and `task`, plus `propose`. The debrief agent does wire `write_todos`.
+- **`delete` is visible to the director.** v0.7 added `delete` to the default file tools, and the staff profile hides the other file tools but not this one. The only file is the memory file, which the browser rebuilds on every order.
+- **No checkpointer, store or interrupts.** Each order is a fresh run with the last eight lines of chat resent; memory lives in the browser save. A request for more money ends the run, and approving it starts a new run instead of resuming the old one.
+- **Prompt caching helps only within a run.** The day's numbers sit in the system prompt, so it changes every order.
+- **The model knows 2013.** Agents can recognise the race from the options alone. That is why memos are assigned an option and the hindsight filter exists, and why the evals score grounding (changed facts followed, agreement where memory is wrong, unrecognised twins) rather than plain agreement.
+- **Tracing.** With the LangSmith variables set, every LangChain run is traced. The debrief route flushes its trace before it returns. The staff route streams and does not flush yet, so some staff traces may be dropped when the function stops on Vercel.
 
 ---
 
@@ -390,7 +466,7 @@ The tunable numbers (money scale, caps, rival budgets, plank sizes, spill, donor
 
 ## 9. Evals: do the agents decide as the real people did?
 
-Issue #28. The short version comes first, as the evals session wrote it for the README (`feat/evals` at `5afe8c6`). The detail below it is taken from `docs/evals.md` on `feat/evals`, through run 7. Tuning is frozen at `bdd01be`. **The held-out run is not reported yet:** when it lands, its numbers go here and in `docs/evals.md`. The code is in `web/src/lib/eval/`, run with `npm run eval` in `web/`. Every run's requests, replies and summary are saved in `web/eval/runs/` and traced in LangSmith (project `campaign-academy-evals`).
+Issue #28. The short version comes first, as the evals session wrote it for the README (`feat/evals` at `5afe8c6`). The detail below it is taken from `docs/evals.md` on `feat/evals` (PR #75), through run 7 and the held-out run. Tuning is frozen at `bdd01be`. The code is in `web/src/lib/eval/`, run with `npm run eval` in `web/`. Every run's requests, replies and summary are saved in `web/eval/runs/` and traced in LangSmith (project `campaign-academy-evals`).
 
 ### In short
 
@@ -414,7 +490,17 @@ What this shows:
 - Where its memory is wrong, the card carries it to the real choice. At the budget decision it's the other way round: memory knows the real answer every time, and the card leads the agent elsewhere.
 - Memory still wins at the hospital protest. On rewritten cards the agent kept the 2013 choice, citing details the card never gave.
 
-What it cannot show: that the agents would decide as these people did in a race the model has never read about. Two prompt changes aimed at grounding made no measurable difference. Eleven held-out decisions, written before any run and run once at the end, are reported in `docs/evals.md`.
+**The held-out test: 11 more real decisions**, five of them rivals' choices, written before any run and run once at the end:
+
+| Held out | Result |
+|---|---|
+| On the card, chose what the real person chose | 23 of 33 (70%) |
+| Memory alone, no card | 22 of 33 (67%) |
+| Memory wrong, card given: still chose what really happened | 2 of 11 |
+
+On decisions it was never tuned on, the card adds almost nothing to memory. The misses are moments of personal caution: Liu and Weiner stepping back from arrest at the hospital protest, and Quinn declining to tell Weiner to quit. Played as those people, the agents chose a bolder line.
+
+**The honest summary:** the agents are grounded in the evidence they are given, and the free run behaves like a real campaign. But they do not reproduce what the real people chose beyond what the model already remembers. Two prompt changes aimed at grounding made no measurable difference.
 (The 11 of 11 adds up runs 2, 4, 6 and 7: 3 + 2 + 3 + 3.)
 
 ### The question
@@ -539,7 +625,7 @@ Plain agreement in run 4: card 16/18, nochips 15/18, masked 14/18, reworded 17/1
 - **Weiner's first changed card and the hospital still hold.** At the hospital it calls it "a hospital closing in my own borough": the changed card names no borough, so that part is memory.
 - **At budget the card never takes the real choice** (0/3 without chips), while memory always knows it (3/3). That's the plainest case of the agent not reading its answer from memory.
 
-**Held out, run once, frozen:** not reported yet. TODO: add the result when the evals session finishes it.
+**Held out, run once, frozen** (`89b03fe`, N = 3): card 23/33 (70%), recall 22/33 (67%), memory wrong and card right 2/11. Full table in `docs/evals.md` and `web/eval/runs/heldout-2026-11-15T12-10-54.md`.
 
 **Free run 1, the whole system** (`b28d704`, before the memo-leak fix and tuning 1):
 - The campaigner held 32 weekly meetings and gave 64 orders. The staff carried out 294 jobs and the rivals made 46 moves.
