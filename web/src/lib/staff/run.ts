@@ -23,6 +23,8 @@ import { PLACES, short, shortPlace, type Snapshot } from "./world";
 export const SCALE = { money: 10, local: 0.5, group: 0.15 };
 export const STAFF_CAP = 5;
 export const BASE_BUDGET = 8000 * SCALE.money;
+/** The most one order may spend, whatever it says: "spend $10 million" must not empty the campaign in one go. */
+export const MAX_ORDER = 25000 * SCALE.money;
 
 // ponytail: the poll's voter groups are read from the one case that has them (mayor2013-factions); make them a field
 // on the case when a second case needs staff.
@@ -340,9 +342,11 @@ export async function instruct(id: string, text: string, extra = 0, followOf?: s
     : []);
   // The budget is what the order says, never more than the campaign has. An order that names no limit gets the default.
   const stated = followOf ? null : (own ?? budgetIn(text));
-  const budget = Math.max(0, Math.min(followOf ? extra : (stated ?? BASE_BUDGET), worldNow().w.budget));
+  const asked = followOf ? extra : (stated ?? BASE_BUDGET);
+  const budget = Math.max(0, Math.min(asked, MAX_ORDER, worldNow().w.budget));
   if (about) pushChat(id, { k: "note", text: `${cap(first(id))} is coming back about ${about}.`, run: runId });
   else pushChat(id, { k: "me", text, run: runId, budget: stated === null ? undefined : budget });
+  if (!about && asked > MAX_ORDER) pushChat(id, { k: "note", text: `One order can spend up to $${MAX_ORDER.toLocaleString("en-US")}. For more, give several orders.`, run: runId });
   pushChat(id, { k: "thoughts", run: runId, items: [], live: true });
   useStaff.setState((st) => ({ active: { ...st.active, [id]: runId }, runs: { ...st.runs, [id]: [{ id: runId, text, origin: about ?? followOf ?? text, follow: !!followOf, picked: !!steps?.length, followUp: !!about, items: [], jobs: [], status: "running" as const }, ...(st.runs[id] ?? [])].slice(0, 6) } }));
   setBusy(id, "down");

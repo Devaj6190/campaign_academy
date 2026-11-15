@@ -6,7 +6,8 @@ import { checkMemosOffline } from "./memoCheck";
 import { Ledger } from "./numbers";
 import { isQuestion, runOffline, runSteps } from "./offline";
 import { budgetIn, memoryFile, RunCtx, type Proposal, type RunEvent } from "./protocol";
-import { BASE_BUDGET, DAILY, dueFollowUps, pick, runBookings, snapshot } from "./run";
+import { BASE_BUDGET, DAILY, dueFollowUps, instruct, MAX_ORDER, pick, runBookings, snapshot } from "./run";
+import { withoutHindsight } from "./memo";
 import { orderFor } from "./speak"; // importing it also mounts the restart hook, which is checked below
 import { useStaff } from "./store";
 
@@ -65,6 +66,9 @@ const BUDGETS: [string, number | null][] = [
   ["Book at most 3 events in Harlem", null],
   ["Canvass voters under 45 in Queens", null],
   ["Canvass Crown Heights this week", null],
+  // "$0" is a limit of nothing (full test, 15 Nov: it was read as no limit, and the default budget booked $18,000).
+  ["Canvass Harlem with $0", 0],
+  ["Spend $0 on this", 0],
 ];
 
 async function offline(director: string, text: string, budget = BASE_BUDGET) {
@@ -178,6 +182,38 @@ export async function checkStaff(): Promise<{ problems: string[]; report: string
     const e = await offline("fin", orderFor({ label: "Lead with targeted mail" }));
     if (!e.events.some((x) => x.t === "action")) problems.push("decision order: the rules planner started no work from it");
     report.push(`decision orders: ${options.length} options each give an order, and the rules planner acts on one`);
+  }
+
+  // Full test, 15 Nov. Nothing past the case's date reaches the campaigner: how the real race went is the debrief's.
+  {
+    const leaks = [
+      "In real life, de Blasio won the September primary outright, Thompson dropped out before a runoff.",
+      "In the real race, de Blasio came from behind and won.",
+      "He went on to beat Joe Lhota in November.",
+      "Historically, this is where the race turned.",
+    ];
+    const keep = ["Thompson has won the teachers' union endorsement.", "We're at 9 and fourth, so I'd fix the South Bronx first.", "We can still win outright if Brooklyn moves."];
+    for (const t of leaks) if (withoutHindsight(t)) problems.push(`hindsight: kept "${t}"`);
+    for (const t of keep) if (withoutHindsight(t) !== t) problems.push(`hindsight: dropped a sentence about today: "${t}"`);
+    const mixed = withoutHindsight(`${leaks[0]} Our race runs on what we do from today.`);
+    if (mixed !== "Our race runs on what we do from today.") problems.push(`hindsight: a mixed reply came out as "${mixed}"`);
+    report.push(`hindsight: ${leaks.length} sentences about how 2013 ended are dropped, ${keep.length} about today kept`);
+  }
+
+  // Full test, 15 Nov: one order may not empty the campaign ("Spend $10,000,000 on canvassing" spent $816,150).
+  {
+    useCase.getState().restart();
+    useCase.setState({ at: 1, step: 1 });
+    useStaff.setState({ chat: {}, active: {} });
+    const w0 = useCase.getState().work.length;
+    await instruct("fd", "Spend $10,000,000 on canvassing");
+    const chat = useStaff.getState().chat.fd ?? [];
+    const me = chat.find((x) => x.k === "me");
+    const spent = useCase.getState().work.slice(w0).reduce((a, x) => a + x.cost, 0);
+    if (me?.k !== "me" || me.budget !== MAX_ORDER) problems.push(`order cap: a $10 million order got a budget of ${me?.k === "me" ? me.budget : "none"}, not ${MAX_ORDER}`);
+    if (spent > MAX_ORDER) problems.push(`order cap: one order spent $${spent}`);
+    if (!chat.some((x) => x.k === "note" && /up to \$250,000/.test(x.text))) problems.push("order cap: the chat does not say an order is capped");
+    report.push(`order cap: a $10 million order runs on $${MAX_ORDER.toLocaleString("en-US")} and spent $${spent.toLocaleString("en-US")}, with a note`);
   }
 
   // "Play it again" starts the staff's remarks over.

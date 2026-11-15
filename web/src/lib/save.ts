@@ -25,7 +25,7 @@ type Store = StoreApi<any>;
 /** A store and the fields of it that make up the campaign. The case store comes first: see restore(). */
 const SLOTS: { name: string; store: Store; keys: string[] }[] = [
   { name: "case", store: useCase, keys: ["caseId", "step", "at", "date", "speed", "card", "picks", "work", "bookings"] },
-  { name: "staff", store: useStaff, keys: ["chat", "runs", "job", "feed", "morale", "hires", "mode", "spoken", "followups", "memory", "draft"] },
+  { name: "staff", store: useStaff, keys: ["chat", "runs", "job", "feed", "morale", "hires", "spoken", "followups", "memory", "draft"] },
   { name: "game", store: useGame, keys: ["staff", "unread"] },
   { name: "paper", store: usePaper, keys: ["editions", "unread"] },
   { name: "rivals", store: useRivals, keys: ["planned", "memory", "mode"] },
@@ -87,6 +87,9 @@ export function restore(save: unknown): boolean {
       chat.push({ k: "note", text: "This order was cut off when the page reloaded. Anything reported above was done; nothing else was.", run: r.id });
     }
   }
+  // Whether the agents are live belongs to this server, not to the save (a demo built with no key said "no API key"
+  // on a live server). Older saves carry it; it is dropped, and the app asks the server (lib/save startSaving).
+  delete (st.staff as { mode?: unknown }).mode;
   const memos = st.memos as { byDecision: Record<string, { status: string }> };
   memos.byDecision = Object.fromEntries(Object.entries(memos.byDecision).filter(([, e]) => e.status === "ready"));
 
@@ -105,7 +108,9 @@ export function restore(save: unknown): boolean {
 
 /** Every store back to how a new visitor finds it, and the save cleared. */
 export function resetAll() {
+  const mode = useStaff.getState().mode; // the server's, not the campaign's: it survives a reset
   for (const { store } of SLOTS) store.setState(initial(store));
+  useStaff.setState({ mode });
   useGame.setState({ ...initial(useGame), view: "case" });
   bumpFeed(0);
   bumpEditions(0);
@@ -159,6 +164,8 @@ export function startSaving() {
     started = true;
     const s = readSave();
     if (s && !restore(s)) clearSave();
+    // Live agents or the rules: the War room's label is right from the start, not only after the first order.
+    void fetch("/api/status").then((r) => r.json()).then((x: { live: boolean }) => useStaff.setState({ mode: x.live ? "live" : "offline" })).catch(() => {});
   }
   return watchSave();
 }

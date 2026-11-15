@@ -1,4 +1,5 @@
 import { ChatAnthropic } from "@langchain/anthropic";
+import { withoutHindsight } from "./memo";
 import { z } from "zod";
 import { Ledger } from "./numbers";
 import { genericPool, POOL, type Candidate } from "./roster";
@@ -38,7 +39,7 @@ export async function speak(r: SpeakRequest): Promise<{ text: string; suggest: s
     const suggest = lines.find((l) => /^suggest:/i.test(l))?.replace(/^suggest:\s*/i, "") ?? r.fallback.suggest;
     const said = lines.find((l) => !/^suggest:/i.test(l)) ?? r.fallback.text;
     // Still a figure nobody gave: that sentence goes, and if nothing is left the plain remark stands.
-    return { text: ledger.clean(said.replace(/^["']|["']$/g, "")) || r.fallback.text, suggest: ledger.clean(suggest) || r.fallback.suggest, mode: "live" };
+    return { text: withoutHindsight(ledger.clean(said.replace(/^["']|["']$/g, ""))) || r.fallback.text, suggest: withoutHindsight(ledger.clean(suggest)) || r.fallback.suggest, mode: "live" };
   } catch (err) {
     console.error("[staff] speak failed:", err);
     return { ...r.fallback, mode: "offline" };

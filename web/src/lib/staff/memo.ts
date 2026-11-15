@@ -74,4 +74,10 @@ export function rulesMemo(r: MemoRequest): Memo {
 }
 
 /** Words that would mean a memo knows what came after its date: later years, the election, how the race ended. */
-export const HINDSIGHT = /\b(201[4-9]|20[2-9]\d|won the (primary|race|nomination)|lost the (primary|race)|went on to|ended up|in the end|turned out|election night|september 10|primary night|landslide|mayor de blasio)\b/i;
+export const HINDSIGHT = /\b(201[4-9]|20[2-9]\d|won the (primary|race|nomination|election)|lost the (primary|race|election)|went on to|ended up|in the end|turned out|election night|september 10|primary night|landslide|mayor de blasio|in real life|in reality|in the real (race|campaign|world|primary|election)|the real race|historically|came from behind|beat (joe )?lhota|became mayor|was elected|won outright|won it)\b/i;
+
+/**
+ * The text with every sentence that reaches past the case's date taken out: how the real race went, who won, what came
+ * later. The staff work from the campaign's own date and the student plays it out; the debrief tells the record.
+ */
+export const withoutHindsight = (text: string) => text.split(/(?<=[.!?])\s+/).filter((s) => !HINDSIGHT.test(s)).join(" ").trim();
