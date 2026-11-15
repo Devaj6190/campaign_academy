@@ -12,6 +12,7 @@ import { FACTIONS_2013 } from "@/lib/cases/mayor2013-factions";
 import { cn } from "@/lib/util";
 import { Cite } from "@/views/CaseView";
 import { PHOTOS } from "@/views/Profile";
+import { pictureFor, type Picture } from "@/lib/paper/pictures";
 import { Dialog, Popover } from "./ui";
 
 // The morning paper: one page per morning, every edition kept. What it reports from the record is the case's own
@@ -81,6 +82,17 @@ function Page({ close }: { close: () => void }) {
   const e = editions.find((x) => x.id === showing) ?? editions.at(-1);
   if (!e) return null;
   const latest = e === editions.at(-1);
+  // This edition's pictures, handed out once so none repeats on the page: the lead first, then the first two of the
+  // record's stories that match a topic, then the campaign's story.
+  const used = new Set<string>();
+  const leadPic = pictureFor(e.lead?.text ?? "", used);
+  const newsPics = new Map<string, Picture>();
+  for (const x of e.news) {
+    if (newsPics.size >= 2) break;
+    const pic = pictureFor(x.text, used);
+    if (pic) newsPics.set(x.key, pic);
+  }
+  const campaignPic = pictureFor(`${e.campaign.headline} ${e.campaign.body}`, used);
 
   return (
     <div className="overflow-y-auto px-11 pt-8 pb-7">
@@ -89,12 +101,12 @@ function Page({ close }: { close: () => void }) {
       {!latest && <p className="mt-3 text-center text-[13px] italic text-muted">An earlier edition. <button className="font-bold not-italic text-gold underline underline-offset-2" onClick={() => usePaper.getState().show(null)}>Back to this morning</button></p>}
 
       {/* key: a new edition prints its front page afresh, headline ink and all. */}
-      <Lead key={e.id} c={c} e={e} latest={latest} close={close} />
+      <Lead key={e.id} c={c} e={e} pic={leadPic} latest={latest} close={close} />
 
       {/* Campaign and rivals stacked beside the poll box, so the row has no hole under a short story. */}
       <div className="ledger-rule mt-7 grid grid-cols-[1.6fr_1fr] gap-7 pt-5 max-[900px]:grid-cols-1">
         <div className="space-y-5 divide-y divide-line [&>*+*]:pt-5">
-          <Sim id="ledger-campaign" label="Your campaign" s={e.campaign} />
+          <Sim id="ledger-campaign" label="Your campaign" s={e.campaign} pic={campaignPic} />
           <Sim id="ledger-rivals" label="Your rivals" s={e.rivals} />
         </div>
         <Poll e={e} />
@@ -104,7 +116,7 @@ function Page({ close }: { close: () => void }) {
         <section id="ledger-stories" className="ledger-rule mt-7 pt-4">
           <Kicker real>The stories moving the race</Kicker>
           <ol className="ledger-cols mt-4 columns-3 max-[1000px]:columns-2">
-            {e.news.map((x) => <Item key={x.key} c={c} x={x} />)}
+            {e.news.map((x) => <Item key={x.key} c={c} x={x} pic={newsPics.get(x.key)} />)}
           </ol>
         </section>
       )}
@@ -225,10 +237,11 @@ function Headline({ text }: { text: string }) {
 type Shot = { src: string; caption: React.ReactNode; lift: number };
 
 /**
- * The moving picture. A candidate named in the lead gets their photograph when we have one; the press room and the
- * skyline follow, crossfading. Each frame keeps moving on its own (the `.living` styles).
+ * The moving picture. A candidate named in the lead gets their photograph when we have one, then the lead's topic
+ * picture from the desk (lib/paper/pictures.ts), then the press room and the skyline, crossfading. Each frame keeps
+ * moving on its own (the `.living` styles).
  */
-function Living({ c, text }: { c: Case; text: string }) {
+function Living({ c, text, pic }: { c: Case; text: string; pic: Picture | null }) {
   const named = c.candidates.find((x) => PHOTOS[x.id] && text.includes(surnameOf(x.name)));
   const shots: Shot[] = [
     ...(named ? [{
@@ -236,6 +249,7 @@ function Living({ c, text }: { c: Case; text: string }) {
       lift: 1.05,
       caption: <>{named.name}, 2013. Photo: <a href={PHOTOS[named.id].href} target="_blank" rel="noreferrer" className="underline">{PHOTOS[named.id].credit}</a></>,
     }] : []),
+    ...(pic ? [{ src: pic.src, lift: 1.1, caption: `Illustration: ${pic.caption}` }] : []),
     { src: "/art/plate-press.webp", lift: 1.25, caption: "The presses ran through the night." },
     { src: "/art/masthead-skyline.webp", lift: 3.2, caption: "The city wakes to the morning’s news." },
   ];
@@ -262,7 +276,7 @@ function Living({ c, text }: { c: Case; text: string }) {
 
 const STAMP: Record<string, string> = { respond: "Answered", staff: "To Comms", pass: "Let pass" };
 
-function Lead({ c, e, latest, close }: { c: Case; e: Edition; latest: boolean; close: () => void }) {
+function Lead({ c, e, pic, latest, close }: { c: Case; e: Edition; pic: Picture | null; latest: boolean; close: () => void }) {
   const [note, setNote] = useState("");
   const [answering, setAnswering] = useState(false);
   const [head, body] = e.lead ? split(e.lead.text) : ["The race for mayor opens", ""];
@@ -277,7 +291,7 @@ function Lead({ c, e, latest, close }: { c: Case; e: Edition; latest: boolean; c
       <div className="mt-3"><Headline text={head} /></div>
 
       <div className="mt-5 grid grid-cols-[1fr_1.1fr] gap-7 max-[900px]:grid-cols-1">
-        <Living c={c} text={e.lead?.text ?? ""} />
+        <Living c={c} text={e.lead?.text ?? ""} pic={pic} />
         <div>
           <p className="ledger-text ledger-drop">
             {story || head}
@@ -368,10 +382,25 @@ function Answer({ e, you, onCancel, onDone }: { e: Edition; you: string; onCance
   );
 }
 
-function Item({ c, x }: { c: Case; x: NewsItem }) {
+/** A small picture for a column story. It moves like the lead's, more quietly at this size. */
+function Snap({ pic }: { pic: Picture }) {
+  return (
+    <figure className="mb-2">
+      <div className="living aspect-[3/2]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={pic.src} alt="" style={{ ["--lift" as string]: 1.1 }} />
+        <span className="vignette" />
+      </div>
+      <figcaption className="mt-1 text-[13px] italic text-muted">Illustration: {pic.caption}</figcaption>
+    </figure>
+  );
+}
+
+function Item({ c, x, pic }: { c: Case; x: NewsItem; pic?: Picture }) {
   const [head, rest] = split(x.text);
   return (
     <li className="mb-5 break-inside-avoid">
+      {pic && <Snap pic={pic} />}
       <h3 className="font-masthead text-[17px] leading-tight font-bold">{head}</h3>
       <div className="mt-1 text-[13px] italic text-muted">{x.outlet ? `${x.outlet}, ` : ""}{longDate(x.date)}</div>
       {rest && <p className="ledger-text mt-1">{rest}</p>}
@@ -383,10 +412,11 @@ function Item({ c, x }: { c: Case; x: NewsItem }) {
   );
 }
 
-function Sim({ id, label, s }: { id: string; label: string; s: { headline: string; body: string } }) {
+function Sim({ id, label, s, pic }: { id: string; label: string; s: { headline: string; body: string }; pic?: Picture | null }) {
   return (
-    <article id={id}>
+    <article id={id} className="flow-root">
       <Kicker>{label}</Kicker>
+      {pic && <div className="float-right mt-3 ml-5 w-[42%]"><Snap pic={pic} /></div>}
       {/* A simulated headline can run to a whole sentence; a long one steps down so it does not swamp its story. */}
       <h3 className={cn("mt-2 font-masthead leading-[1.15] font-black", s.headline.length > 70 ? "text-[18px]" : "text-[22px]")}>{s.headline}</h3>
       <p className="ledger-text mt-2">{s.body}</p>
