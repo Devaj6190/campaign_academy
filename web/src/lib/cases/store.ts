@@ -128,6 +128,25 @@ export function worldNow(): { c: Case; w: World } {
   return { c, w: { budget: w.budget + (ch.budget ?? 0), poll: plus(w.poll, ch.poll), groups: plus(w.groups, ch.groups) } };
 }
 
+/**
+ * Every candidate's poll on each day from the briefing to today, on the student's path: the same calculation as
+ * worldNow(), with only the work done by that day and only the decisions reached by then. Read-only; for the chart.
+ */
+export function pollHistory(): { date: string; poll: Record<string, number> }[] {
+  const { caseId, picks, date: today } = useCase.getState();
+  const c = currentCase(caseId);
+  const out: { date: string; poll: Record<string, number> }[] = [];
+  for (let t = Date.parse(c.briefingDate); t <= Date.parse(today); t += 86_400_000) {
+    const date = new Date(t).toISOString().slice(0, 10);
+    const i = Math.max(0, c.decisions.filter((d) => d.date <= date).length - 1);
+    const w = simulate(withWork(c, date), options(picks), i);
+    const d = c.decisions[i];
+    const ch = d && picks[d.id] ? changeAt(c, picks, d) : null;
+    out.push({ date, poll: Object.fromEntries(Object.entries(w.poll).map(([k, v]) => [k, v + (ch?.poll?.[k] ?? 0)])) });
+  }
+  return out;
+}
+
 /** The live campaign: its world, the step and date it has reached and the days left. Re-renders the caller. */
 export function useCaseNow() {
   const step = useCase((s) => s.at);

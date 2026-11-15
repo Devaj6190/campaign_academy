@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import { ArrowDown, ArrowRight, ArrowUp, Check, ChevronDown, ExternalLink, Map as MapIcon, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Button, Label, Meter, Section } from "@/components/ui";
@@ -237,6 +238,51 @@ export function Changes({ c, s }: { c: Case; s: Shift }) {
   );
 }
 
+/**
+ * What the decision did, as bars moving from where things stood on arrival to where they stand after it: the
+ * student's poll, each voter group the case tracks, and the money. They animate once, right after the student decides;
+ * on any later visit they simply show the result.
+ */
+function Moved({ c, before, s, fresh }: { c: Case; before: World; s: Shift; fresh: boolean }) {
+  const rows: { label: string; from: number; to: number; max: number; money?: boolean }[] = [];
+  const you = before.poll[c.follow] ?? 0;
+  rows.push({ label: "Your poll standing", from: you, to: you + (s.poll?.[c.follow] ?? 0), max: 50 });
+  for (const g of c.groups) {
+    const from = before.groups[g.id] ?? 0, d = s.groups?.[g.id] ?? 0;
+    if (d) rows.push({ label: g.name, from, to: from + d, max: 50 });
+  }
+  if (s.budget) rows.push({ label: "Money left to spend", from: before.budget, to: before.budget + s.budget, max: c.start.budget, money: true });
+  const fmt = (r: (typeof rows)[number], v: number) => (r.money ? `$${(v / 1e6).toFixed(2)}M` : `${v.toFixed(1)}%`);
+  const ease = [0.22, 1, 0.36, 1] as const;
+  return (
+    <ul className="mb-5 space-y-3">
+      {rows.map((r, i) => {
+        const up = r.to >= r.from, w = (v: number) => `${Math.max(0, Math.min(100, (v / r.max) * 100))}%`;
+        return (
+          <li key={r.label}>
+            <div className="flex items-baseline justify-between text-[14px]">
+              <span className="text-soft">{r.label}</span>
+              <span className="tnum font-mono text-[13px] text-muted">
+                {fmt(r, r.from)} → <span className={up ? "text-pos" : "text-neg"}>{fmt(r, r.to)}</span>
+              </span>
+            </div>
+            <div className="relative mt-1.5 h-[6px] overflow-hidden rounded-full bg-white/[0.07]">
+              {/* Where it stood, faint; where it stands now, moving there. */}
+              <span className="absolute inset-y-0 left-0 rounded-full bg-white/15" style={{ width: w(r.from) }} />
+              <motion.span
+                className={cn("absolute inset-y-0 left-0 rounded-full", up ? "bg-warm" : "bg-neg")}
+                initial={fresh ? { width: w(r.from) } : false}
+                animate={{ width: w(r.to) }}
+                transition={{ duration: 1.1, delay: fresh ? 0.25 + i * 0.12 : 0, ease }}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** One decision: the record, the advisers, the choice. Shown in the Case tab and as the card that opens when the clock reaches it. */
 /**
  * What two of the student's directors argue on this decision, from this campaign. Written in the background by live
@@ -277,6 +323,8 @@ export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: num
   const last = index === c.decisions.length - 1;
   const label = (id: string) => d.options.find((o) => o.id === id)?.label;
   const [advice, setAdvice] = useState(false);
+  // Set when the student decides here, so what the decision did animates once, then and only then.
+  const [fresh, setFresh] = useState(false);
 
   return (
     <>
@@ -326,12 +374,13 @@ export function DecisionStep({ c, d, index }: { c: Case; d: Decision; index: num
             );
           })}
         </div>
-        {!decided && <Button variant="primary" className="mt-3" disabled={!option} onClick={() => decide(d.id, { option })}>Decide</Button>}
+        {!decided && <Button variant="primary" className="mt-3" disabled={!option} onClick={() => { setFresh(true); decide(d.id, { option }); }}>Decide</Button>}
       </Section>
 
       {decided && (
         <>
           <Section big title="What changed">
+            <Moved c={c} before={w} s={changeAt(c, picks, d)} fresh={fresh} />
             <Changes c={c} s={changeAt(c, picks, d)} />
             <Button className="mt-4" onClick={() => { useCase.setState({ card: false }); useGame.getState().select({ filter: decisionFilter(d.id), district: null }); useGame.getState().go("map"); }}><MapIcon className="size-3.5" /> See it on the map</Button>
           </Section>

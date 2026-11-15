@@ -1,5 +1,6 @@
 "use client";
 
+import { PollChart } from "./PollChart";
 import { ArrowDownRight, ArrowUpRight, ListChecks, Swords } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
@@ -261,7 +262,8 @@ function RivalsPanel({ c, rivals, onOpen }: { c: Case; rivals: ReturnType<typeof
   const stamp = (i: RivalItem) => <span className="flex shrink-0 items-center gap-2"><span className="tnum font-mono text-[13px] text-muted">{shortDate(i.date)}</span><Tag kind={i.source ? "real" : "sim"} /></span>;
   return (
     <div className="max-h-[72vh] overflow-y-auto p-4">
-      <Label className="text-[20px] leading-tight font-semibold text-gold-bright">What your rivals are doing</Label>
+      <PollChart />
+      <Label className="mt-5 block text-[20px] leading-tight font-semibold text-gold-bright">What your rivals are doing</Label>
       <div className="mt-3 space-y-2">
         {rivals.map((o) => {
           const items = o.items.slice(0, full ? RIVAL_ITEMS : 1);
