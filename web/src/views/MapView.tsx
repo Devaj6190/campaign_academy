@@ -71,7 +71,7 @@ export function MapView() {
       <section className="@container relative flex min-w-0 flex-1 flex-col">
         <ViewHeader
           title={isNight ? "Election night" : "New York City"}
-          sub={isNight ? "Your result in the 65 Assembly Districts: each one's certified 2013 result, moved by your citywide finish. Colour shows your share." : real ? "The certified result in the 65 Assembly Districts. Colour shows de Blasio's share of the vote in each one." : dec ? `What your decision "${dec.d.title}" moved. Colour shows where you gained and lost ground because of it.` : group ? `Where ${group.name} live. Colour shows each district's share of residents in this group, against the group's share of the whole city (census).` : "59 community districts on the real street map. Colour shows where your campaign is stronger or weaker than its citywide standing."}
+          sub={isNight ? "Your result in the 65 Assembly Districts: each one's certified 2013 result, moved by your citywide finish. Colour shows your share." : real ? "The certified result in the 65 Assembly Districts. Colour shows de Blasio's share of the vote in each one." : dec ? `What your decision "${dec.d.title}" moved. Colour and arrows show where you gained and lost ground because of it, in points.` : group ? `Where ${group.name} live. Colour shows each district's share of residents in this group, against the group's share of the whole city (census).` : "59 community districts on the real street map. Colour shows where your campaign is stronger or weaker than its citywide standing."}
           right={
             <div className="flex shrink-0 items-center gap-5">
               <div className="hidden items-center gap-2 text-[11px] text-muted @[700px]:flex">
