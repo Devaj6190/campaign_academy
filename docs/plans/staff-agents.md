@@ -91,14 +91,16 @@ check that turning files on for staff does not turn them on for the rival agents
 - At most one follow-up per job, and it respects the remark limits.
 - **Done when:** a canvass on day N produces one follow-up with its real result by day N+5.
 
-### 7. Ordinary conversation
+### 7. Ordinary conversation (dropped)
+- Dropped by Devank on 15 November: not needed. Questions get options and orders get work, as in phase 1.
+
 - "Why did you do that?", "thanks", "what happened in Queens?" get a reply in voice, using memory, with no work
   started and nothing spent.
 - Three kinds of message, decided by the agent: talk, question (options), order (work).
 - **Done when:** ten scripted messages are each handled as the right kind, live and with no key.
 
-### 8. Live staff memos before each case decision (waits for Devaj)
-- Posted on the coordination board first; built only after Devaj agrees.
+### 8. Live staff memos before each case decision (agreed by Devaj on #32, built)
+- Built as designed, with one change found by the test: left to choose, the model picked the real campaign's option on all six decisions, so the option is now assigned by rules that know nothing of 2013 and the model writes the case for it.
 - The idea: before each of the six decisions, the relevant directors each write a short memo arguing for one option,
   from what has happened in this campaign.
 - Safeguards the design must keep:
