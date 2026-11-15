@@ -143,7 +143,7 @@ function Briefing({ c }: { c: Case }) {
   );
 }
 
-const Chip = ({ up, children }: { up: boolean; children: string }) => (
+export const Chip = ({ up, children }: { up: boolean; children: string }) => (
   <span className={cn("inline-flex items-center gap-0.5 rounded border px-1.5 py-px text-[11px]", up ? "border-pos/30 text-pos" : "border-neg/30 text-neg")}>
     {up ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}{children}
   </span>
