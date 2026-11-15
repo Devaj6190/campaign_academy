@@ -1,11 +1,10 @@
 "use client";
 
 import { ArrowRight, BookOpen, Map as MapIcon } from "lucide-react";
-import { Dock, DockButton, Inspector, Label, Meter, Section } from "@/components/ui";
+import { Dock, DockButton, Inspector, Label, Section } from "@/components/ui";
 import { ShaderBackground } from "@/components/ui21/dithering";
 import { useCase, useCaseNow } from "@/lib/cases/store";
 import { useGame } from "@/lib/store";
-import { cn } from "@/lib/util";
 import { Claims } from "./CaseView";
 import { PlankDesk } from "@/components/PlankDesk";
 import { PlatformSection } from "./Platform";
@@ -25,11 +24,8 @@ export function Profile() {
   const work = useCase((s) => s.work);
   const lastMove = (id: string) => [...work].reverse().find((x) => x.by === id)?.note;
 
-  const race = c.candidates.map((x) => ({ ...x, poll: w.poll[x.id] ?? 0 })).filter((x) => x.poll > 0 || x.id === c.follow).sort((a, b) => b.poll - a.poll);
-  const rank = race.findIndex((x) => x.id === c.follow) + 1;
-  const undecided = Math.max(0, 100 - race.reduce((n, x) => n + x.poll, 0));
+  // No poll figures here: the student reads polls in the morning paper, on the mornings it carries one.
   const stats: [string, string, string][] = [
-    ["Polling", `${Math.round(w.poll[c.follow] ?? 0)}%`, `${rank} of ${race.length} in the field`],
     ["Days left", String(daysLeft), `Primary on ${new Date(c.electionDate).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}`],
     ["Money left", money(Math.max(0, w.budget)), "To spend under the cap"],
     ["To win outright", `${c.threshold}%`, "Below it, a runoff"],
@@ -52,7 +48,7 @@ export function Profile() {
               </div>
             </div>
 
-            <div className="mt-9 grid grid-cols-4 divide-x divide-line rounded-xl border border-line bg-surface">
+            <div className="mt-9 grid grid-cols-3 divide-x divide-line rounded-xl border border-line bg-surface">
               {stats.map(([k, v, sub]) => (
                 <div key={k} className="px-5 py-4">
                   <Label>{k}</Label>
@@ -61,7 +57,7 @@ export function Profile() {
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-[11.5px] text-faint">Polling and money follow your decisions so far and are simulated. Everything else on this page is from the record.</p>
+            <p className="mt-2 text-[11.5px] text-faint">Money follows your decisions so far and is simulated. Everything else on this page is from the record.</p>
 
             <div className="mt-8"><Claims c={c} items={me.about} /></div>
 
@@ -77,16 +73,6 @@ export function Profile() {
       </section>
 
       <Inspector>
-        <Section title="The race, as your campaign stands">
-          <div className="space-y-3">
-            {[...race.map((x) => [x.name, x.poll, x.id === c.follow] as const), ["Undecided or others", undecided, false] as const].map(([n, v, mine]) => (
-              <div key={n}>
-                <div className="flex justify-between text-[13px]"><span className={cn(!mine && "text-soft")}>{n}</span><span className="tnum font-mono text-[12px]">{Math.round(v)}%</span></div>
-                <Meter value={v * 2} color={mine ? "var(--color-warm)" : "rgb(255 255 255 / .35)"} className="mt-1.5" />
-              </div>
-            ))}
-          </div>
-        </Section>
         <Section title="Opponents">
           <div className="space-y-2">
             {rivals.map((o) => (

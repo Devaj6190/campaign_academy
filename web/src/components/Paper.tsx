@@ -64,7 +64,9 @@ function Page({ close }: { close: () => void }) {
         <Sim label="Your rivals" s={e.rivals} />
       </div>
 
-      <div className="mt-8 grid grid-cols-2 gap-8 border-t border-line pt-6">
+      {/* A poll runs about once a week (POLL_EVERY). Other mornings the paper has no figures. */}
+      {!e.polled && <p className="mt-8 border-t border-line pt-6 text-[12.5px] text-muted">No new poll this morning. The Ledger polls about once a week; earlier polls are in the archive.</p>}
+      {e.polled && <div className="mt-8 grid grid-cols-2 gap-8 border-t border-line pt-6">
         <div>
           <div className="flex items-center gap-2"><Label>The poll</Label><Tag kind="sim" /></div>
           <div className="mt-3 space-y-2.5">
@@ -84,7 +86,7 @@ function Page({ close }: { close: () => void }) {
             <div className="flex gap-2.5"><ArrowDown className="mt-0.5 size-3.5 shrink-0 text-cool" /><span className="text-soft">Weakest with {e.weak.map((x) => `${x.name} (${x.v}%)`).join(", ")}</span></div>
           </div>
         </div>
-      </div>
+      </div>}
 
       <section className="mt-8 border-t border-line pt-6">
         <div className="flex items-center gap-2"><Label>Voices of the city</Label><Tag kind="sim" /></div>

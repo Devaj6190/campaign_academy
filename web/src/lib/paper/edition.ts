@@ -14,6 +14,8 @@ import type { Case, World } from "../cases/types";
 /** The most news items an edition carries, lead included, and the most of those that can be our own inference. */
 export const CAP = 5;
 export const MAX_ESTIMATES = 1;
+/** Days between polls in the paper. An edition after a longer gap carries one too, so a long skip always ends on a poll. */
+export const POLL_EVERY = 7;
 
 export type NewsItem = { key: string; date: string; outlet?: string; text: string; sources: string[]; impact: number; outside?: boolean; estimate?: boolean };
 export type Story = { headline: string; body: string };
@@ -30,7 +32,9 @@ export type Edition = {
   campaign: Story;
   rivals: Story;
   voices: (Story & { group: string })[];
-  poll: { id: string; name: string; v: number; you: boolean }[];
+  /** Whether this morning's paper carries a poll. Most mornings it does not, and the page leaves the figures below out. */
+  polled: boolean;
+  poll:{ id: string; name: string; v: number; you: boolean }[];
   strong: { id: string; name: string; v: number }[];
   weak: { id: string; name: string; v: number }[];
   /** Every number the simulated stories may use. */
@@ -108,11 +112,12 @@ function letter(f: Faction, pleased: boolean): Story & { group: string } {
     : { group: f.name, headline: `From ${who}: "We are being taken for granted"`, body: not ? `We have said it before: no ${not}. Whoever wants our vote should show us, not tell us.` : "Nobody running has come to our neighbourhood to ask what we need. That will be remembered in September." };
 }
 
-type Inputs = { c: Case; w: World; today: string; step: number; work: Work[]; since: string | null; groupWork: Record<string, number>; id: number };
+type Inputs = { c: Case; w: World; today: string; step: number; work: Work[]; since: string | null; groupWork: Record<string, number>; id: number; lastPoll: string | null };
 
-/** Build the morning's edition. Pure: the same inputs give the same paper. `since` is the previous edition's date. */
-export function buildEdition({ c, w, today, step, work, since, groupWork, id }: Inputs): Edition {
+/** Build the morning's edition. Pure: the same inputs give the same paper. `since` is the previous edition's date, `lastPoll` the date of the last edition that carried a poll. */
+export function buildEdition({ c, w, today, step, work, since, groupWork, id, lastPoll }: Inputs): Edition {
   const { lead, news } = pickNews(c, today, step);
+  const polled = !lastPoll || days(lastPoll, today) >= POLL_EVERY;
   const fresh = work.filter((x) => (since ? x.date >= since : true) && x.date <= today);
   const isRival = (by: string) => by !== c.follow && c.candidates.some((r) => r.id === by);
   const name = (id: string) => c.candidates.find((x) => x.id === id)?.name ?? id;
@@ -146,10 +151,12 @@ export function buildEdition({ c, w, today, step, work, since, groupWork, id }: 
     campaign,
     rivals,
     voices,
+    polled,
     poll,
     strong: standing.slice(0, 3).map((x) => ({ id: x.f.id, name: x.f.name, v: Math.round(x.v) })),
     weak: standing.slice(-3).reverse().map((x) => ({ id: x.f.id, name: x.f.name, v: Math.round(x.v) })),
-    numbers: [...new Set([...numbersIn(text), ...poll.map((x) => String(x.v)), "2013"])],
+    // Without a poll this morning the newsroom gets no poll figures to write from.
+    numbers: [...new Set([...numbersIn(text), ...(polled ? poll.map((x) => String(x.v)) : []), "2013"])],
     mode: "template",
   };
 }
@@ -160,7 +167,7 @@ export const factsOf = (e: Edition, c: Case) => ({
   daysLeft: e.daysLeft,
   campaignOf: c.candidates.find((x) => x.id === c.follow)?.name,
   rivals: c.candidates.filter((x) => x.id !== c.follow).map((x) => x.name),
-  poll: e.poll.map((x) => `${x.name} ${x.v}`),
+  poll: e.polled ? e.poll.map((x) => `${x.name} ${x.v}`) : [],
   stories: { campaign: e.campaign, rivals: e.rivals, voices: e.voices.map(({ headline, body }) => ({ headline, body })) },
   voiceGroups: e.voices.map((v) => v.group),
   allowedNumbers: e.numbers,
